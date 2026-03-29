@@ -1,0 +1,114 @@
+{
+  "entities": {
+    "users": {
+      "title": "User Profile",
+      "description": "Stores user information and roles.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "description": "Firebase Auth UID" },
+        "email": { "type": "string", "format": "email" },
+        "displayName": { "type": "string" },
+        "photoURL": { "type": "string", "format": "uri" },
+        "role": { "type": "string", "enum": ["admin", "student"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "email", "role"]
+    },
+    "reservations": {
+      "title": "Course Reservation",
+      "description": "Stores booking details for students.",
+      "type": "object",
+      "properties": {
+        "studentUid": { "type": "string" },
+        "courseId": { "type": "string" },
+        "level": { "type": "string" },
+        "durationWeeks": { "type": "integer", "enum": [4, 8, 12] },
+        "sessionsPerWeek": { "type": "integer", "enum": [1, 2, 3] },
+        "sessionDuration": { "type": "number", "enum": [1, 1.5, 2] },
+        "preferredSlots": { "type": "array", "items": { "type": "string" } },
+        "totalPrice": { "type": "number" },
+        "status": { "type": "string", "enum": ["pending", "confirmed", "completed"] },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["studentUid", "courseId", "level", "durationWeeks", "totalPrice", "status"]
+    },
+    "feedback": {
+      "title": "Student Feedback",
+      "description": "Expert feedback from the PhD instructor.",
+      "type": "object",
+      "properties": {
+        "reservationId": { "type": "string" },
+        "studentUid": { "type": "string" },
+        "content": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["reservationId", "studentUid", "content"]
+    },
+    "resources": {
+      "title": "Learning Resource",
+      "description": "Educational materials like PDFs, MP3s, or images.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "groupId": { "type": "string" },
+        "fileUrl": { "type": "string", "format": "uri" },
+        "fileType": { "type": "string", "enum": ["pdf", "mp3", "image"] },
+        "accessLevel": { "type": "string", "enum": ["public", "member", "premium"] },
+        "downloadCount": { "type": "integer" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["title", "categoryId", "groupId", "fileUrl", "fileType", "accessLevel"]
+    },
+    "downloads": {
+      "title": "Resource Download",
+      "description": "Tracks which user downloaded which resource.",
+      "type": "object",
+      "properties": {
+        "resourceId": { "type": "string" },
+        "userUid": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["resourceId", "userUid"]
+    },
+    "comments": {
+      "title": "Resource Comment",
+      "description": "User feedback or questions on specific resources.",
+      "type": "object",
+      "properties": {
+        "resourceId": { "type": "string" },
+        "userUid": { "type": "string" },
+        "userName": { "type": "string" },
+        "content": { "type": "string" },
+        "reply": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["resourceId", "userUid", "content"]
+    },
+    "community": {
+      "title": "Community Post",
+      "description": "General inquiries or resource requests.",
+      "type": "object",
+      "properties": {
+        "userUid": { "type": "string" },
+        "userName": { "type": "string" },
+        "title": { "type": "string" },
+        "content": { "type": "string" },
+        "type": { "type": "string", "enum": ["inquiry", "request"] },
+        "reply": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userUid", "title", "content", "type"]
+    }
+  },
+  "firestore": {
+    "/users/{uid}": { "schema": "users", "description": "User profiles" },
+    "/reservations/{reservationId}": { "schema": "reservations", "description": "Course bookings" },
+    "/feedback/{feedbackId}": { "schema": "feedback", "description": "Instructor feedback" },
+    "/resources/{resourceId}": { "schema": "resources", "description": "Learning materials" },
+    "/downloads/{downloadId}": { "schema": "downloads", "description": "Download tracking" },
+    "/comments/{commentId}": { "schema": "comments", "description": "Resource comments" },
+    "/community/{postId}": { "schema": "community", "description": "Community posts" }
+  }
+}

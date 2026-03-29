@@ -1,0 +1,2176 @@
+import { useState, useEffect, useRef, Component, ReactNode, FC, FormEvent } from 'react';
+import * as React from 'react';
+import Markdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
+import rehypeRaw from 'rehype-raw';
+import { 
+  BookOpen, 
+  GraduationCap, 
+  MessageSquare, 
+  Briefcase, 
+  Globe, 
+  ChevronRight, 
+  ArrowRight,
+  User, 
+  LogOut, 
+  Calendar, 
+  Star,
+  CheckCircle2,
+  Clock,
+  LayoutDashboard,
+  Image as ImageIcon,
+  AlertCircle,
+  Plus,
+  Check,
+  ShieldCheck,
+  FileText,
+  Music,
+  Trash2,
+  BarChart3,
+  Users,
+  Search,
+  Download,
+  MessageCircle,
+  Send,
+  Filter,
+  MoreVertical
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { GoogleGenAI, Modality } from "@google/genai";
+import { COURSES, calculatePrice, RESOURCE_GROUPS } from './constants';
+import { cn } from './lib/utils';
+import { LANGUAGES, TRANSLATIONS, LanguageCode } from './translations';
+
+import { auth, loginWithGoogle, logout as firebaseLogout, db, handleFirestoreError, OperationType } from './firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { collection, addDoc, serverTimestamp, onSnapshot, query, where, orderBy, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+
+// Helper to convert raw PCM from Gemini TTS to a playable WAV Blob
+const pcmToWav = (pcmBase64: string, sampleRate: number = 24000) => {
+  const binaryString = atob(pcmBase64);
+  const len = binaryString.length;
+  const bytes = new Uint8Array(len);
+  for (let i = 0; i < len; i++) {
+    bytes[i] = binaryString.charCodeAt(i);
+  }
+
+  const header = new ArrayBuffer(44);
+  const d = new DataView(header);
+  d.setUint32(0, 0x52494646, false); // "RIFF"
+  d.setUint32(4, 36 + bytes.length, true); // size
+  d.setUint32(8, 0x57415645, false); // "WAVE"
+  d.setUint32(12, 0x666d7420, false); // "fmt "
+  d.setUint16(16, 16, true); // length (should be 16 for PCM)
+  d.setUint16(20, 1, true); // PCM format
+  d.setUint16(22, 1, true); // Mono
+  d.setUint32(24, sampleRate, true); // Sample rate
+  d.setUint32(28, sampleRate * 2, true); // Byte rate (SampleRate * Channels * BitsPerSample/8)
+  d.setUint16(32, 2, true); // Block align (Channels * BitsPerSample/8)
+  d.setUint16(34, 16, true); // Bits per sample
+  d.setUint32(36, 0x64617461, false); // "data"
+  d.setUint32(40, bytes.length, true); // Data length
+
+  const blob = new Blob([header, bytes], { type: 'audio/wav' });
+  return URL.createObjectURL(blob);
+};
+
+export default function App() {
+  const [user, setUser] = useState<any>(null);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [isAuthReady, setIsAuthReady] = useState(false);
+  const [view, setView] = useState<'landing' | 'booking' | 'mypage' | 'admin' | 'image-gen' | 'archive' | 'community'>('landing');
+  const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
+  const [initialArchiveFilter, setInitialArchiveFilter] = useState<{ groupId: string | null, categoryId: string | null }>({ groupId: null, categoryId: null });
+  const [language, setLanguage] = useState<LanguageCode>('ko');
+  const t = TRANSLATIONS[language];
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (u) => {
+      setUser(u);
+      if (u) {
+        const userRef = doc(db, 'users', u.uid);
+        const userSnap = await getDoc(userRef);
+        if (userSnap.exists()) {
+          setUserProfile(userSnap.data());
+        }
+      } else {
+        setUserProfile(null);
+      }
+      setIsAuthReady(true);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLogin = async () => {
+    try {
+      await loginWithGoogle();
+    } catch (e) {
+      console.error('Login failed', e);
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await firebaseLogout();
+      setView('landing');
+    } catch (e) {
+      console.error('Logout failed', e);
+    }
+  };
+
+  return (
+    <div className="min-h-screen flex flex-col">
+      {/* Navigation */}
+      <nav className="sticky top-0 z-50 bg-paper/80 backdrop-blur-md border-b border-ink/10">
+        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+          <div 
+            className="flex items-center gap-2 cursor-pointer" 
+            onClick={() => setView('landing')}
+          >
+            <div className="w-10 h-10 bg-ink text-paper rounded-full flex items-center justify-center font-serif text-xl font-bold">L</div>
+            <div className="flex flex-col">
+              <span className="font-serif text-xl font-bold tracking-tight">{t.nav.systemName}</span>
+              <span className="text-[10px] uppercase tracking-[0.2em] opacity-60">Language & Culture Link</span>
+            </div>
+          </div>
+
+          <div className="hidden md:flex items-center gap-8">
+            <div className="relative group">
+              <button className="flex items-center gap-2 text-xs uppercase tracking-widest hover:text-gold transition-colors">
+                <Globe size={14} /> {LANGUAGES.find(l => l.code === language)?.nativeName}
+              </button>
+              <div className="absolute top-full right-0 mt-2 w-48 bg-paper border border-ink/10 rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] max-h-[60vh] overflow-y-auto p-2">
+                {LANGUAGES.map(lang => (
+                  <button
+                    key={lang.code}
+                    onClick={() => setLanguage(lang.code)}
+                    className={cn(
+                      "w-full text-left px-4 py-2 text-xs rounded-xl transition-colors",
+                      language === lang.code ? "bg-ink text-paper" : "hover:bg-ink/5"
+                    )}
+                  >
+                    {lang.nativeName} ({lang.name})
+                  </button>
+                ))}
+              </div>
+            </div>
+            <button onClick={() => setView('landing')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.curriculum}</button>
+            <button onClick={() => setView('landing')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.pricing}</button>
+            <button onClick={() => setView('archive')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.archive}</button>
+            <button onClick={() => setView('community')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.community}</button>
+            <button onClick={() => setView('image-gen')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.aiStudio}</button>
+            {user ? (
+              <div className="flex items-center gap-4">
+                {userProfile?.role === 'admin' && (
+                  <button 
+                    onClick={() => setView('admin')}
+                    className="flex items-center gap-2 text-xs uppercase tracking-widest text-gold font-bold hover:opacity-80 transition-colors"
+                  >
+                    <LayoutDashboard size={16} /> {t.nav.admin}
+                  </button>
+                )}
+                <button 
+                  onClick={() => setView('mypage')}
+                  className="flex items-center gap-2 text-xs uppercase tracking-widest hover:text-gold transition-colors"
+                >
+                  <User size={16} /> {t.nav.myPage}
+                </button>
+                <button onClick={handleLogout} className="text-xs uppercase tracking-widest opacity-50 hover:opacity-100"><LogOut size={16} /></button>
+              </div>
+            ) : (
+              <button 
+                onClick={handleLogin}
+                className="px-6 py-2 border border-ink rounded-full text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-all"
+              >
+                {t.nav.login}
+              </button>
+            )}
+          </div>
+        </div>
+      </nav>
+
+      <main className="flex-grow">
+        <AnimatePresence mode="wait">
+          {view === 'landing' && <LandingView key="landing" setView={setView} onBook={(course) => { setSelectedCourse(course); setView('booking'); }} setInitialArchiveFilter={setInitialArchiveFilter} language={language} />}
+          {view === 'booking' && <BookingView key="booking" course={selectedCourse} onComplete={() => setView('mypage')} />}
+          {view === 'mypage' && <MyPageView key="mypage" />}
+          {view === 'admin' && <AdminView key="admin" language={language} />}
+          {view === 'image-gen' && <ImageGenView key="image-gen" language={language} />}
+          {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} />}
+          {view === 'community' && <CommunityView key="community" language={language} />}
+        </AnimatePresence>
+      </main>
+
+      <footer className="bg-ink text-paper py-20 px-6">
+        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
+          <div className="col-span-2">
+            <div className="flex items-center gap-2 mb-6">
+              <div className="w-8 h-8 bg-paper text-ink rounded-full flex items-center justify-center font-serif text-lg font-bold">L</div>
+              <span className="font-serif text-xl font-bold tracking-tight">{t.nav.systemName}</span>
+            </div>
+            <p className="font-serif text-2xl font-light leading-relaxed opacity-80 max-w-md">
+              {t.footer.quote}
+            </p>
+          </div>
+          <div>
+            <h4 className="text-xs uppercase tracking-widest mb-6 opacity-50">{t.footer.contact}</h4>
+            <p className="text-sm">lhbin777@gmail.com</p>
+            <p className="text-sm mt-2">{language === 'ko' ? '20년 현지 경력 & 언어학 박사 직강' : '20 Years Local Experience & PhD Direct Instruction'}</p>
+          </div>
+          <div>
+            <h4 className="text-xs uppercase tracking-widest mb-6 opacity-50">{t.footer.social}</h4>
+            <div className="flex gap-4">
+              <span className="text-sm hover:text-gold cursor-pointer">Instagram</span>
+              <span className="text-sm hover:text-gold cursor-pointer">Blog</span>
+            </div>
+          </div>
+        </div>
+        <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-paper/10 flex justify-between items-center">
+          <p className="text-[10px] uppercase tracking-widest opacity-40">{t.footer.rights}</p>
+          <p className="text-[10px] uppercase tracking-widest opacity-40">{t.footer.tagline}</p>
+        </div>
+      </footer>
+    </div>
+  );
+}
+
+const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode }> = ({ setView, onBook, setInitialArchiveFilter, language }) => {
+  const t = TRANSLATIONS[language];
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
+      exit={{ opacity: 0 }}
+      className="space-y-32"
+    >
+      {/* Hero Section */}
+      <section className="relative h-[90vh] flex items-center overflow-hidden px-6">
+        <div className="absolute right-0 top-0 w-1/2 h-full bg-ink/5 -z-10 flex items-center justify-center">
+          <div className="w-[80%] aspect-[3/4] bg-ink/10 rounded-[200px] overflow-hidden relative">
+            <img 
+              src="https://picsum.photos/seed/chinese-culture/800/1200" 
+              alt="Chinese Culture" 
+              className="w-full h-full object-cover opacity-80"
+              referrerPolicy="no-referrer"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-paper/40 to-transparent" />
+          </div>
+          <div className="absolute top-1/2 left-0 -translate-x-1/2 vertical-text opacity-20 text-4xl font-serif">
+            Language & Culture Link
+          </div>
+        </div>
+
+        <div className="max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-2">
+          <div className="space-y-8">
+            <motion.div 
+              initial={{ x: -50, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="inline-block px-4 py-1 border border-gold text-gold text-[10px] uppercase tracking-[0.3em] rounded-full"
+            >
+              {t.hero.badge}
+            </motion.div>
+            <motion.h1 
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="text-7xl md:text-8xl font-serif font-light leading-[0.9] tracking-tighter"
+            >
+              {language === 'ko' ? (
+                <>
+                  박사의 깊이를 <br />
+                  <span className="italic text-gold">더한</span> 프리미엄 <br />
+                  중국어
+                </>
+              ) : t.hero.title}
+            </motion.h1>
+            <motion.p 
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.6 }}
+              className="text-lg font-serif max-w-md opacity-70 leading-relaxed"
+            >
+              {t.hero.subtitle}
+            </motion.p>
+            <motion.div 
+              initial={{ y: 30, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              transition={{ delay: 0.8 }}
+              className="flex items-center gap-6"
+            >
+              <button 
+                onClick={() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' })}
+                className="px-10 py-4 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:scale-105 transition-transform"
+              >
+                {t.hero.cta}
+              </button>
+              <div className="flex items-center gap-3">
+                <div className="flex -space-x-2">
+                  {[1,2,3].map(i => (
+                    <div key={i} className="w-8 h-8 rounded-full border-2 border-paper bg-ink/20 overflow-hidden">
+                      <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="Student" referrerPolicy="no-referrer" />
+                    </div>
+                  ))}
+                </div>
+            <span className="text-[10px] uppercase tracking-widest opacity-60">{language === 'ko' ? '500+ 수강생 참여' : '500+ Students Joined'}</span>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
+      {/* Curriculum Section */}
+      <section id="curriculum" className="max-w-7xl mx-auto px-6 py-20">
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
+          <div className="space-y-4">
+            <span className="text-gold text-[10px] uppercase tracking-[0.4em]">{t.curriculum.badge}</span>
+            <h2 className="text-5xl font-serif font-light">{t.curriculum.title}</h2>
+          </div>
+          <p className="max-w-xs text-sm opacity-60 font-serif italic">
+            {t.curriculum.subtitle}
+          </p>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-px bg-ink/10 border border-ink/10">
+          {COURSES.map((course, idx) => (
+            <motion.div 
+              key={course.id}
+              whileHover={{ backgroundColor: 'rgba(26, 26, 26, 0.02)' }}
+              className="bg-paper p-8 space-y-8 flex flex-col h-full"
+            >
+              <div className="space-y-4 flex-grow">
+                <div className="w-12 h-12 rounded-full border border-ink/10 flex items-center justify-center">
+                  {idx === 0 && <MessageSquare size={20} />}
+                  {idx === 1 && <GraduationCap size={20} />}
+                  {idx === 2 && <Star size={20} />}
+                  {idx === 3 && <Briefcase size={20} />}
+                  {idx === 4 && <Globe size={20} />}
+                </div>
+                <h3 className="text-2xl font-serif">{course.title}</h3>
+                <p className="text-xs opacity-60 leading-relaxed">{course.description}</p>
+                <div className="flex flex-wrap gap-2">
+                  {course.levels.map(level => (
+                    <span key={level} className="text-[9px] uppercase tracking-widest px-2 py-1 bg-ink/5 rounded-sm">{level}</span>
+                  ))}
+                </div>
+              </div>
+              <button 
+                onClick={() => onBook(course)}
+                className="group flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold hover:text-gold transition-colors"
+              >
+                {t.curriculum.bookNow} <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+              </button>
+            </motion.div>
+          ))}
+        </div>
+      </section>
+
+      {/* Pricing Section */}
+      <section className="bg-ink text-paper py-32 px-6">
+        <div className="max-w-7xl mx-auto">
+          <div className="text-center space-y-6 mb-20">
+            <span className="text-gold text-[10px] uppercase tracking-[0.4em]">{t.pricing.badge}</span>
+            <h2 className="text-5xl font-serif font-light">{t.pricing.title}</h2>
+            <p className="max-w-xl mx-auto opacity-60 font-serif italic">
+              {t.pricing.subtitle}
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {[4, 8, 12].map((weeks) => (
+              <div 
+                key={weeks}
+                className={cn(
+                  "p-12 border border-paper/10 rounded-3xl flex flex-col items-center text-center space-y-8 relative overflow-hidden",
+                  weeks === 12 && "border-gold/50 bg-paper/5"
+                )}
+              >
+                {weeks === 12 && (
+                  <div className="absolute top-0 right-0 bg-gold text-ink text-[10px] font-bold uppercase tracking-widest px-6 py-2 rounded-bl-2xl">
+                    {t.pricing.bestValue}
+                  </div>
+                )}
+                <span className="text-xs uppercase tracking-widest opacity-50">{weeks} {t.pricing.weeks}</span>
+                <div className="space-y-2">
+                  <span className="text-6xl font-serif font-light">
+                    ₩{calculatePrice('입문', weeks, 1, 1).toLocaleString()}
+                  </span>
+                  <p className="text-[10px] uppercase tracking-widest opacity-40">{t.pricing.startingFrom}</p>
+                </div>
+                <ul className="space-y-4 w-full text-sm opacity-70">
+                  {t.pricing.features.map((feature: string, i: number) => (
+                    <li key={i} className="flex items-center justify-center gap-2">
+                      <CheckCircle2 size={14} className="text-gold" /> {feature}
+                    </li>
+                  ))}
+                </ul>
+                <button 
+                  onClick={() => onBook(COURSES[0])}
+                  className={cn(
+                    "w-full py-4 rounded-full text-xs uppercase tracking-widest transition-all",
+                    weeks === 12 ? "bg-gold text-ink font-bold" : "bg-paper text-ink"
+                  )}
+                >
+                  {t.pricing.selectPlan}
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Testimonials / Quote */}
+      <section className="max-w-4xl mx-auto px-6 py-32 text-center space-y-12">
+        <div className="w-12 h-12 mx-auto border border-ink/10 rounded-full flex items-center justify-center opacity-20">"</div>
+        <p className="text-4xl md:text-5xl font-serif font-light italic leading-tight">
+          {t.testimonial.quote}
+        </p>
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-widest font-bold">{t.testimonial.author}</p>
+          <p className="text-[10px] uppercase tracking-widest opacity-50">{t.testimonial.authorTitle}</p>
+        </div>
+      </section>
+
+      {/* Resource Marketing Section - Redesigned with Categories */}
+      <section className="bg-paper py-32 px-6 border-y border-ink/5">
+        <div className="max-w-7xl mx-auto space-y-20">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
+            <div className="space-y-8">
+              <span className="text-gold text-[10px] uppercase tracking-[0.4em]">Knowledge Library</span>
+              <h2 className="text-5xl md:text-6xl font-serif font-light leading-tight">
+                "언어는 고립된 기호가 아니라, <br />
+                <span className="italic text-gold">역사가 숨 쉬는 생명체</span>입니다."
+              </h2>
+              <p className="text-lg opacity-70 font-serif leading-relaxed">
+                L.C.L Knowledge Library는 중국 언어학 박사의 학문적 엄격함과 20년 현지 체류의 직관을 결합한 지식의 정수입니다. 
+                단순한 학습 자료를 넘어, 언어의 구조적 원리와 문화적 맥락을 관통하는 통찰력을 제공합니다.
+              </p>
+            </div>
+            <div className="relative hidden md:block">
+              <div className="aspect-[16/9] bg-ink/5 rounded-[40px] overflow-hidden rotate-1">
+                <img 
+                  src="https://picsum.photos/seed/library-main/1200/800" 
+                  alt="Library" 
+                  className="w-full h-full object-cover opacity-80"
+                  referrerPolicy="no-referrer"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            {RESOURCE_GROUPS.map((group) => (
+              <motion.div 
+                key={group.id}
+                whileHover={{ y: -5 }}
+                className="group p-8 bg-white border border-ink/5 rounded-[32px] shadow-sm hover:shadow-xl hover:border-gold/30 transition-all space-y-8"
+              >
+                <div className="space-y-4">
+                  <div className="w-12 h-12 rounded-2xl bg-gold/10 text-gold flex items-center justify-center group-hover:bg-gold group-hover:text-ink transition-colors">
+                    {group.id === 'group-a' && <BookOpen size={24} />}
+                    {group.id === 'group-b' && <GraduationCap size={24} />}
+                    {group.id === 'group-c' && <Globe size={24} />}
+                  </div>
+                  <div>
+                    <h3 className="text-2xl font-serif">{group.name.split(':')[1]?.trim() || group.name}</h3>
+                    <p className="text-[10px] uppercase tracking-widest text-gold font-bold">{group.name.split(':')[0]}</p>
+                  </div>
+                  <p className="text-sm opacity-60 leading-relaxed">{group.description}</p>
+                </div>
+
+                <div className="space-y-3">
+                  {group.categories.map((cat) => (
+                    <button 
+                      key={cat.id}
+                      onClick={() => {
+                        setInitialArchiveFilter({ groupId: group.id, categoryId: cat.id });
+                        setView('archive');
+                      }}
+                      className="w-full text-left p-4 rounded-2xl hover:bg-paper border border-transparent hover:border-ink/5 transition-all group/item"
+                    >
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium">{cat.name}</span>
+                        <ArrowRight size={14} className="opacity-0 group-hover/item:opacity-100 -translate-x-2 group-hover/item:translate-x-0 transition-all" />
+                      </div>
+                      <p className="text-[10px] opacity-40 mt-1">{cat.description}</p>
+                    </button>
+                  ))}
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="text-center pt-8">
+            <button 
+              onClick={() => setView('archive')}
+              className="px-12 py-5 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:bg-gold hover:text-ink transition-all shadow-lg hover:shadow-gold/20"
+            >
+              전체 라이브러리 탐색하기
+            </button>
+          </div>
+        </div>
+      </section>
+    </motion.div>
+  );
+};
+
+const BookingView: FC<{ course: any, onComplete: () => void }> = ({ course, onComplete }) => {
+  const [level, setLevel] = useState(course.levels[0]);
+  const [weeks, setWeeks] = useState(12);
+  const [sessions, setSessions] = useState(1);
+  const [hours, setHours] = useState(1);
+  const [selectedSlots, setSelectedSlots] = useState<string[]>([]);
+  const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const price = calculatePrice(level, weeks, sessions, hours);
+
+  const toggleSlot = (slot: string) => {
+    setSelectedSlots(prev => 
+      prev.includes(slot) 
+        ? prev.filter(s => s !== slot) 
+        : [...prev, slot]
+    );
+  };
+
+  const handleCompleteBooking = async () => {
+    if (!auth.currentUser) return;
+    setIsSubmitting(true);
+    const path = 'reservations';
+    try {
+      await addDoc(collection(db, path), {
+        studentUid: auth.currentUser.uid,
+        courseId: course.id,
+        level: level,
+        durationWeeks: weeks,
+        sessionsPerWeek: sessions,
+        sessionDuration: hours,
+        preferredSlots: selectedSlots,
+        totalPrice: price,
+        status: 'pending',
+        createdAt: serverTimestamp()
+      });
+      onComplete();
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, path);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }} 
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-4xl mx-auto px-6 py-20"
+    >
+      <div className="flex items-center gap-4 mb-12">
+        <button onClick={() => window.history.back()} className="text-xs uppercase tracking-widest opacity-50 hover:opacity-100">Back</button>
+        <div className="h-px flex-grow bg-ink/10" />
+        <span className="text-[10px] uppercase tracking-widest opacity-50">Step {step} of 3</span>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+        <div className="md:col-span-2 space-y-12">
+          {step === 1 && (
+            <div className="space-y-8">
+              <h2 className="text-4xl font-serif">수강 과정 및 기간 선택</h2>
+              
+              <div className="space-y-4">
+                <label className="text-[10px] uppercase tracking-widest opacity-50">상세 레벨 (Level)</label>
+                <div className="flex flex-wrap gap-4">
+                  {course.levels.map(l => (
+                    <button 
+                      key={l}
+                      onClick={() => setLevel(l)}
+                      className={cn(
+                        "px-6 py-3 border rounded-xl text-sm transition-all",
+                        level === l ? "border-ink bg-ink text-paper" : "border-ink/10 hover:border-ink/30"
+                      )}
+                    >
+                      {l}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-[10px] uppercase tracking-widest opacity-50">수강 기간 (Weeks)</label>
+                <div className="grid grid-cols-3 gap-4">
+                  {[4, 8, 12].map(w => (
+                    <button 
+                      key={w}
+                      onClick={() => setWeeks(w)}
+                      className={cn(
+                        "py-4 border rounded-xl text-sm transition-all",
+                        weeks === w ? "border-ink bg-ink text-paper" : "border-ink/10 hover:border-ink/30"
+                      )}
+                    >
+                      {w}주 {w === 12 && "(15%↓)"}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-[10px] uppercase tracking-widest opacity-50">주당 횟수 (Sessions per Week)</label>
+                <div className="grid grid-cols-3 gap-4">
+                  {[1, 2, 3].map(s => (
+                    <button 
+                      key={s}
+                      onClick={() => setSessions(s)}
+                      className={cn(
+                        "py-4 border rounded-xl text-sm transition-all",
+                        sessions === s ? "border-ink bg-ink text-paper" : "border-ink/10 hover:border-ink/30"
+                      )}
+                    >
+                      주 {s}회
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <label className="text-[10px] uppercase tracking-widest opacity-50">수업 시간 (Hours per Session)</label>
+                <div className="grid grid-cols-3 gap-4">
+                  {[1, 1.5, 2].map(h => (
+                    <button 
+                      key={h}
+                      onClick={() => setHours(h)}
+                      className={cn(
+                        "py-4 border rounded-xl text-sm transition-all",
+                        hours === h ? "border-ink bg-ink text-paper" : "border-ink/10 hover:border-ink/30"
+                      )}
+                    >
+                      {h}시간
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {step === 2 && (
+            <div className="space-y-8">
+              <div className="flex justify-between items-end">
+                <h2 className="text-4xl font-serif">희망 시간대 선택</h2>
+                <p className="text-[10px] uppercase tracking-widest opacity-50">
+                  주 {sessions}회 수업 / {selectedSlots.length}개 선택됨
+                </p>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map(day => (
+                  <div key={day} className="space-y-2">
+                    <span className="text-[10px] uppercase tracking-widest opacity-50 block text-center border-b border-ink/10 pb-1">{day}</span>
+                    {['10:00', '14:00', '19:00'].map(time => {
+                      const slotId = `${day}-${time}`;
+                      const isSelected = selectedSlots.includes(slotId);
+                      return (
+                        <button 
+                          key={time} 
+                          onClick={() => toggleSlot(slotId)}
+                          className={cn(
+                            "w-full py-3 border rounded-xl text-xs transition-all",
+                            isSelected 
+                              ? "border-ink bg-ink text-paper" 
+                              : "border-ink/10 hover:border-ink/30"
+                          )}
+                        >
+                          {time}
+                        </button>
+                      );
+                    })}
+                  </div>
+                ))}
+              </div>
+              <p className="text-[10px] opacity-50 italic">
+                * 실제 수업 시간은 박사님과 상담 후 최종 확정됩니다. 여러 시간대를 선택해 주시면 조율이 더 원활합니다.
+              </p>
+            </div>
+          )}
+
+          {step === 3 && (
+            <div className="space-y-8">
+              <h2 className="text-4xl font-serif">예약 확인 및 결제</h2>
+              <div className="p-8 bg-ink/5 rounded-2xl space-y-6">
+                <div className="flex justify-between items-center border-b border-ink/10 pb-4">
+                  <span className="text-sm opacity-60">Course</span>
+                  <span className="font-bold">{course.title} ({level})</span>
+                </div>
+                <div className="flex justify-between items-center border-b border-ink/10 pb-4">
+                  <span className="text-sm opacity-60">Schedule</span>
+                  <span>{weeks}주 / 주 {sessions}회 / {hours}시간</span>
+                </div>
+                {selectedSlots.length > 0 && (
+                  <div className="flex justify-between items-start border-b border-ink/10 pb-4">
+                    <span className="text-sm opacity-60">Preferred Times</span>
+                    <div className="text-right flex flex-wrap justify-end gap-1 max-w-[200px]">
+                      {selectedSlots.map(s => (
+                        <span key={s} className="text-[10px] bg-ink text-paper px-2 py-0.5 rounded-full">{s}</span>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                <div className="flex justify-between items-center pt-4">
+                  <span className="text-lg font-serif">Total Price</span>
+                  <span className="text-3xl font-serif text-gold">₩{price.toLocaleString()}</span>
+                </div>
+              </div>
+              <p className="text-xs opacity-50 text-center italic">
+                * 결제 완료 후 박사님께서 직접 연락드려 상세 레벨 테스트 일정을 조율합니다.
+              </p>
+            </div>
+          )}
+
+          <div className="flex justify-between items-center pt-8">
+            <button 
+              disabled={step === 1}
+              onClick={() => setStep(s => s - 1)}
+              className="text-xs uppercase tracking-widest opacity-50 hover:opacity-100 disabled:opacity-0"
+            >
+              Previous
+            </button>
+            <button 
+              onClick={() => step < 3 ? setStep(s => s + 1) : handleCompleteBooking()}
+              disabled={isSubmitting}
+              className="px-10 py-4 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:scale-105 transition-transform disabled:opacity-50"
+            >
+              {isSubmitting ? 'Processing...' : (step === 3 ? 'Complete Booking' : 'Next Step')}
+            </button>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          <div className="p-8 border border-ink/10 rounded-2xl space-y-6 sticky top-32">
+            <h4 className="text-xs uppercase tracking-widest opacity-50">Summary</h4>
+            <div className="space-y-4">
+              <div className="flex justify-between text-sm">
+                <span className="opacity-60">Course</span>
+                <span className="text-right">{course.id.toUpperCase()} ({level})</span>
+              </div>
+              <div className="flex justify-between text-sm">
+                <span className="opacity-60">Duration</span>
+                <span>{weeks} Weeks</span>
+              </div>
+              <div className="flex justify-between text-sm font-bold pt-4 border-t border-ink/10">
+                <span>Total</span>
+                <span className="text-gold">₩{price.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
+  const t = TRANSLATIONS[language];
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [users, setUsers] = useState<any[]>([]);
+  const [resources, setResources] = useState<any[]>([]);
+  const [downloads, setDownloads] = useState<any[]>([]);
+  const [communityPosts, setCommunityPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState<'reservations' | 'resources' | 'community' | 'stats'>('reservations');
+  
+  const [feedbackText, setFeedbackText] = useState<{ [key: string]: string }>({});
+  const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
+  
+  // Resource Form State
+  const [newResource, setNewResource] = useState({
+    title: '',
+    description: '',
+    groupId: RESOURCE_GROUPS[0].id,
+    categoryId: RESOURCE_GROUPS[0].categories[0].id,
+    fileUrl: '',
+    fileType: 'pdf' as 'pdf' | 'mp3' | 'image',
+    accessLevel: 'member' as 'public' | 'member' | 'premium'
+  });
+
+  useEffect(() => {
+    const unsubRes = onSnapshot(query(collection(db, 'reservations'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setReservations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'reservations'));
+
+    const unsubUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+      setUsers(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'users'));
+
+    const unsubResources = onSnapshot(query(collection(db, 'resources'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setResources(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'resources'));
+
+    const unsubDownloads = onSnapshot(collection(db, 'downloads'), (snapshot) => {
+      setDownloads(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'downloads'));
+
+    const unsubCommunity = onSnapshot(query(collection(db, 'community'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setCommunityPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'community'));
+
+    setLoading(false);
+
+    return () => {
+      unsubRes();
+      unsubUsers();
+      unsubResources();
+      unsubDownloads();
+      unsubCommunity();
+    };
+  }, []);
+
+  const updateStatus = async (id: string, status: string) => {
+    const path = 'reservations';
+    try {
+      await updateDoc(doc(db, path, id), { status });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  };
+
+  const submitFeedback = async (resId: string, studentUid: string) => {
+    const content = feedbackText[resId];
+    if (!content) return;
+    const path = 'feedback';
+    try {
+      await addDoc(collection(db, path), {
+        reservationId: resId,
+        studentUid,
+        content,
+        createdAt: serverTimestamp()
+      });
+      setFeedbackText(prev => ({ ...prev, [resId]: '' }));
+      alert(language === 'ko' ? '피드백이 전송되었습니다.' : 'Feedback has been sent.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, path);
+    }
+  };
+
+  const handleCreateResource = async (e: FormEvent) => {
+    e.preventDefault();
+    const path = 'resources';
+    try {
+      await addDoc(collection(db, path), {
+        ...newResource,
+        downloadCount: 0,
+        createdAt: serverTimestamp()
+      });
+      setNewResource({
+        title: '',
+        description: '',
+        groupId: RESOURCE_GROUPS[0].id,
+        categoryId: RESOURCE_GROUPS[0].categories[0].id,
+        fileUrl: '',
+        fileType: 'pdf',
+        accessLevel: 'member'
+      });
+      alert(language === 'ko' ? '자료가 업로드되었습니다.' : 'Resource has been uploaded.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, path);
+    }
+  };
+
+  const handleDeleteResource = async (id: string) => {
+    if (!confirm(language === 'ko' ? '정말 삭제하시겠습니까?' : 'Are you sure you want to delete this?')) return;
+    const path = 'resources';
+    try {
+      await deleteDoc(doc(db, path, id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  };
+
+  const seedResources = async () => {
+    const path = 'resources';
+    const samples = [
+      // Group A: Standard & Test
+      { title: 'HSK 6급 핵심 요약집', description: '급수별 핵심 요약집, 최신 기출 변형 문제.', groupId: 'group-a', categoryId: 'hsk', fileType: 'pdf', accessLevel: 'member', fileUrl: 'https://example.com/hsk6_summary.pdf' },
+      { title: 'HSK 5급 필수 단어 2500', description: '5급 합격을 위한 필수 어휘 리스트와 예문.', groupId: 'group-a', categoryId: 'hsk', fileType: 'pdf', accessLevel: 'public', fileUrl: 'https://example.com/hsk5_words.pdf' },
+      { title: '상황별 필수 회화 100선', description: '박사님이 엄선한 상황별 필수 문장 리스트.', groupId: 'group-a', categoryId: 'conversation', fileType: 'pdf', accessLevel: 'public', fileUrl: 'https://example.com/conv100.pdf' },
+      { title: '식당에서 바로 쓰는 중국어', description: '주문부터 결제까지, 식당 이용 필수 표현.', groupId: 'group-a', categoryId: 'conversation', fileType: 'pdf', accessLevel: 'member', fileUrl: 'https://example.com/restaurant_conv.pdf' },
+      { title: '중국 마트 실전 표현', description: '중국 현지 마트, 병원 등에서 쓰이는 생생한 실전 표현.', groupId: 'group-a', categoryId: 'daily', fileType: 'pdf', accessLevel: 'member', fileUrl: 'https://example.com/daily_market.pdf' },
+      { title: '중국 대중교통 이용 가이드', description: '지하철, 택시, 버스 이용 시 유용한 표현 모음.', groupId: 'group-a', categoryId: 'daily', fileType: 'pdf', accessLevel: 'public', fileUrl: 'https://example.com/transport_guide.pdf' },
+
+      // Group B: Professional & Academic
+      { title: 'AI 기술 트렌드 리포트', description: 'IT, AI, 공학 등 전문 분야의 중-한 대역어 및 기술 트렌드 리포트.', groupId: 'group-b', categoryId: 'science', fileType: 'pdf', accessLevel: 'premium', fileUrl: 'https://example.com/ai_tech_report.pdf' },
+      { title: '중국 반도체 산업 분석', description: '최신 중국 반도체 시장 동향 및 전문 용어 정리.', groupId: 'group-b', categoryId: 'science', fileType: 'pdf', accessLevel: 'premium', fileUrl: 'https://example.com/semiconductor_china.pdf' },
+      { title: '비즈니스 이메일 템플릿', description: '계약서 양식, 이메일 템플릿, 비즈니스 에티켓 가이드.', groupId: 'group-b', categoryId: 'business', fileType: 'pdf', accessLevel: 'member', fileUrl: 'https://example.com/biz_email_templates.pdf' },
+      { title: '중국 비즈니스 협상 전략', description: '성공적인 비즈니스를 위한 협상 기술과 문화적 팁.', groupId: 'group-b', categoryId: 'business', fileType: 'pdf', accessLevel: 'premium', fileUrl: 'https://example.com/negotiation_strategy.pdf' },
+      { title: '시사 이슈 찬반 토론 가이드', description: '찬반 논쟁이 가능한 시사 이슈 정리 및 핵심 표현.', groupId: 'group-b', categoryId: 'debate', fileType: 'pdf', accessLevel: 'premium', fileUrl: 'https://example.com/debate_guide.pdf' },
+      { title: '환경 문제와 지속 가능성 토론', description: '중국의 환경 정책과 관련 시사 토론 자료.', groupId: 'group-b', categoryId: 'debate', fileType: 'pdf', accessLevel: 'member', fileUrl: 'https://example.com/env_debate.pdf' },
+
+      // Group C: Culture & Trends
+      { title: '중국 8대 요리 문화', description: '지역별 요리 특징과 식사 에티켓.', groupId: 'group-c', categoryId: 'culture', fileType: 'pdf', accessLevel: 'public', fileUrl: 'https://example.com/china_food_culture.pdf' },
+      { title: '중국 명절과 전통 풍습', description: '춘절, 중추절 등 주요 명절의 유래와 현대적 변화.', groupId: 'group-c', categoryId: 'culture', fileType: 'pdf', accessLevel: 'member', fileUrl: 'https://example.com/festivals.pdf' },
+      { title: '필수 사자성어 50선', description: '일상과 비즈니스에서 자주 쓰이는 고사성어.', groupId: 'group-c', categoryId: 'idioms', fileType: 'pdf', accessLevel: 'member', fileUrl: 'https://example.com/idioms_50.pdf' },
+      { title: '고사성어로 배우는 중국 역사', description: '흥미로운 역사 이야기와 함께 익히는 사자성어.', groupId: 'group-c', categoryId: 'idioms', fileType: 'pdf', accessLevel: 'premium', fileUrl: 'https://example.com/history_idioms.pdf' },
+      { title: '2024 중국 유행어 사전', description: 'SNS와 젊은 층 사이에서 쓰이는 최신 신조어.', groupId: 'group-c', categoryId: 'slang', fileType: 'pdf', accessLevel: 'member', fileUrl: 'https://example.com/slang_2024.pdf' },
+      { title: '샤오홍슈(小红书) 마케팅 용어', description: '중국 MZ세대의 필수 앱, 샤오홍슈에서 쓰이는 용어 분석.', groupId: 'group-c', categoryId: 'slang', fileType: 'pdf', accessLevel: 'premium', fileUrl: 'https://example.com/xiaohongshu_terms.pdf' },
+    ];
+
+    try {
+      for (const res of samples) {
+        await addDoc(collection(db, path), {
+          ...res,
+          downloadCount: 0,
+          createdAt: serverTimestamp()
+        });
+      }
+      alert(language === 'ko' ? `샘플 자료 ${samples.length}개가 성공적으로 등록되었습니다.` : `Successfully seeded ${samples.length} sample resources.`);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, path);
+    }
+  };
+
+  const submitCommunityReply = async (postId: string) => {
+    const reply = replyText[postId];
+    if (!reply) return;
+    const path = 'community';
+    try {
+      await updateDoc(doc(db, path, postId), { reply });
+      setReplyText(prev => ({ ...prev, [postId]: '' }));
+      alert(language === 'ko' ? '답변이 등록되었습니다.' : 'Reply has been registered.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  };
+
+  if (loading) return <div className="py-20 text-center font-serif italic opacity-50">{t.community.loading}</div>;
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }}
+      className="max-w-7xl mx-auto px-6 py-20 space-y-12"
+    >
+      <div className="flex flex-col md:flex-row justify-between items-end gap-8">
+        <div className="space-y-4">
+          <span className="text-gold text-[10px] uppercase tracking-[0.4em]">{t.admin.title}</span>
+          <h2 className="text-5xl font-serif font-light">{t.nav.systemName}</h2>
+        </div>
+        <div className="flex bg-ink/5 p-1 rounded-2xl">
+          {(['reservations', 'resources', 'community', 'stats'] as const).map(tab => (
+            <button 
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={cn(
+                "px-6 py-2 rounded-xl text-[10px] uppercase tracking-widest font-bold transition-all",
+                activeTab === tab ? "bg-ink text-paper shadow-lg" : "opacity-40 hover:opacity-100"
+              )}
+            >
+              {t.admin[tab]}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {activeTab === 'reservations' && (
+        <div className="grid grid-cols-1 gap-8">
+          {reservations.map(res => {
+            const student = users.find(u => u.uid === res.studentUid);
+            return (
+              <div key={res.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
+                <div className="flex flex-col md:flex-row justify-between gap-6">
+                  <div className="flex items-center gap-4">
+                    <div className="w-12 h-12 rounded-full overflow-hidden bg-ink/5">
+                      <img src={student?.photoURL || "https://i.pravatar.cc/100"} alt="Profile" referrerPolicy="no-referrer" />
+                    </div>
+                    <div>
+                      <p className="font-bold">{student?.displayName || student?.email || 'Unknown Student'}</p>
+                      <p className="text-[10px] uppercase tracking-widest opacity-50">{student?.email}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-4">
+                    <select 
+                      value={res.status}
+                      onChange={(e) => updateStatus(res.id, e.target.value)}
+                      className="px-4 py-2 border border-ink/10 rounded-xl text-xs uppercase tracking-widest bg-paper"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="confirmed">Confirmed</option>
+                      <option value="completed">Completed</option>
+                    </select>
+                    <div className={cn(
+                      "px-3 py-1 text-[10px] uppercase tracking-widest rounded-full font-bold",
+                      res.status === 'confirmed' ? "bg-green-100 text-green-700" : 
+                      res.status === 'completed' ? "bg-blue-100 text-blue-700" : "bg-gold/20 text-gold"
+                    )}>
+                      {res.status}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-y border-ink/5">
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Course</p>
+                    <p className="text-sm font-bold">{COURSES.find(c => c.id === res.courseId)?.title} ({res.level})</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Schedule</p>
+                    <p className="text-sm">{res.durationWeeks}주 / 주 {res.sessionsPerWeek}회 / {res.sessionDuration}시간</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Price</p>
+                    <p className="text-sm font-bold text-gold">₩{res.totalPrice.toLocaleString()}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Preferred Times</p>
+                    <div className="flex flex-wrap gap-1">
+                      {res.preferredSlots?.map((s: string) => (
+                        <span key={s} className="text-[8px] bg-ink/5 px-1.5 py-0.5 rounded-full">{s}</span>
+                      )) || <span className="text-xs opacity-30 italic">None</span>}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.feedback}</label>
+                  <div className="flex gap-4">
+                    <textarea 
+                      value={feedbackText[res.id] || ''}
+                      onChange={(e) => setFeedbackText(prev => ({ ...prev, [res.id]: e.target.value }))}
+                      placeholder={language === 'ko' ? "수강생에게 전달할 피드백을 입력하세요..." : "Enter feedback for the student..."}
+                      className="flex-grow p-4 border border-ink/10 rounded-2xl text-sm bg-paper/50 focus:border-gold outline-none transition-colors"
+                      rows={2}
+                    />
+                    <button 
+                      onClick={() => submitFeedback(res.id, res.studentUid)}
+                      className="px-6 py-4 bg-ink text-paper rounded-2xl text-[10px] uppercase tracking-widest hover:bg-gold transition-colors self-end"
+                    >
+                      {t.community.submit}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {activeTab === 'resources' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+          {/* Upload Form */}
+          <div className="md:col-span-1 space-y-8">
+            <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6 sticky top-32">
+              <h3 className="text-xl font-serif">{t.admin.upload}</h3>
+              <form onSubmit={handleCreateResource} className="space-y-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50">{t.community.titleLabel}</label>
+                  <input 
+                    type="text" required
+                    value={newResource.title}
+                    onChange={(e) => setNewResource(prev => ({ ...prev, title: e.target.value }))}
+                    className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-sm"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50">{t.community.contentLabel}</label>
+                  <textarea 
+                    required
+                    value={newResource.description}
+                    onChange={(e) => setNewResource(prev => ({ ...prev, description: e.target.value }))}
+                    className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-sm"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">Group</label>
+                    <select 
+                      value={newResource.groupId}
+                      onChange={(e) => setNewResource(prev => ({ ...prev, groupId: e.target.value, categoryId: RESOURCE_GROUPS.find(g => g.id === e.target.value)?.categories[0].id || '' }))}
+                      className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-xs"
+                    >
+                      {RESOURCE_GROUPS.map(g => <option key={g.id} value={g.id}>{g.name.split(':')[0]}</option>)}
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">Category</label>
+                    <select 
+                      value={newResource.categoryId}
+                      onChange={(e) => setNewResource(prev => ({ ...prev, categoryId: e.target.value }))}
+                      className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-xs"
+                    >
+                      {RESOURCE_GROUPS.find(g => g.id === newResource.groupId)?.categories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                    </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">File Type</label>
+                    <select 
+                      value={newResource.fileType}
+                      onChange={(e) => setNewResource(prev => ({ ...prev, fileType: e.target.value as any }))}
+                      className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-xs"
+                    >
+                      <option value="pdf">PDF</option>
+                      <option value="mp3">MP3</option>
+                      <option value="image">Image</option>
+                    </select>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">Access</label>
+                    <select 
+                      value={newResource.accessLevel}
+                      onChange={(e) => setNewResource(prev => ({ ...prev, accessLevel: e.target.value as any }))}
+                      className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-xs"
+                    >
+                      <option value="public">Public</option>
+                      <option value="member">Member</option>
+                      <option value="premium">Premium</option>
+                    </select>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50">File URL</label>
+                  <input 
+                    type="url" required
+                    value={newResource.fileUrl}
+                    onChange={(e) => setNewResource(prev => ({ ...prev, fileUrl: e.target.value }))}
+                    placeholder="https://..."
+                    className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-sm"
+                  />
+                </div>
+                <button type="submit" className="w-full py-4 bg-ink text-paper rounded-xl text-xs uppercase tracking-widest hover:bg-gold transition-colors">
+                  {t.admin.upload}
+                </button>
+              </form>
+            </div>
+          </div>
+
+          {/* Resource List */}
+          <div className="md:col-span-2 space-y-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-xl font-serif">{t.admin.list}</h3>
+              <button 
+                onClick={seedResources}
+                className="px-4 py-2 bg-gold/10 text-gold border border-gold/20 rounded-xl text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all"
+              >
+                {t.admin.seed}
+              </button>
+            </div>
+            {resources.map(res => (
+              <div key={res.id} className="p-6 border border-ink/10 rounded-3xl bg-white flex items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-xl bg-ink/5 flex items-center justify-center text-ink/40">
+                    {res.fileType === 'pdf' && <FileText size={20} />}
+                    {res.fileType === 'mp3' && <Music size={20} />}
+                    {res.fileType === 'image' && <ImageIcon size={20} />}
+                  </div>
+                  <div>
+                    <h4 className="font-bold">{res.title}</h4>
+                    <p className="text-[10px] uppercase tracking-widest opacity-50">
+                      {RESOURCE_GROUPS.find(g => g.id === res.groupId)?.name.split(':')[0]} / {res.categoryId}
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-6">
+                  <div className="text-right">
+                    <p className="text-xs font-bold">{res.downloadCount || 0}</p>
+                    <p className="text-[8px] uppercase tracking-widest opacity-40">Downloads</p>
+                  </div>
+                  <button 
+                    onClick={() => handleDeleteResource(res.id)}
+                    className="p-2 text-ink/20 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'community' && (
+        <div className="space-y-8">
+          {communityPosts.map(post => (
+            <div key={post.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
+              <div className="flex justify-between items-start">
+                <div className="space-y-2">
+                  <div className="flex items-center gap-3">
+                    <span className={cn(
+                      "text-[8px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold",
+                      post.type === 'request' ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                    )}>
+                      {post.type}
+                    </span>
+                    <h3 className="text-xl font-bold">{post.title}</h3>
+                  </div>
+                  <p className="text-[10px] uppercase tracking-widest opacity-40">{post.userName} • {post.createdAt?.toDate().toLocaleDateString()}</p>
+                </div>
+              </div>
+              <p className="text-sm opacity-70 leading-relaxed">{post.content}</p>
+              
+              <div className="space-y-4 pt-6 border-t border-ink/5">
+                <label className="text-[10px] uppercase tracking-widest opacity-50">답변 작성</label>
+                <div className="flex gap-4">
+                  <textarea 
+                    value={replyText[post.id] || post.reply || ''}
+                    onChange={(e) => setReplyText(prev => ({ ...prev, [post.id]: e.target.value }))}
+                    placeholder="답변을 입력하세요..."
+                    className="flex-grow p-4 border border-ink/10 rounded-2xl text-sm bg-paper/50 focus:border-gold outline-none transition-colors"
+                    rows={2}
+                  />
+                  <button 
+                    onClick={() => submitCommunityReply(post.id)}
+                    className="px-6 py-4 bg-ink text-paper rounded-2xl text-[10px] uppercase tracking-widest hover:bg-gold transition-colors self-end"
+                  >
+                    {post.reply ? (language === 'ko' ? '수정' : 'Update') : t.admin.reply}
+                  </button>
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {activeTab === 'stats' && (
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-4">
+            <BarChart3 className="text-gold" size={32} />
+            <h4 className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.totalDownloads}</h4>
+            <p className="text-4xl font-serif">{downloads.length}</p>
+          </div>
+          <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-4">
+            <Users className="text-gold" size={32} />
+            <h4 className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.activeStudents}</h4>
+            <p className="text-4xl font-serif">{users.length}</p>
+          </div>
+          <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-4">
+            <FileText className="text-gold" size={32} />
+            <h4 className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.totalResources}</h4>
+            <p className="text-4xl font-serif">{resources.length}</p>
+          </div>
+
+          <div className="md:col-span-3 p-8 border border-ink/10 rounded-3xl bg-white space-y-8">
+            <h3 className="text-xl font-serif">{t.admin.recentDownloads}</h3>
+            <div className="space-y-4">
+              {downloads.slice(0, 10).map(dl => {
+                const user = users.find(u => u.uid === dl.userUid);
+                const resource = resources.find(r => r.id === dl.resourceId);
+                return (
+                  <div key={dl.id} className="flex justify-between items-center py-3 border-b border-ink/5">
+                    <div className="flex items-center gap-4">
+                      <div className="w-8 h-8 rounded-full overflow-hidden bg-ink/5">
+                        <img src={user?.photoURL || "https://i.pravatar.cc/100"} alt="User" referrerPolicy="no-referrer" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold">{user?.displayName || user?.email}</p>
+                        <p className="text-[10px] opacity-40">{dl.timestamp?.toDate().toLocaleString()}</p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xs font-bold">{resource?.title}</p>
+                      <p className="text-[8px] uppercase tracking-widest opacity-40">{resource?.fileType}</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </motion.div>
+  );
+};
+
+const MyPageView: FC = () => {
+  const [reservations, setReservations] = useState<any[]>([]);
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!auth.currentUser) return;
+
+    const resPath = 'reservations';
+    const qRes = query(
+      collection(db, resPath), 
+      where('studentUid', '==', auth.currentUser.uid),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubRes = onSnapshot(qRes, (snapshot) => {
+      setReservations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, resPath);
+    });
+
+    const feedPath = 'feedback';
+    const qFeed = query(
+      collection(db, feedPath),
+      where('studentUid', '==', auth.currentUser.uid),
+      orderBy('createdAt', 'desc')
+    );
+
+    const unsubFeed = onSnapshot(qFeed, (snapshot) => {
+      setFeedbacks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, feedPath);
+    });
+
+    return () => {
+      unsubRes();
+      unsubFeed();
+    };
+  }, []);
+
+  const activeRes = reservations.find(r => r.status === 'pending' || r.status === 'confirmed');
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }}
+      className="max-w-7xl mx-auto px-6 py-20 space-y-20"
+    >
+      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+        <div className="space-y-4">
+          <span className="text-gold text-[10px] uppercase tracking-[0.4em]">Student Dashboard</span>
+          <h2 className="text-5xl font-serif font-light">나의 학습 현황</h2>
+        </div>
+        <div className="flex items-center gap-4 p-4 bg-ink/5 rounded-2xl">
+          <div className="w-12 h-12 rounded-full overflow-hidden">
+            <img src={auth.currentUser?.photoURL || "https://i.pravatar.cc/100?img=12"} alt="Profile" referrerPolicy="no-referrer" />
+          </div>
+          <div>
+            <p className="text-sm font-bold">{auth.currentUser?.displayName || auth.currentUser?.email}</p>
+            <p className="text-[10px] uppercase tracking-widest opacity-50">Premium Student</p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        <div className="md:col-span-2 space-y-8">
+          {activeRes ? (
+            <div className="p-8 border border-ink/10 rounded-3xl space-y-8">
+              <div className="flex items-center justify-between">
+                <h3 className="text-2xl font-serif">현재 수강 중인 과정</h3>
+                <span className="px-3 py-1 bg-gold/20 text-gold text-[10px] uppercase tracking-widest rounded-full font-bold">
+                  {activeRes.status.toUpperCase()}
+                </span>
+              </div>
+              <div className="flex items-center gap-8">
+                <div className="w-20 h-20 bg-ink text-paper rounded-2xl flex items-center justify-center font-serif text-3xl">
+                  {activeRes.courseId.toUpperCase()}
+                </div>
+                <div className="space-y-2">
+                  <h4 className="text-xl font-serif">{COURSES.find(c => c.id === activeRes.courseId)?.title} ({activeRes.level})</h4>
+                  <p className="text-sm opacity-60">{activeRes.durationWeeks}주 패키지 / {activeRes.sessionsPerWeek}회 세션</p>
+                  <div className="w-64 h-1 bg-ink/10 rounded-full overflow-hidden">
+                    <div className="w-1/3 h-full bg-gold" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="p-12 border border-dashed border-ink/20 rounded-3xl text-center space-y-4">
+              <p className="opacity-50 font-serif italic">현재 수강 중인 과정이 없습니다.</p>
+              <button 
+                onClick={() => window.location.href = '#curriculum'}
+                className="text-xs uppercase tracking-widest text-gold font-bold"
+              >
+                Browse Courses
+              </button>
+            </div>
+          )}
+
+          <div className="space-y-6">
+            <h3 className="text-2xl font-serif">박사님의 학습 피드백</h3>
+            {feedbacks.length > 0 ? feedbacks.map((f, i) => (
+              <div key={f.id} className="p-8 bg-ink/5 rounded-3xl space-y-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-widest opacity-50">Feedback</span>
+                  <span className="text-[10px] opacity-40">{f.createdAt?.toDate().toLocaleDateString()}</span>
+                </div>
+                <p className="text-sm leading-relaxed italic opacity-80">
+                  "{f.content}"
+                </p>
+              </div>
+            )) : (
+              <p className="text-sm opacity-40 italic">아직 도착한 피드백이 없습니다.</p>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          <div className="p-8 bg-ink text-paper rounded-3xl space-y-8">
+            <h3 className="text-2xl font-serif">수업 스케줄</h3>
+            <div className="space-y-6">
+              {activeRes ? (
+                <div className="space-y-6">
+                  {activeRes.preferredSlots && activeRes.preferredSlots.length > 0 && (
+                    <div className="space-y-3">
+                      <label className="text-[10px] uppercase tracking-widest opacity-50">희망 시간대</label>
+                      <div className="flex flex-wrap gap-2">
+                        {activeRes.preferredSlots.map((s: string) => (
+                          <span key={s} className="px-3 py-1 bg-paper/10 text-paper text-[10px] uppercase tracking-widest rounded-full border border-paper/20">
+                            {s}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="space-y-4 pt-4 border-t border-paper/10">
+                    <p className="text-sm opacity-70">박사님께서 곧 연락드려 상세 일정을 확정할 예정입니다.</p>
+                    <div className="flex items-center gap-4 opacity-50">
+                      <Clock size={16} />
+                      <span className="text-xs uppercase tracking-widest">Waiting for confirmation</span>
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm opacity-40 italic">예약된 수업이 없습니다.</p>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}
+
+const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: string | null }, onClearFilter?: () => void, language: LanguageCode }> = ({ initialFilter, onClearFilter, language }) => {
+  const t = TRANSLATIONS[language];
+  const [resources, setResources] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [selectedGroup, setSelectedGroup] = useState<string | null>(initialFilter?.groupId || null);
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(initialFilter?.categoryId || null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  useEffect(() => {
+    if (initialFilter) {
+      setSelectedGroup(initialFilter.groupId);
+      setSelectedCategory(initialFilter.categoryId);
+    }
+  }, [initialFilter]);
+  useEffect(() => {
+    const path = 'resources';
+    const q = query(collection(db, path), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setResources(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, (error) => {
+      // If it's a permission error, we might still want to show what we have or a message
+      console.error("Archive fetch error:", error);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const filteredResources = resources.filter(res => {
+    const matchesGroup = !selectedGroup || res.groupId === selectedGroup;
+    const matchesCategory = !selectedCategory || res.categoryId === selectedCategory;
+    const matchesSearch = !searchQuery || res.title.toLowerCase().includes(searchQuery.toLowerCase()) || res.description.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesGroup && matchesCategory && matchesSearch;
+  });
+
+  const handleDownload = async (resource: any) => {
+    if (!auth.currentUser) {
+      alert('로그인이 필요한 서비스입니다.');
+      return;
+    }
+    
+    // In a real app, we would trigger a file download here.
+    // For now, we'll just track the download.
+    const path = 'downloads';
+    try {
+      await addDoc(collection(db, path), {
+        resourceId: resource.id,
+        userUid: auth.currentUser.uid,
+        timestamp: serverTimestamp()
+      });
+      
+      // Update download count on resource
+      await updateDoc(doc(db, 'resources', resource.id), {
+        downloadCount: (resource.downloadCount || 0) + 1
+      });
+      
+      window.open(resource.fileUrl, '_blank');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, path);
+    }
+  };
+
+  if (loading) return <div className="py-20 text-center font-serif italic opacity-50">Loading Archive...</div>;
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }}
+      className="max-w-7xl mx-auto px-6 py-20 space-y-16"
+    >
+      <div className="text-center space-y-4">
+        <span className="text-gold text-[10px] uppercase tracking-[0.4em]">L.C.L Archive</span>
+        <h2 className="text-5xl font-serif font-light">{t.archive.title}</h2>
+        <p className="max-w-3xl mx-auto opacity-60 font-serif italic leading-relaxed">
+          {t.archive.subtitle}
+        </p>
+      </div>
+
+      {/* Category Hub */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+        {RESOURCE_GROUPS.map((group) => (
+          <motion.div 
+            key={group.id}
+            className={cn(
+              "p-8 rounded-[40px] border transition-all space-y-8",
+              selectedGroup === group.id 
+                ? "bg-ink text-paper border-ink shadow-2xl scale-[1.02]" 
+                : "bg-white border-ink/5 hover:border-gold/30"
+            )}
+          >
+            <div className="space-y-4">
+              <div className="flex justify-between items-start">
+                <div className={cn(
+                  "w-12 h-12 rounded-2xl flex items-center justify-center",
+                  selectedGroup === group.id ? "bg-gold text-ink" : "bg-gold/10 text-gold"
+                )}>
+                  {group.id === 'group-a' && <BookOpen size={24} />}
+                  {group.id === 'group-b' && <GraduationCap size={24} />}
+                  {group.id === 'group-c' && <Globe size={24} />}
+                </div>
+                <button 
+                  onClick={() => {
+                    setSelectedGroup(selectedGroup === group.id ? null : group.id);
+                    setSelectedCategory(null);
+                  }}
+                  className={cn(
+                    "text-[10px] uppercase tracking-widest font-bold px-4 py-2 rounded-full border transition-all",
+                    selectedGroup === group.id 
+                      ? "border-paper/20 bg-paper/10 text-paper" 
+                      : "border-ink/10 text-ink/40"
+                  )}
+                >
+                  {selectedGroup === group.id ? 'Deselect' : 'Select Group'}
+                </button>
+              </div>
+              <div>
+                <h3 className="text-2xl font-serif">{group.name.split(':')[1]?.trim() || group.name}</h3>
+                <p className={cn(
+                  "text-[10px] uppercase tracking-widest font-bold",
+                  selectedGroup === group.id ? "text-gold" : "text-gold/60"
+                )}>{group.name.split(':')[0]}</p>
+              </div>
+              <p className="text-sm opacity-60 leading-relaxed">{group.description}</p>
+            </div>
+
+            <div className="grid grid-cols-1 gap-2">
+              {group.categories.map((cat) => (
+                <button 
+                  key={cat.id}
+                  onClick={() => {
+                    setSelectedGroup(group.id);
+                    setSelectedCategory(selectedCategory === cat.id ? null : cat.id);
+                  }}
+                  className={cn(
+                    "w-full text-left p-4 rounded-2xl transition-all group/item",
+                    selectedCategory === cat.id
+                      ? "bg-gold text-ink"
+                      : selectedGroup === group.id
+                        ? "bg-paper/10 hover:bg-paper/20 text-paper"
+                        : "bg-paper hover:bg-ink/5 text-ink"
+                  )}
+                >
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm font-medium">{cat.name}</span>
+                    <ArrowRight size={14} className={cn(
+                      "transition-all",
+                      selectedCategory === cat.id ? "opacity-100" : "opacity-0 group-hover/item:opacity-100 -translate-x-2 group-hover/item:translate-x-0"
+                    )} />
+                  </div>
+                  <p className={cn(
+                    "text-[10px] mt-1",
+                    selectedCategory === cat.id ? "text-ink/60" : "opacity-40"
+                  )}>{cat.description}</p>
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* Search and Results */}
+      <div className="space-y-12">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-8 border-b border-ink/10 pb-8">
+          <div className="space-y-1">
+            <h3 className="text-2xl font-serif">{t.archive.title}</h3>
+            <p className="text-xs opacity-50 uppercase tracking-widest">
+              {filteredResources.length} {language === 'ko' ? '개의 자료를 찾았습니다' : 'Resources Found'}
+              {(selectedGroup || selectedCategory || searchQuery) && (language === 'ko' ? " (필터 적용됨)" : " (Filtered)")}
+            </p>
+          </div>
+          <div className="relative w-full md:w-80">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30" size={18} />
+            <input 
+              type="text" 
+              placeholder={t.archive.search}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-12 pr-6 py-4 bg-white border border-ink/10 rounded-full text-sm focus:outline-none focus:border-gold transition-all"
+            />
+          </div>
+        </div>
+
+        {/* Resource Grid */}
+        <div className="flex-grow grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredResources.length > 0 ? filteredResources.map(res => (
+            <motion.div 
+              key={res.id}
+              layout
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="p-6 border border-ink/10 rounded-2xl bg-white space-y-4 flex flex-col hover:shadow-xl hover:shadow-ink/5 transition-all group"
+            >
+              <div className="flex justify-between items-start">
+                <div className="w-10 h-10 rounded-xl bg-ink/5 flex items-center justify-center text-ink/40 group-hover:bg-gold group-hover:text-ink transition-colors">
+                  {res.fileType === 'pdf' && <FileText size={20} />}
+                  {res.fileType === 'mp3' && <Music size={20} />}
+                  {res.fileType === 'image' && <ImageIcon size={20} />}
+                </div>
+                <span className={cn(
+                  "text-[8px] uppercase tracking-widest px-2 py-1 rounded-full font-bold",
+                  res.accessLevel === 'premium' ? "bg-gold/20 text-gold" : "bg-ink/5 text-ink/40"
+                )}>
+                  {res.accessLevel === 'public' ? t.archive.access.public : res.accessLevel === 'member' ? t.archive.access.member : t.archive.access.premium}
+                </span>
+              </div>
+              <div className="space-y-2 flex-grow">
+                <h3 className="font-bold text-lg leading-tight">{res.title}</h3>
+                <p className="text-xs opacity-50 line-clamp-2">{res.description}</p>
+              </div>
+              <div className="pt-4 border-t border-ink/5 flex items-center justify-between">
+                <div className="flex items-center gap-2 opacity-30 text-[10px]">
+                  <Download size={12} />
+                  <span>{res.downloadCount || 0}</span>
+                </div>
+                <button 
+                  onClick={() => handleDownload(res)}
+                  className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold hover:text-gold transition-colors"
+                >
+                  {t.archive.download} <ChevronRight size={12} />
+                </button>
+              </div>
+            </motion.div>
+          )) : (
+            <div className="col-span-full py-20 text-center space-y-4 opacity-30">
+              <FileText size={48} className="mx-auto" />
+              <p className="font-serif italic">{language === 'ko' ? '해당 카테고리에 등록된 자료가 없습니다.' : 'No resources found in this category.'}</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </motion.div>
+  );
+};
+
+const CommunityView: FC<{ language: LanguageCode }> = ({ language }) => {
+  const t = TRANSLATIONS[language];
+  const [posts, setPosts] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [newPost, setNewPost] = useState({ title: '', content: '', type: 'inquiry' as 'inquiry' | 'request' });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    const path = 'community';
+    const q = query(collection(db, path), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    }, (error) => {
+      console.error("Community fetch error:", error);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleLoginRequired = () => {
+    loginWithGoogle().catch(console.error);
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!auth.currentUser) {
+      alert(t.community.loginRequired);
+      handleLoginRequired();
+      return;
+    }
+    setIsSubmitting(true);
+    const path = 'community';
+    try {
+      await addDoc(collection(db, path), {
+        ...newPost,
+        userUid: auth.currentUser.uid,
+        userName: auth.currentUser.displayName || auth.currentUser.email,
+        createdAt: serverTimestamp()
+      });
+      setNewPost({ title: '', content: '', type: 'inquiry' });
+      setShowForm(false);
+      alert(language === 'ko' ? '게시글이 등록되었습니다.' : 'Post has been registered.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, path);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (loading) return <div className="py-20 text-center font-serif italic opacity-50">{t.community.loading}</div>;
+
+  if (!auth.currentUser) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }}
+        className="max-w-4xl mx-auto px-6 py-32 text-center space-y-8"
+      >
+        <div className="w-20 h-20 bg-ink/5 rounded-full flex items-center justify-center mx-auto">
+          <MessageSquare size={32} className="opacity-20" />
+        </div>
+        <div className="space-y-4">
+          <h2 className="text-3xl font-serif">{t.community.loginRequired}</h2>
+          <p className="opacity-60 font-serif italic">{t.community.subtitle}</p>
+        </div>
+        <button 
+          onClick={handleLoginRequired}
+          className="px-10 py-4 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:bg-gold hover:text-ink transition-all"
+        >
+          Login with Google
+        </button>
+      </motion.div>
+    );
+  }
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }}
+      className="max-w-4xl mx-auto px-6 py-20 space-y-16"
+    >
+      <div className="flex justify-between items-end">
+        <div className="space-y-4">
+          <span className="text-gold text-[10px] uppercase tracking-[0.4em]">Community</span>
+          <h2 className="text-5xl font-serif font-light">{t.community.title}</h2>
+        </div>
+        {!showForm && (
+          <button 
+            onClick={() => setShowForm(true)}
+            className="px-8 py-3 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:bg-gold hover:text-ink transition-all flex items-center gap-2"
+          >
+            <Plus size={16} /> {t.community.newPost}
+          </button>
+        )}
+      </div>
+
+      <AnimatePresence>
+        {showForm && (
+          <motion.form 
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            onSubmit={handleSubmit}
+            className="p-8 border border-ink/10 rounded-3xl bg-ink/5 space-y-6 overflow-hidden"
+          >
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest opacity-50">Type</label>
+                <select 
+                  value={newPost.type}
+                  onChange={(e) => setNewPost(prev => ({ ...prev, type: e.target.value as any }))}
+                  className="w-full p-3 bg-white border border-ink/10 rounded-xl text-sm outline-none focus:border-gold"
+                >
+                  <option value="inquiry">{t.community.inquiry}</option>
+                  <option value="request">{t.community.request}</option>
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest opacity-50">Title</label>
+                <input 
+                  type="text" 
+                  required
+                  value={newPost.title}
+                  onChange={(e) => setNewPost(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder={language === 'ko' ? "제목을 입력하세요" : "Enter title"}
+                  className="w-full p-3 bg-white border border-ink/10 rounded-xl text-sm outline-none focus:border-gold"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <label className="text-[10px] uppercase tracking-widest opacity-50">{t.community.contentLabel}</label>
+              <textarea 
+                required
+                value={newPost.content}
+                onChange={(e) => setNewPost(prev => ({ ...prev, content: e.target.value }))}
+                placeholder={language === 'ko' ? "내용을 입력하세요" : "Enter content"}
+                rows={4}
+                className="w-full p-4 bg-white border border-ink/10 rounded-xl text-sm outline-none focus:border-gold"
+              />
+            </div>
+            <div className="flex justify-end gap-4">
+              <button 
+                type="button"
+                onClick={() => setShowForm(false)}
+                className="px-6 py-3 text-xs uppercase tracking-widest opacity-50 hover:opacity-100"
+              >
+                {t.community.cancel}
+              </button>
+              <button 
+                type="submit"
+                disabled={isSubmitting}
+                className="px-10 py-3 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:bg-gold hover:text-ink transition-all disabled:opacity-50"
+              >
+                {isSubmitting ? '...' : t.community.submit}
+              </button>
+            </div>
+          </motion.form>
+        )}
+      </AnimatePresence>
+
+      <div className="space-y-6">
+        {posts.length > 0 ? posts.map(post => (
+          <div key={post.id} className="p-8 border border-ink/10 rounded-3xl space-y-6 bg-white hover:shadow-lg hover:shadow-ink/5 transition-all">
+            <div className="flex justify-between items-start">
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <span className={cn(
+                    "text-[8px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold",
+                    post.type === 'request' ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
+                  )}>
+                    {post.type === 'request' ? t.community.request : t.community.inquiry}
+                  </span>
+                  <h3 className="text-xl font-bold">{post.title}</h3>
+                </div>
+                <div className="flex items-center gap-3 text-[10px] opacity-40">
+                  <span>{post.userName}</span>
+                  <span>•</span>
+                  <span>{post.createdAt?.toDate().toLocaleDateString()}</span>
+                </div>
+              </div>
+              {post.reply && (
+                <div className="flex items-center gap-2 text-gold">
+                  <Check size={14} />
+                  <span className="text-[10px] uppercase tracking-widest font-bold">{t.community.answered}</span>
+                </div>
+              )}
+            </div>
+            <p className="text-sm opacity-70 leading-relaxed">{post.content}</p>
+            
+            {post.reply && (
+              <div className="p-6 bg-ink/5 rounded-2xl space-y-3 border-l-4 border-gold">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck size={14} className="text-gold" />
+                  <span className="text-[10px] uppercase tracking-widest font-bold">{t.community.replyTitle}</span>
+                </div>
+                <p className="text-sm italic opacity-80">"{post.reply}"</p>
+              </div>
+            )}
+          </div>
+        )) : (
+          <div className="py-20 text-center opacity-30 font-serif italic">
+            {t.community.noPosts}
+          </div>
+        )}
+      </div>
+    </motion.div>
+  );
+};
+
+const ImageGenView: FC<{ language: LanguageCode }> = ({ language }) => {
+  const t = TRANSLATIONS[language];
+  const [prompt, setPrompt] = useState('');
+  const [level, setLevel] = useState('beginner');
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generatedAudio, setGeneratedAudio] = useState<string | null>(null);
+  const [learningContent, setLearningContent] = useState<string | null>(null);
+  const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
+  const [elapsedTime, setElapsedTime] = useState(0);
+  const [finalTime, setFinalTime] = useState<number | null>(null);
+  const timerRef = useRef<any>(null);
+
+  useEffect(() => {
+    if (isGenerating) {
+      const start = Date.now();
+      setElapsedTime(0);
+      setFinalTime(null);
+      timerRef.current = setInterval(() => {
+        setElapsedTime(Math.floor((Date.now() - start) / 100) / 10);
+      }, 100);
+    } else {
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+    return () => { if (timerRef.current) clearInterval(timerRef.current); };
+  }, [isGenerating]);
+
+  const handleGenerate = async () => {
+    if (!prompt) return;
+    setIsGenerating(true);
+    setIsGeneratingAudio(false);
+    setGeneratedImage(null);
+    setGeneratedAudio(null);
+    setLearningContent(null);
+    const startTime = Date.now();
+    
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      
+      // Parallel generation for speed
+      const isBasicLevel = level === 'intro' || level === 'beginner';
+      const formattingInstructions = `
+          DIALOGUE FORMATTING (STRICT LINE-BY-LINE):
+          ${isBasicLevel ? `
+          - For every dialogue turn, you MUST provide exactly 4 lines:
+            1. Pinyin (Top line, aligned with Hanzi)
+            2. Speaker Label + Chinese (Hanzi)
+            3. Korean Translation
+            4. English Translation
+          - Example:
+                     Fúwùyuán wǒ yào diǎncài
+            고객 :  服务员,         我要点菜.
+                       여기요, 요리를 주문할게요.
+                       Waiter, I would like to order.
+          ` : `
+          - For every dialogue turn, you MUST provide exactly 3 lines (NO PINYIN):
+            1. Speaker Label + Chinese (Hanzi)
+            2. Korean Translation
+            3. English Translation
+          - Example:
+            고객 :   服务员,    我要点菜.
+                       여기요, 요리를 주문할게요.
+                       Waiter, I would like to order.
+          `}
+
+          VOCABULARY LIST FORMATTING (MANDATORY FOR ALL LEVELS):
+          - Every word in the vocabulary list MUST include Pinyin.
+          - Structure for each word:
+            1. Chinese (Hanzi)
+            2. Pinyin
+            3. Korean Meaning
+            4. English Meaning
+          - Format this as a clean list or table.
+
+          CULTURAL NOTE:
+          - Add a short 'Cultural Note' if relevant.
+      `;
+
+      const [imageResponse, textResponse] = await Promise.all([
+        ai.models.generateContent({
+          model: 'gemini-2.5-flash-image',
+          contents: {
+            parts: [
+              {
+                text: `Premium educational illustration for Chinese language learning: ${prompt}. High quality, elegant, clean background, educational style. No text, no letters, no characters, no words.`,
+              },
+            ],
+          },
+          config: {
+            imageConfig: {
+              aspectRatio: "1:1",
+            }
+          }
+        }),
+        ai.models.generateContent({
+          model: 'gemini-3-flash-preview',
+          contents: `Generate a short, practical Chinese dialogue (3-4 exchanges) and a vocabulary list (5-8 words) based on this situation: "${prompt}". 
+          The target learner level is: ${level} (where intro is absolute beginner and expert is near-native).
+          
+          ${formattingInstructions}
+          
+          The user's interface language is ${language}. Please provide translations in ${language} where appropriate.`,
+        })
+      ]);
+
+      // Handle Image
+      for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+          const base64EncodeString = part.inlineData.data;
+          setGeneratedImage(`data:image/png;base64,${base64EncodeString}`);
+          break;
+        }
+      }
+
+      // Handle Text
+      const text = textResponse.text || "Failed to generate text content.";
+      setLearningContent(text);
+      
+      // Generate Audio (TTS)
+      setIsGeneratingAudio(true);
+      try {
+        // Extract only Hanzi for cleaner TTS
+        const hanziOnly = text.match(/[\u4e00-\u9fa5]+/g)?.join(' ') || text;
+
+        const audioResponse = await ai.models.generateContent({
+          model: "gemini-2.5-flash-preview-tts",
+          contents: [{ parts: [{ text: `Read this Chinese dialogue naturally: ${hanziOnly}` }] }],
+          config: {
+            responseModalities: [Modality.AUDIO],
+            speechConfig: {
+              voiceConfig: {
+                prebuiltVoiceConfig: { voiceName: 'Kore' },
+              },
+            },
+          },
+        });
+
+        const base64Audio = audioResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+        if (base64Audio) {
+          const audioUrl = pcmToWav(base64Audio, 24000);
+          setGeneratedAudio(audioUrl);
+        }
+      } catch (audioErr) {
+        console.error('Audio generation error:', audioErr);
+      } finally {
+        setIsGeneratingAudio(false);
+      }
+      
+      setFinalTime(Math.floor((Date.now() - startTime) / 100) / 10);
+    } catch (error) {
+      console.error('Generation error:', error);
+      alert(t.aiStudio.error);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }}
+      className="max-w-6xl mx-auto px-6 py-20 space-y-12"
+    >
+      <div className="text-center space-y-4">
+        <div className="flex flex-col items-center gap-2">
+          <span className="text-gold text-[10px] uppercase tracking-[0.4em]">AI Learning Assistant</span>
+          {(isGenerating || finalTime !== null) && (
+            <motion.div 
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="px-4 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-mono tracking-widest"
+            >
+              {isGenerating ? `${t.aiStudio.timerGenerating}: ${elapsedTime.toFixed(1)}s` : `${t.aiStudio.timerCompleted}: ${finalTime?.toFixed(1)}s`}
+            </motion.div>
+          )}
+        </div>
+        <h2 className="text-5xl font-serif font-light">{t.aiStudio.title}</h2>
+        <p className="max-w-xl mx-auto opacity-60 font-serif italic">
+          {t.aiStudio.subtitle} <br />
+          {t.aiStudio.example}
+        </p>
+      </div>
+
+      <div className="space-y-8">
+        <div className="max-w-2xl mx-auto space-y-6">
+          <div className="flex flex-wrap justify-center gap-2">
+            {Object.entries(t.aiStudio.levels).map(([key, label]: [string, any]) => (
+              <button
+                key={key}
+                onClick={() => setLevel(key)}
+                className={cn(
+                  "px-4 py-2 rounded-full text-[10px] uppercase tracking-widest transition-all border",
+                  level === key 
+                    ? "bg-gold border-gold text-ink font-bold" 
+                    : "border-ink/10 hover:border-gold/50 opacity-60 hover:opacity-100"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+
+          <div className="relative">
+            <input 
+              type="text" 
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
+              placeholder={t.aiStudio.placeholder}
+              className="w-full p-6 bg-ink/5 border border-ink/10 rounded-2xl focus:outline-none focus:border-gold transition-colors pr-32"
+            />
+            <button 
+              onClick={handleGenerate}
+              disabled={!prompt || isGenerating}
+              className="absolute right-2 top-2 bottom-2 px-6 bg-ink text-paper rounded-xl text-xs uppercase tracking-widest hover:bg-gold hover:text-ink transition-all disabled:opacity-50"
+            >
+              {isGenerating ? t.aiStudio.generating : t.aiStudio.generate}
+            </button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          {/* Image Section */}
+          <div className="space-y-4">
+            <h3 className="text-xs uppercase tracking-widest opacity-50 flex items-center gap-2">
+              <ImageIcon size={14} /> {t.aiStudio.visualContext}
+            </h3>
+            <div className="aspect-square w-full bg-ink/5 rounded-3xl overflow-hidden flex items-center justify-center border border-dashed border-ink/20 relative">
+              {generatedImage ? (
+                <img src={generatedImage} alt="Generated" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+              ) : (
+                <div className="text-center space-y-4 opacity-20">
+                  {isGenerating ? (
+                    <div className="animate-pulse flex flex-col items-center gap-4">
+                      <div className="w-16 h-16 rounded-full border-2 border-ink border-t-transparent animate-spin" />
+                      <p className="text-[10px] uppercase tracking-widest">Creating visual...</p>
+                    </div>
+                  ) : (
+                    <>
+                      <ImageIcon size={64} className="mx-auto" />
+                      <p className="text-xs uppercase tracking-widest">Your AI visual will appear here</p>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Text Content Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs uppercase tracking-widest opacity-50 flex items-center gap-2">
+                <FileText size={14} /> {t.aiStudio.learningContent}
+              </h3>
+              {generatedAudio && (
+                <div className="flex items-center gap-2">
+                  <span className="text-[8px] uppercase tracking-widest text-gold font-bold">{t.aiStudio.audioReady}</span>
+                  <audio controls src={generatedAudio} className="h-8 w-48" />
+                </div>
+              )}
+              {isGeneratingAudio && (
+                <div className="flex items-center gap-2 text-gold animate-pulse">
+                  <Music size={14} className="animate-bounce" />
+                  <span className="text-[8px] uppercase tracking-widest font-bold">{t.aiStudio.generatingAudio}</span>
+                </div>
+              )}
+            </div>
+            <div className="min-h-[400px] h-full p-8 bg-ink/5 rounded-3xl border border-ink/10 overflow-y-auto">
+              {learningContent ? (
+                <div className="markdown-body">
+                  <Markdown 
+                    remarkPlugins={[remarkGfm]} 
+                    rehypePlugins={[rehypeRaw]}
+                  >
+                    {learningContent}
+                  </Markdown>
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center text-center space-y-4 opacity-20">
+                  {isGenerating ? (
+                    <div className="animate-pulse flex flex-col items-center gap-4">
+                      <div className="w-16 h-16 rounded-full border-2 border-ink border-t-transparent animate-spin" />
+                      <p className="text-[10px] uppercase tracking-widest">Generating dialogue...</p>
+                    </div>
+                  ) : (
+                    <>
+                      <FileText size={64} className="mx-auto" />
+                      <p className="text-xs uppercase tracking-widest">Dialogue and vocabulary will appear here</p>
+                    </>
+                  )}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </motion.div>
+  );
+}

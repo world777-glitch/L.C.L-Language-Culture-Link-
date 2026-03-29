@@ -1,0 +1,53 @@
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400;1,500;1,600;1,700&family=Montserrat:wght@100;200;300;400;500;600;700;800;900&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-serif: "Cormorant Garamond", serif;
+  --font-sans: "Montserrat", sans-serif;
+  
+  --color-paper: #f5f2ed;
+  --color-ink: #1a1a1a;
+  --color-gold: #c5a059;
+}
+
+@layer base {
+  body {
+    @apply bg-paper text-ink font-sans antialiased;
+  }
+  
+  h1, h2, h3, h4, h5, h6 {
+    @apply font-serif;
+  }
+}
+
+.oval-mask {
+  mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%);
+  mask-size: contain;
+}
+
+.vertical-text {
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  font-size: 11px;
+}
+
+.markdown-body {
+  @apply font-serif text-sm leading-relaxed;
+}
+.markdown-body h1 { @apply text-2xl font-bold mb-4 mt-6; }
+.markdown-body h2 { @apply text-xl font-bold mb-3 mt-5; }
+.markdown-body h3 { @apply text-lg font-bold mb-2 mt-4; }
+.markdown-body p { @apply mb-4; }
+.markdown-body ul { @apply list-disc pl-5 mb-4; }
+.markdown-body ol { @apply list-decimal pl-5 mb-4; }
+.markdown-body li { @apply mb-1; }
+.markdown-body table { @apply w-full border-collapse mb-4; }
+.markdown-body th, .markdown-body td { @apply border border-ink/10 p-2 text-left; }
+.markdown-body th { @apply bg-ink/5; }
+.markdown-body blockquote { @apply border-l-4 border-gold pl-4 italic my-4; }
+.markdown-body strong { @apply font-bold text-gold; }
+.markdown-body ruby { @apply inline-flex flex-col-reverse items-center leading-none align-middle mx-1; }
+.markdown-body rt { @apply block text-[12px] font-sans font-medium text-gold mb-1 tracking-wider; }
+
