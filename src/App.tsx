@@ -35,7 +35,9 @@ import {
   Filter,
   MoreVertical,
   Upload,
-  Edit
+  Edit,
+  X,
+  ExternalLink
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
@@ -88,15 +90,16 @@ export default function App() {
   const t = TRANSLATIONS[language];
 
   const [isEditMode, setIsEditMode] = useState(false);
-  const [siteContent, setSiteContent] = useState<Record<string, string>>({});
+  const [siteContent, setSiteContent] = useState<Record<string, any>>({});
+  const isAdmin = userProfile?.role === 'admin';
 
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'siteContent'), (snapshot) => {
-      const content: Record<string, string> = {};
+      const content: Record<string, any> = {};
       snapshot.docs.forEach(doc => {
         const data = doc.data();
         if (data.language === language) {
-          content[data.key] = data.value;
+          content[data.key] = data;
         }
       });
       setSiteContent(content);
@@ -223,7 +226,16 @@ export default function App() {
             <button onClick={() => scrollToSection('library')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.archive.title}</button>
             <button onClick={() => setView('archive')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.archive}</button>
             <button onClick={() => setView('community')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.community}</button>
-            <button onClick={() => setView('image-gen')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.aiStudio}</button>
+            <button 
+              onClick={() => setView('image-gen')} 
+              className={cn(
+                "text-xs uppercase tracking-widest transition-colors flex items-center gap-1",
+                view === 'image-gen' ? "text-gold font-bold" : "hover:text-gold"
+              )}
+            >
+              {t.nav.aiStudio}
+              {!isAdmin && userProfile?.role !== 'premium' && <ShieldCheck size={10} className="text-gold/50" />}
+            </button>
             {user ? (
               <div className="flex items-center gap-4">
                 {userProfile?.role === 'admin' && (
@@ -271,8 +283,8 @@ export default function App() {
           {view === 'booking' && <BookingView key="booking" course={selectedCourse} onComplete={() => setView('mypage')} />}
           {view === 'mypage' && <MyPageView key="mypage" />}
           {view === 'admin' && <AdminView key="admin" language={language} />}
-          {view === 'image-gen' && <ImageGenView key="image-gen" language={language} />}
-          {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} />}
+          {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} />}
+          {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} />}
           {view === 'community' && <CommunityView key="community" language={language} />}
         </AnimatePresence>
 
@@ -311,14 +323,14 @@ export default function App() {
               <span className="font-serif text-xl font-bold tracking-tight">{t.nav.systemName}</span>
             </div>
             <div className="font-serif text-2xl font-light leading-relaxed opacity-80 max-w-md">
-              <EditableText contentKey="footer.quote" defaultValue={t.footer.quote} isEditMode={isEditMode} language={language} />
+              <EditableText contentKey="footer.quote" defaultValue={t.footer.quote} isEditMode={isEditMode} language={language} siteContent={siteContent} />
             </div>
           </div>
           <div>
             <h4 className="text-xs uppercase tracking-widest mb-6 opacity-50">{t.footer.contact}</h4>
             <p className="text-sm">lhbin777@gmail.com</p>
             <div className="text-sm mt-2">
-              <EditableText contentKey="footer.experience" defaultValue={language === 'ko' ? '20년 현지 경력 & 언어학 박사 직강' : '20 Years Local Experience & PhD Direct Instruction'} isEditMode={isEditMode} language={language} />
+              <EditableText contentKey="footer.experience" defaultValue={language === 'ko' ? '20년 현지 경력 & 언어학 박사 직강' : '20 Years Local Experience & PhD Direct Instruction'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
             </div>
           </div>
           <div>
@@ -332,7 +344,7 @@ export default function App() {
         <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-paper/10 flex justify-between items-center">
           <p className="text-[10px] uppercase tracking-widest opacity-40">{t.footer.rights}</p>
           <div className="text-[10px] uppercase tracking-widest opacity-40">
-            <EditableText contentKey="footer.tagline" defaultValue={t.footer.tagline} isEditMode={isEditMode} language={language} />
+            <EditableText contentKey="footer.tagline" defaultValue={t.footer.tagline} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
         </div>
       </footer>
@@ -340,20 +352,46 @@ export default function App() {
   );
 }
 
+const FONTS = [
+  "SimSun", "SimHei", "Batang", "Gulim", "Dotum", "Gungsuh", "Malgun Gothic",
+  "Microsoft YaHei", "Microsoft JhengHei", "KaiTi", "FangSong", "NSimSun",
+  "MingLiU", "PMingLiU", "Arial", "Helvetica", "Times New Roman", "Georgia",
+  "Courier New", "Verdana", "Tahoma", "Trebuchet MS", "Impact", "Comic Sans MS",
+  "Lucida Sans Unicode", "Palatino Linotype", "Book Antiqua", "Century Gothic",
+  "Franklin Gothic Medium", "Garamond"
+];
+
+const COLORS = [
+  "#000000", "#FFFFFF", "#FF0000", "#00FF00", "#0000FF", "#FFFF00", "#00FFFF", "#FF00FF",
+  "#C0C0C0", "#808080", "#800000", "#808000", "#008000", "#800080", "#008080", "#000080",
+  "#D4AF37", "#B8860B", "#DAA520", "#FFD700", "#F0E68C", "#BDB76B", "#556B2F", "#6B8E23",
+  "#9ACD32", "#32CD32", "#228B22", "#006400", "#00FA9A", "#00CED1", "#1E90FF", "#4169E1"
+];
+
+const SIZES = ["10px", "12px", "14px", "16px", "18px", "20px", "24px", "32px", "40px", "48px", "64px", "72px", "80px", "96px", "112px"];
+
 const EditableText: FC<{ 
   contentKey: string, 
   defaultValue: string, 
   isEditMode: boolean, 
   language: string,
+  siteContent: Record<string, any>,
   className?: string,
   as?: any
-}> = ({ contentKey, defaultValue, isEditMode, language, className, as: Component = 'span' }) => {
+}> = ({ contentKey, defaultValue, isEditMode, language, siteContent, className, as: Component = 'span' }) => {
   const [isEditing, setIsEditing] = useState(false);
-  const [value, setValue] = useState(defaultValue);
+  const content = siteContent[contentKey] || {};
+  const [value, setValue] = useState(content.value || defaultValue);
+  const [fontFamily, setFontFamily] = useState(content.fontFamily || "");
+  const [fontSize, setFontSize] = useState(content.fontSize || "");
+  const [color, setColor] = useState(content.color || "");
 
   useEffect(() => {
-    setValue(defaultValue);
-  }, [defaultValue]);
+    setValue(content.value || defaultValue);
+    setFontFamily(content.fontFamily || "");
+    setFontSize(content.fontSize || "");
+    setColor(content.color || "");
+  }, [content.value, content.fontFamily, content.fontSize, content.color, defaultValue]);
 
   const handleSave = async () => {
     const docId = `${language}_${contentKey.replace(/\./g, '_')}`;
@@ -362,6 +400,9 @@ const EditableText: FC<{
         key: contentKey,
         language,
         value,
+        fontFamily,
+        fontSize,
+        color,
         updatedAt: serverTimestamp()
       });
       setIsEditing(false);
@@ -370,18 +411,52 @@ const EditableText: FC<{
     }
   };
 
+  const currentStyles = {
+    fontFamily: fontFamily || undefined,
+    fontSize: fontSize || undefined,
+    color: color || undefined
+  };
+
   if (isEditMode) {
     return (
       <div className={cn("relative group", className)}>
         {isEditing ? (
-          <div className="flex flex-col gap-2 w-full min-w-[200px]">
+          <div className="flex flex-col gap-3 w-full min-w-[300px] bg-white p-4 rounded-xl border border-gold shadow-2xl z-[100] absolute top-0 left-0">
             <textarea 
               value={value} 
               onChange={(e) => setValue(e.target.value)}
-              className="w-full p-2 bg-paper border border-gold rounded-lg text-ink font-serif text-sm focus:outline-none focus:ring-1 focus:ring-gold"
+              className="w-full p-2 bg-paper border border-ink/10 rounded-lg text-ink font-serif text-sm focus:outline-none focus:ring-1 focus:ring-gold"
               rows={3}
               autoFocus
             />
+            <div className="grid grid-cols-2 gap-2">
+              <select 
+                value={fontFamily} 
+                onChange={(e) => setFontFamily(e.target.value)}
+                className="text-[10px] p-1 border border-ink/10 rounded bg-paper"
+              >
+                <option value="">Default Font</option>
+                {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
+              </select>
+              <select 
+                value={fontSize} 
+                onChange={(e) => setFontSize(e.target.value)}
+                className="text-[10px] p-1 border border-ink/10 rounded bg-paper"
+              >
+                <option value="">Default Size</option>
+                {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </div>
+            <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto p-1 border border-ink/5 rounded">
+              {COLORS.map(c => (
+                <button 
+                  key={c} 
+                  onClick={() => setColor(c)}
+                  className={cn("w-4 h-4 rounded-full border border-ink/10", color === c && "ring-2 ring-gold")}
+                  style={{ backgroundColor: c }}
+                />
+              ))}
+            </div>
             <div className="flex gap-2 justify-end">
               <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-[10px] uppercase tracking-widest opacity-50 hover:opacity-100 transition-opacity">Cancel</button>
               <button onClick={handleSave} className="px-3 py-1 bg-gold text-ink rounded-full text-[10px] uppercase tracking-widest font-bold hover:scale-105 transition-transform">Save</button>
@@ -393,7 +468,7 @@ const EditableText: FC<{
             onClick={() => setIsEditing(true)}
           >
             <div className="absolute -inset-2 border border-dashed border-gold/0 group-hover/item:border-gold/40 rounded-lg transition-colors -z-10" />
-            <Component className={className}>{value}</Component>
+            <Component className={className} style={currentStyles}>{value}</Component>
             <button 
               className="absolute -top-2 -right-2 w-6 h-6 bg-gold text-ink rounded-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity shadow-lg z-10"
             >
@@ -405,14 +480,79 @@ const EditableText: FC<{
     );
   }
 
-  return <Component className={className}>{value}</Component>;
+  return <Component className={className} style={currentStyles}>{value}</Component>;
 };
 
-const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode, isEditMode: boolean, siteContent: Record<string, string> }> = ({ setView, onBook, setInitialArchiveFilter, language, isEditMode, siteContent }) => {
+const EditableImage: FC<{ 
+  contentKey: string, 
+  defaultUrl: string, 
+  isEditMode: boolean, 
+  language: string,
+  siteContent: Record<string, any>,
+  className?: string,
+  alt?: string
+}> = ({ contentKey, defaultUrl, isEditMode, language, siteContent, className, alt }) => {
+  const [isUploading, setIsUploading] = useState(false);
+  const content = siteContent[contentKey] || {};
+  const url = content.value || defaultUrl;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const storageRef = ref(storage, `siteContent/${language}/${contentKey}_${Date.now()}`);
+    try {
+      await uploadBytes(storageRef, file);
+      const downloadUrl = await getDownloadURL(storageRef);
+      
+      const docId = `${language}_${contentKey.replace(/\./g, '_')}`;
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: contentKey,
+        language,
+        value: downloadUrl,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Upload failed', error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  if (isEditMode) {
+    return (
+      <div className={cn("relative group", className)}>
+        <div 
+          className="relative cursor-pointer group/item"
+          onClick={() => fileInputRef.current?.click()}
+        >
+          <div className="absolute inset-0 bg-gold/20 opacity-0 group-hover/item:opacity-100 transition-opacity flex items-center justify-center z-10 rounded-lg border-2 border-dashed border-gold">
+            <div className="bg-paper text-ink px-4 py-2 rounded-full text-[10px] uppercase tracking-widest font-bold shadow-xl flex items-center gap-2">
+              {isUploading ? <Clock size={12} className="animate-spin" /> : <Upload size={12} />}
+              {isUploading ? 'Uploading...' : 'Change Image'}
+            </div>
+          </div>
+          <img src={url} alt={alt} className={cn("w-full h-full object-cover", className)} referrerPolicy="no-referrer" />
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleUpload} 
+            className="hidden" 
+            accept="image/*"
+          />
+        </div>
+      </div>
+    );
+  }
+
+  return <img src={url} alt={alt} className={className} referrerPolicy="no-referrer" />;
+};
+
+const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode, isEditMode: boolean, siteContent: Record<string, any> }> = ({ setView, onBook, setInitialArchiveFilter, language, isEditMode, siteContent }) => {
   const t = TRANSLATIONS[language];
   
-  const getT = (key: string, defaultVal: string) => siteContent[key] || defaultVal;
-
   return (
     <motion.div 
       initial={{ opacity: 0 }} 
@@ -424,11 +564,14 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       <section className="relative h-[90vh] flex items-center overflow-hidden px-6">
         <div className="absolute right-0 top-0 w-1/2 h-full bg-ink/5 -z-10 flex items-center justify-center">
           <div className="w-[80%] aspect-[3/4] bg-ink/10 rounded-[200px] overflow-hidden relative">
-            <img 
-              src="https://picsum.photos/seed/chinese-culture/800/1200" 
+            <EditableImage 
+              contentKey="hero.image"
+              defaultUrl="https://picsum.photos/seed/chinese-culture/800/1200" 
               alt="Chinese Culture" 
               className="w-full h-full object-cover opacity-80"
-              referrerPolicy="no-referrer"
+              isEditMode={isEditMode}
+              language={language}
+              siteContent={siteContent}
             />
             <div className="absolute inset-0 bg-gradient-to-t from-paper/40 to-transparent" />
           </div>
@@ -445,7 +588,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               transition={{ delay: 0.2 }}
               className="inline-block px-4 py-1 border border-gold text-gold text-[10px] uppercase tracking-[0.3em] rounded-full"
             >
-              <EditableText contentKey="hero.badge" defaultValue={t.hero.badge} isEditMode={isEditMode} language={language} />
+              <EditableText contentKey="hero.badge" defaultValue={t.hero.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
             </motion.div>
             <motion.h1 
               initial={{ y: 30, opacity: 0 }}
@@ -453,7 +596,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               transition={{ delay: 0.4 }}
               className="text-7xl md:text-8xl font-serif font-light leading-[0.9] tracking-tighter"
             >
-              <EditableText contentKey="hero.title" defaultValue={t.hero.title} isEditMode={isEditMode} language={language} as="div" />
+              <EditableText contentKey="hero.title" defaultValue={t.hero.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
             </motion.h1>
             <motion.div 
               initial={{ y: 30, opacity: 0 }}
@@ -461,7 +604,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               transition={{ delay: 0.6 }}
               className="text-lg font-serif max-w-md opacity-70 leading-relaxed"
             >
-              <EditableText contentKey="hero.subtitle" defaultValue={t.hero.subtitle} isEditMode={isEditMode} language={language} as="div" />
+              <EditableText contentKey="hero.subtitle" defaultValue={t.hero.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
             </motion.div>
             <motion.div 
               initial={{ y: 30, opacity: 0 }}
@@ -495,14 +638,14 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
           <div className="space-y-4">
             <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
-              <EditableText contentKey="curriculum.badge" defaultValue={t.curriculum.badge} isEditMode={isEditMode} language={language} />
+              <EditableText contentKey="curriculum.badge" defaultValue={t.curriculum.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
             </span>
             <h2 className="text-5xl font-serif font-light">
-              <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} />
+              <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} />
             </h2>
           </div>
           <div className="max-w-xs text-sm opacity-60 font-serif italic">
-            <EditableText contentKey="curriculum.subtitle" defaultValue={t.curriculum.subtitle} isEditMode={isEditMode} language={language} />
+            <EditableText contentKey="curriculum.subtitle" defaultValue={t.curriculum.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
         </div>
 
@@ -545,13 +688,13 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
         <div className="max-w-7xl mx-auto">
           <div className="text-center space-y-6 mb-20">
             <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
-              <EditableText contentKey="pricing.badge" defaultValue={t.pricing.badge} isEditMode={isEditMode} language={language} />
+              <EditableText contentKey="pricing.badge" defaultValue={t.pricing.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
             </span>
             <h2 className="text-5xl font-serif font-light">
-              <EditableText contentKey="pricing.title" defaultValue={t.pricing.title} isEditMode={isEditMode} language={language} />
+              <EditableText contentKey="pricing.title" defaultValue={t.pricing.title} isEditMode={isEditMode} language={language} siteContent={siteContent} />
             </h2>
             <div className="max-w-xl mx-auto opacity-60 font-serif italic">
-              <EditableText contentKey="pricing.subtitle" defaultValue={t.pricing.subtitle} isEditMode={isEditMode} language={language} />
+              <EditableText contentKey="pricing.subtitle" defaultValue={t.pricing.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
             </div>
           </div>
 
@@ -602,14 +745,14 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       <section className="max-w-4xl mx-auto px-6 py-32 text-center space-y-12">
         <div className="w-12 h-12 mx-auto border border-ink/10 rounded-full flex items-center justify-center opacity-20">"</div>
         <div className="text-4xl md:text-5xl font-serif font-light italic leading-tight">
-          <EditableText contentKey="testimonial.quote" defaultValue={t.testimonial.quote} isEditMode={isEditMode} language={language} />
+          <EditableText contentKey="testimonial.quote" defaultValue={t.testimonial.quote} isEditMode={isEditMode} language={language} siteContent={siteContent} />
         </div>
         <div className="space-y-2">
           <div className="text-xs uppercase tracking-widest font-bold">
-            <EditableText contentKey="testimonial.author" defaultValue={t.testimonial.author} isEditMode={isEditMode} language={language} />
+            <EditableText contentKey="testimonial.author" defaultValue={t.testimonial.author} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
           <div className="text-[10px] uppercase tracking-widest opacity-50">
-            <EditableText contentKey="testimonial.authorTitle" defaultValue={t.testimonial.authorTitle} isEditMode={isEditMode} language={language} />
+            <EditableText contentKey="testimonial.authorTitle" defaultValue={t.testimonial.authorTitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
         </div>
       </section>
@@ -620,22 +763,25 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
           <div className="grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
             <div className="space-y-8">
               <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
-                <EditableText contentKey="library.badge" defaultValue="Knowledge Library" isEditMode={isEditMode} language={language} />
+                <EditableText contentKey="library.badge" defaultValue="Knowledge Library" isEditMode={isEditMode} language={language} siteContent={siteContent} />
               </span>
               <h2 className="text-5xl md:text-6xl font-serif font-light leading-tight">
-                <EditableText contentKey="library.title" defaultValue={language === 'ko' ? '"언어는 고립된 기호가 아니라, 역사가 숨 쉬는 생명체입니다."' : '"Language is not an isolated symbol, but a living organism where history breathes."'} isEditMode={isEditMode} language={language} as="div" />
+                <EditableText contentKey="library.title" defaultValue={language === 'ko' ? '"언어는 고립된 기호가 아니라, 역사가 숨 쉬는 생명체입니다."' : '"Language is not an isolated symbol, but a living organism where history breathes."'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
               </h2>
               <div className="text-lg opacity-70 font-serif leading-relaxed">
-                <EditableText contentKey="library.description" defaultValue={language === 'ko' ? 'L.C.L Knowledge Library는 중국 언어학 박사의 학문적 엄격함과 20년 현지 체류의 직관을 결합한 지식의 정수입니다. 단순한 학습 자료를 넘어, 언어의 구조적 원리와 문화적 맥락을 관통하는 통찰력을 제공합니다.' : 'The L.C.L Knowledge Library is the essence of knowledge that combines the academic rigor of a PhD in Chinese linguistics with the intuition of 20 years of local residence. Beyond simple learning materials, it provides insight into the structural principles and cultural context of language.'} isEditMode={isEditMode} language={language} as="div" />
+                <EditableText contentKey="library.description" defaultValue={language === 'ko' ? 'L.C.L Knowledge Library는 중국 언어학 박사의 학문적 엄격함과 20년 현지 체류의 직관을 결합한 지식의 정수입니다. 단순한 학습 자료를 넘어, 언어의 구조적 원리와 문화적 맥락을 관통하는 통찰력을 제공합니다.' : 'The L.C.L Knowledge Library is the essence of knowledge that combines the academic rigor of a PhD in Chinese linguistics with the intuition of 20 years of local residence. Beyond simple learning materials, it provides insight into the structural principles and cultural context of language.'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
               </div>
             </div>
             <div className="relative hidden md:block">
               <div className="aspect-[16/9] bg-ink/5 rounded-[40px] overflow-hidden rotate-1">
-                <img 
-                  src="https://picsum.photos/seed/library-main/1200/800" 
+                <EditableImage 
+                  contentKey="library.image"
+                  defaultUrl="https://picsum.photos/seed/library-main/1200/800" 
                   alt="Library" 
                   className="w-full h-full object-cover opacity-80"
-                  referrerPolicy="no-referrer"
+                  isEditMode={isEditMode}
+                  language={language}
+                  siteContent={siteContent}
                 />
               </div>
             </div>
@@ -971,7 +1117,9 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
     categoryId: RESOURCE_GROUPS[0].categories[0].id,
     fileUrl: '',
     fileType: 'pdf' as 'pdf' | 'mp3' | 'image',
-    accessLevel: 'member' as 'public' | 'member' | 'premium'
+    accessLevel: 'member' as 'public' | 'member' | 'premium',
+    author: '',
+    tags: ''
   });
 
   useEffect(() => {
@@ -1050,16 +1198,18 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
   const handleCreateResource = async (e: FormEvent) => {
     e.preventDefault();
     const path = 'resources';
+    const resourceData = {
+      ...newResource,
+      tags: newResource.tags.split(',').map(t => t.trim()).filter(Boolean),
+      updatedAt: serverTimestamp()
+    };
     try {
       if (editingResource) {
-        await updateDoc(doc(db, path, editingResource.id), {
-          ...newResource,
-          updatedAt: serverTimestamp()
-        });
+        await updateDoc(doc(db, path, editingResource.id), resourceData);
         setEditingResource(null);
       } else {
         await addDoc(collection(db, path), {
-          ...newResource,
+          ...resourceData,
           downloadCount: 0,
           createdAt: serverTimestamp()
         });
@@ -1071,7 +1221,9 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
         categoryId: RESOURCE_GROUPS[0].categories[0].id,
         fileUrl: '',
         fileType: 'pdf',
-        accessLevel: 'member'
+        accessLevel: 'member',
+        author: '',
+        tags: ''
       });
       alert(language === 'ko' ? '처리가 완료되었습니다.' : 'Operation completed.');
     } catch (error) {
@@ -1113,7 +1265,9 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
       categoryId: res.categoryId,
       fileUrl: res.fileUrl,
       fileType: res.fileType,
-      accessLevel: res.accessLevel
+      accessLevel: res.accessLevel,
+      author: res.author || '',
+      tags: Array.isArray(res.tags) ? res.tags.join(', ') : ''
     });
     // Scroll to form
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1234,7 +1388,7 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
       {/* Quick Actions Bar */}
       <div className="flex flex-wrap gap-4 p-6 bg-gold/5 border border-gold/10 rounded-3xl">
         <button 
-          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', fileType: 'pdf', accessLevel: 'member' }); }}
+          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '' }); }}
           className="flex items-center gap-2 px-6 py-3 bg-ink text-paper rounded-xl text-[10px] uppercase tracking-widest font-bold hover:bg-gold transition-all"
         >
           <Upload size={14} />
@@ -1406,7 +1560,9 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                       categoryId: RESOURCE_GROUPS[0].categories[0].id,
                       fileUrl: '',
                       fileType: 'pdf',
-                      accessLevel: 'member'
+                      accessLevel: 'member',
+                      author: '',
+                      tags: ''
                     });
                   }}
                   className="text-xs text-gold underline"
@@ -1480,6 +1636,28 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                       <option value="member">Member</option>
                       <option value="premium">Premium</option>
                     </select>
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">Author</label>
+                    <input 
+                      type="text"
+                      value={newResource.author}
+                      onChange={(e) => setNewResource(prev => ({ ...prev, author: e.target.value }))}
+                      className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-sm"
+                      placeholder="Dr. L.C.L"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">Tags (comma-separated)</label>
+                    <input 
+                      type="text"
+                      value={newResource.tags}
+                      onChange={(e) => setNewResource(prev => ({ ...prev, tags: e.target.value }))}
+                      className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-sm"
+                      placeholder="HSK, Vocabulary, PDF"
+                    />
                   </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1920,13 +2098,30 @@ const MyPageView: FC = () => {
   );
 }
 
-const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: string | null }, onClearFilter?: () => void, language: LanguageCode }> = ({ initialFilter, onClearFilter, language }) => {
+const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: string | null }, onClearFilter?: () => void, language: LanguageCode, isAdmin: boolean }> = ({ initialFilter, onClearFilter, language, isAdmin }) => {
   const t = TRANSLATIONS[language];
   const [resources, setResources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedGroup, setSelectedGroup] = useState<string | null>(initialFilter?.groupId || null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialFilter?.categoryId || null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [selectedResource, setSelectedResource] = useState<any | null>(null);
+
+  // Admin Resource Form State
+  const [isManaging, setIsManaging] = useState(false);
+  const [editingResource, setEditingResource] = useState<any>(null);
+  const [uploading, setUploading] = useState(false);
+  const [newResource, setNewResource] = useState({
+    title: '',
+    description: '',
+    groupId: RESOURCE_GROUPS[0].id,
+    categoryId: RESOURCE_GROUPS[0].categories[0].id,
+    fileUrl: '',
+    fileType: 'pdf' as 'pdf' | 'mp3' | 'image',
+    accessLevel: 'member' as 'public' | 'member' | 'premium',
+    author: '',
+    tags: ''
+  });
 
   useEffect(() => {
     if (initialFilter) {
@@ -1941,7 +2136,6 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
       setResources(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     }, (error) => {
-      // If it's a permission error, we might still want to show what we have or a message
       console.error("Archive fetch error:", error);
       setLoading(false);
     });
@@ -1957,30 +2151,118 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
 
   const handleDownload = async (resource: any) => {
     if (!auth.currentUser) {
-      alert('로그인이 필요한 서비스입니다.');
+      alert(language === 'ko' ? '로그인이 필요한 서비스입니다.' : 'Login is required.');
+      loginWithGoogle().catch(console.error);
       return;
     }
     
-    // In a real app, we would trigger a file download here.
-    // For now, we'll just track the download.
-    const path = 'downloads';
+    const downloadPath = 'downloads';
     try {
-      await addDoc(collection(db, path), {
-        resourceId: resource.id,
-        userUid: auth.currentUser.uid,
-        timestamp: serverTimestamp()
-      });
-      
-      // Update download count on resource
       await updateDoc(doc(db, 'resources', resource.id), {
         downloadCount: (resource.downloadCount || 0) + 1
       });
       
       window.open(resource.fileUrl, '_blank');
+      
+      await addDoc(collection(db, downloadPath), {
+        resourceId: resource.id,
+        userUid: auth.currentUser.uid,
+        timestamp: serverTimestamp()
+      });
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, path);
+      handleFirestoreError(error, OperationType.CREATE, downloadPath);
     }
   };
+
+  const handleCreateResource = async (e: FormEvent) => {
+    e.preventDefault();
+    const path = 'resources';
+    const resourceData = {
+      ...newResource,
+      tags: newResource.tags.split(',').map(t => t.trim()).filter(Boolean),
+      updatedAt: serverTimestamp()
+    };
+    try {
+      if (editingResource) {
+        await updateDoc(doc(db, path, editingResource.id), resourceData);
+        setEditingResource(null);
+      } else {
+        await addDoc(collection(db, path), {
+          ...resourceData,
+          downloadCount: 0,
+          createdAt: serverTimestamp()
+        });
+      }
+      setNewResource({
+        title: '',
+        description: '',
+        groupId: RESOURCE_GROUPS[0].id,
+        categoryId: RESOURCE_GROUPS[0].categories[0].id,
+        fileUrl: '',
+        fileType: 'pdf',
+        accessLevel: 'member',
+        author: '',
+        tags: ''
+      });
+      setIsManaging(false);
+      alert(language === 'ko' ? '처리가 완료되었습니다.' : 'Operation completed.');
+    } catch (error) {
+      handleFirestoreError(error, editingResource ? OperationType.UPDATE : OperationType.CREATE, path);
+    }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploading(true);
+    try {
+      const storageRef = ref(storage, `resources/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      let fileType: 'pdf' | 'mp3' | 'image' = 'pdf';
+      if (extension === 'mp3') fileType = 'mp3';
+      if (['jpg', 'jpeg', 'png', 'gif'].includes(extension || '')) fileType = 'image';
+      setNewResource(prev => ({ ...prev, fileUrl: url, fileType }));
+      alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleEditResource = (res: any) => {
+    setEditingResource(res);
+    setNewResource({
+      title: res.title,
+      description: res.description,
+      groupId: res.groupId,
+      categoryId: res.categoryId,
+      fileUrl: res.fileUrl,
+      fileType: res.fileType,
+      accessLevel: res.accessLevel,
+      author: res.author || '',
+      tags: Array.isArray(res.tags) ? res.tags.join(', ') : ''
+    });
+    setIsManaging(true);
+  };
+
+  const handleDeleteResource = async (id: string) => {
+    if (!confirm(language === 'ko' ? '정말 삭제하시겠습니까?' : 'Are you sure you want to delete this?')) return;
+    const path = 'resources';
+    try {
+      await deleteDoc(doc(db, path, id));
+      if (selectedResource?.id === id) setSelectedResource(null);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  };
+
+  const relatedResources = selectedResource 
+    ? resources.filter(r => r.id !== selectedResource.id && r.categoryId === selectedResource.categoryId).slice(0, 3)
+    : [];
 
   if (loading) return <div className="py-20 text-center font-serif italic opacity-50">Loading Archive...</div>;
 
@@ -2090,15 +2372,26 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
               {(selectedGroup || selectedCategory || searchQuery) && (language === 'ko' ? " (필터 적용됨)" : " (Filtered)")}
             </p>
           </div>
-          <div className="relative w-full md:w-80">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30" size={18} />
-            <input 
-              type="text" 
-              placeholder={t.archive.search}
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-12 pr-6 py-4 bg-white border border-ink/10 rounded-full text-sm focus:outline-none focus:border-gold transition-all"
-            />
+          <div className="flex items-center gap-4 w-full md:w-auto">
+            {isAdmin && (
+              <button 
+                onClick={() => { setEditingResource(null); setIsManaging(true); }}
+                className="flex items-center gap-2 px-6 py-4 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:bg-ink/90 transition-all shadow-lg shadow-ink/10"
+              >
+                <Plus size={16} />
+                {language === 'ko' ? '자료 추가' : 'Add Resource'}
+              </button>
+            )}
+            <div className="relative flex-grow md:w-80">
+              <Search className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30" size={18} />
+              <input 
+                type="text" 
+                placeholder={t.archive.search}
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-12 pr-6 py-4 bg-white border border-ink/10 rounded-full text-sm focus:outline-none focus:border-gold transition-all"
+              />
+            </div>
           </div>
         </div>
 
@@ -2110,7 +2403,15 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
               layout
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="p-6 border border-ink/10 rounded-2xl bg-white space-y-4 flex flex-col hover:shadow-xl hover:shadow-ink/5 transition-all group"
+              onClick={() => {
+                if (!auth.currentUser) {
+                  alert(language === 'ko' ? '로그인이 필요한 서비스입니다.' : 'Login is required.');
+                  loginWithGoogle().catch(console.error);
+                  return;
+                }
+                setSelectedResource(res);
+              }}
+              className="p-6 border border-ink/10 rounded-2xl bg-white space-y-4 flex flex-col hover:shadow-xl hover:shadow-ink/5 transition-all group cursor-pointer"
             >
               <div className="flex justify-between items-start">
                 <div className="w-10 h-10 rounded-xl bg-ink/5 flex items-center justify-center text-ink/40 group-hover:bg-gold group-hover:text-ink transition-colors">
@@ -2118,28 +2419,53 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                   {res.fileType === 'mp3' && <Music size={20} />}
                   {res.fileType === 'image' && <ImageIcon size={20} />}
                 </div>
-                <span className={cn(
-                  "text-[8px] uppercase tracking-widest px-2 py-1 rounded-full font-bold",
-                  res.accessLevel === 'premium' ? "bg-gold/20 text-gold" : "bg-ink/5 text-ink/40"
-                )}>
-                  {res.accessLevel === 'public' ? t.archive.access.public : res.accessLevel === 'member' ? t.archive.access.member : t.archive.access.premium}
-                </span>
+                <div className="flex items-center gap-2">
+                  {isAdmin && (
+                    <div className="flex items-center gap-1">
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleEditResource(res); }}
+                        className="p-2 hover:bg-ink/5 rounded-full text-ink/40 hover:text-ink transition-colors"
+                      >
+                        <Edit size={14} />
+                      </button>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); handleDeleteResource(res.id); }}
+                        className="p-2 hover:bg-red-50 rounded-full text-ink/40 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  )}
+                  <span className={cn(
+                    "text-[8px] uppercase tracking-widest px-2 py-1 rounded-full font-bold",
+                    res.accessLevel === 'premium' ? "bg-gold/20 text-gold" : "bg-ink/5 text-ink/40"
+                  )}>
+                    {res.accessLevel === 'public' ? t.archive.access.public : res.accessLevel === 'member' ? t.archive.access.member : t.archive.access.premium}
+                  </span>
+                </div>
               </div>
               <div className="space-y-2 flex-grow">
-                <h3 className="font-bold text-lg leading-tight">{res.title}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-lg leading-tight">{res.title}</h3>
+                  {res.author && <span className="text-[10px] opacity-40 font-serif italic">by {res.author}</span>}
+                </div>
                 <p className="text-xs opacity-50 line-clamp-2">{res.description}</p>
+                {res.tags && res.tags.length > 0 && (
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {res.tags.map((tag: string) => (
+                      <span key={tag} className="text-[8px] px-1.5 py-0.5 bg-ink/5 rounded text-ink/40">#{tag}</span>
+                    ))}
+                  </div>
+                )}
               </div>
               <div className="pt-4 border-t border-ink/5 flex items-center justify-between">
                 <div className="flex items-center gap-2 opacity-30 text-[10px]">
                   <Download size={12} />
                   <span>{res.downloadCount || 0}</span>
                 </div>
-                <button 
-                  onClick={() => handleDownload(res)}
-                  className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold hover:text-gold transition-colors"
-                >
-                  {t.archive.download} <ChevronRight size={12} />
-                </button>
+                <div className="flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold group-hover:text-gold transition-colors">
+                  {language === 'ko' ? '상세보기' : 'View Details'} <ChevronRight size={12} />
+                </div>
               </div>
             </motion.div>
           )) : (
@@ -2150,6 +2476,298 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
           )}
         </div>
       </div>
+
+      {/* Admin Resource Management Modal */}
+      <AnimatePresence>
+        {isManaging && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-ink/60 backdrop-blur-sm"
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-paper w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden"
+            >
+              <div className="p-8 md:p-12 space-y-8">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-3xl font-serif italic">
+                    {editingResource ? (language === 'ko' ? '자료 수정' : 'Edit Resource') : (language === 'ko' ? '새 자료 추가' : 'Add New Resource')}
+                  </h3>
+                  <button onClick={() => setIsManaging(false)} className="p-2 hover:bg-ink/5 rounded-full transition-colors">
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <form onSubmit={handleCreateResource} className="space-y-6">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase tracking-widest opacity-50">Title</label>
+                      <input 
+                        type="text" required
+                        value={newResource.title}
+                        onChange={(e) => setNewResource(prev => ({ ...prev, title: e.target.value }))}
+                        className="w-full p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm focus:outline-none focus:border-gold transition-all"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase tracking-widest opacity-50">Description</label>
+                      <textarea 
+                        required
+                        value={newResource.description}
+                        onChange={(e) => setNewResource(prev => ({ ...prev, description: e.target.value }))}
+                        className="w-full p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm min-h-[100px] focus:outline-none focus:border-gold transition-all"
+                      />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase tracking-widest opacity-50">Author</label>
+                        <input 
+                          type="text"
+                          value={newResource.author}
+                          onChange={(e) => setNewResource(prev => ({ ...prev, author: e.target.value }))}
+                          className="w-full p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm focus:outline-none focus:border-gold transition-all"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase tracking-widest opacity-50">Tags</label>
+                        <input 
+                          type="text"
+                          value={newResource.tags}
+                          onChange={(e) => setNewResource(prev => ({ ...prev, tags: e.target.value }))}
+                          className="w-full p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm focus:outline-none focus:border-gold transition-all"
+                          placeholder="HSK, PDF, etc."
+                        />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase tracking-widest opacity-50">Group</label>
+                        <select 
+                          value={newResource.groupId}
+                          onChange={(e) => {
+                            const gid = e.target.value;
+                            const group = RESOURCE_GROUPS.find(g => g.id === gid);
+                            setNewResource(prev => ({ 
+                              ...prev, 
+                              groupId: gid, 
+                              categoryId: group?.categories[0].id || '' 
+                            }));
+                          }}
+                          className="w-full p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm focus:outline-none focus:border-gold transition-all"
+                        >
+                          {RESOURCE_GROUPS.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase tracking-widest opacity-50">Category</label>
+                        <select 
+                          value={newResource.categoryId}
+                          onChange={(e) => setNewResource(prev => ({ ...prev, categoryId: e.target.value }))}
+                          className="w-full p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm focus:outline-none focus:border-gold transition-all"
+                        >
+                          {RESOURCE_GROUPS.find(g => g.id === newResource.groupId)?.categories.map(c => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase tracking-widest opacity-50">File Type</label>
+                        <select 
+                          value={newResource.fileType}
+                          onChange={(e) => setNewResource(prev => ({ ...prev, fileType: e.target.value as any }))}
+                          className="w-full p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm focus:outline-none focus:border-gold transition-all"
+                        >
+                          <option value="pdf">PDF</option>
+                          <option value="mp3">MP3</option>
+                          <option value="image">Image</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase tracking-widest opacity-50">Access Level</label>
+                        <select 
+                          value={newResource.accessLevel}
+                          onChange={(e) => setNewResource(prev => ({ ...prev, accessLevel: e.target.value as any }))}
+                          className="w-full p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm focus:outline-none focus:border-gold transition-all"
+                        >
+                          <option value="public">Public</option>
+                          <option value="member">Member</option>
+                          <option value="premium">Premium</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase tracking-widest opacity-50">File URL / Upload</label>
+                      <div className="flex gap-2">
+                        <input 
+                          type="url" required
+                          value={newResource.fileUrl}
+                          onChange={(e) => setNewResource(prev => ({ ...prev, fileUrl: e.target.value }))}
+                          className="flex-grow p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm focus:outline-none focus:border-gold transition-all"
+                          placeholder="https://..."
+                        />
+                        <input 
+                          type="file" 
+                          onChange={handleFileUpload}
+                          disabled={uploading}
+                          className="hidden"
+                          id="archive-file-upload"
+                        />
+                        <label 
+                          htmlFor="archive-file-upload"
+                          className={cn(
+                            "px-6 py-4 rounded-2xl flex items-center justify-center cursor-pointer transition-all",
+                            uploading ? "bg-ink/10 text-ink/30" : "bg-gold text-ink hover:bg-gold/90"
+                          )}
+                        >
+                          {uploading ? <div className="w-5 h-5 border-2 border-ink/30 border-t-ink rounded-full animate-spin" /> : <Upload size={20} />}
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+
+                  <button 
+                    type="submit"
+                    className="w-full py-4 bg-ink text-paper rounded-2xl font-bold uppercase tracking-widest hover:bg-ink/90 transition-all shadow-xl shadow-ink/10"
+                  >
+                    {editingResource ? (language === 'ko' ? '수정 완료' : 'Update Resource') : (language === 'ko' ? '자료 등록' : 'Create Resource')}
+                  </button>
+                </form>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Resource Detail Modal */}
+      <AnimatePresence>
+        {selectedResource && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-ink/60 backdrop-blur-sm"
+            onClick={() => setSelectedResource(null)}
+          >
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              className="bg-paper w-full max-w-4xl max-h-[90vh] rounded-[40px] shadow-2xl overflow-hidden flex flex-col md:flex-row"
+              onClick={e => e.stopPropagation()}
+            >
+              {/* Left: Preview/Info */}
+              <div className="flex-grow p-8 md:p-12 space-y-8 overflow-y-auto">
+                <div className="flex justify-between items-start">
+                  <div className="space-y-2">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gold text-ink flex items-center justify-center">
+                        {selectedResource.fileType === 'pdf' && <FileText size={20} />}
+                        {selectedResource.fileType === 'mp3' && <Music size={20} />}
+                        {selectedResource.fileType === 'image' && <ImageIcon size={20} />}
+                      </div>
+                      <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">
+                        {selectedResource.fileType} Resource
+                      </span>
+                    </div>
+                    <h2 className="text-3xl md:text-4xl font-serif">{selectedResource.title}</h2>
+                    {selectedResource.author && <p className="text-sm opacity-50 font-serif italic">by {selectedResource.author}</p>}
+                    {selectedResource.tags && selectedResource.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 pt-2">
+                        {selectedResource.tags.map((tag: string) => (
+                          <span key={tag} className="text-[10px] text-gold font-medium">#{tag}</span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                  <button 
+                    onClick={() => setSelectedResource(null)}
+                    className="p-2 hover:bg-ink/5 rounded-full transition-colors"
+                  >
+                    <X size={24} />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  <h4 className="text-[10px] uppercase tracking-widest font-bold opacity-40">Description</h4>
+                  <div className="text-lg font-serif italic opacity-70 leading-relaxed">
+                    {selectedResource.description}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-8 border-y border-ink/5">
+                  <div className="space-y-1">
+                    <p className="text-[8px] uppercase tracking-widest opacity-40">Access</p>
+                    <p className="text-xs font-bold uppercase">{selectedResource.accessLevel}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[8px] uppercase tracking-widest opacity-40">Downloads</p>
+                    <p className="text-xs font-bold">{selectedResource.downloadCount || 0}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[8px] uppercase tracking-widest opacity-40">Type</p>
+                    <p className="text-xs font-bold uppercase">{selectedResource.fileType}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[8px] uppercase tracking-widest opacity-40">Date</p>
+                    <p className="text-xs font-bold">{selectedResource.createdAt?.toDate?.()?.toLocaleDateString() || 'Recently'}</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-wrap gap-4 pt-4">
+                  <button 
+                    onClick={() => handleDownload(selectedResource)}
+                    className="flex-grow md:flex-none px-10 py-4 bg-ink text-paper rounded-full text-xs uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all flex items-center justify-center gap-3 shadow-lg hover:shadow-gold/20"
+                  >
+                    <Download size={16} /> {t.archive.download}
+                  </button>
+                  {selectedResource.fileType === 'pdf' && (
+                    <button 
+                      onClick={() => window.open(selectedResource.fileUrl, '_blank')}
+                      className="flex-grow md:flex-none px-10 py-4 border border-ink/10 rounded-full text-xs uppercase tracking-widest font-bold hover:border-ink transition-all flex items-center justify-center gap-3"
+                    >
+                      <ExternalLink size={16} /> {language === 'ko' ? '미리보기' : 'Preview'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Right: Related Content */}
+              <div className="w-full md:w-80 bg-ink/5 p-8 md:p-12 space-y-8 border-l border-ink/5">
+                <h4 className="text-[10px] uppercase tracking-widest font-bold opacity-40">
+                  {language === 'ko' ? '관련 자료' : 'Related Content'}
+                </h4>
+                <div className="space-y-6">
+                  {relatedResources.length > 0 ? relatedResources.map(res => (
+                    <button 
+                      key={res.id}
+                      onClick={() => setSelectedResource(res)}
+                      className="w-full text-left space-y-2 group"
+                    >
+                      <div className="flex items-center gap-2 text-[8px] uppercase tracking-widest opacity-40 group-hover:text-gold transition-colors">
+                        {res.fileType === 'pdf' && <FileText size={10} />}
+                        {res.fileType === 'mp3' && <Music size={10} />}
+                        {res.fileType === 'image' && <ImageIcon size={10} />}
+                        {res.fileType}
+                      </div>
+                      <h5 className="font-bold text-sm leading-tight group-hover:text-gold transition-colors line-clamp-2">{res.title}</h5>
+                    </button>
+                  )) : (
+                    <p className="text-xs opacity-40 italic">
+                      {language === 'ko' ? '관련 자료가 없습니다.' : 'No related content found.'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </motion.div>
   );
 };
@@ -2365,7 +2983,7 @@ const CommunityView: FC<{ language: LanguageCode }> = ({ language }) => {
   );
 };
 
-const ImageGenView: FC<{ language: LanguageCode }> = ({ language }) => {
+const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: boolean, setView: (v: any) => void }> = ({ language, userProfile, isAuthReady, setView }) => {
   const t = TRANSLATIONS[language];
   const [prompt, setPrompt] = useState('');
   const [level, setLevel] = useState('beginner');
@@ -2377,6 +2995,8 @@ const ImageGenView: FC<{ language: LanguageCode }> = ({ language }) => {
   const [elapsedTime, setElapsedTime] = useState(0);
   const [finalTime, setFinalTime] = useState<number | null>(null);
   const timerRef = useRef<any>(null);
+
+  const isPremiumOrAdmin = userProfile?.role === 'admin' || userProfile?.role === 'premium';
 
   useEffect(() => {
     if (isGenerating) {
@@ -2393,7 +3013,7 @@ const ImageGenView: FC<{ language: LanguageCode }> = ({ language }) => {
   }, [isGenerating]);
 
   const handleGenerate = async () => {
-    if (!prompt) return;
+    if (!prompt || !isPremiumOrAdmin) return;
     setIsGenerating(true);
     setIsGeneratingAudio(false);
     setGeneratedImage(null);
@@ -2424,7 +3044,7 @@ const ImageGenView: FC<{ language: LanguageCode }> = ({ language }) => {
           }
         }),
         ai.models.generateContent({
-          model: 'gemini-3.1-pro-preview',
+          model: 'gemini-3-flash-preview',
           contents: `Generate a practical Chinese dialogue and vocabulary list based on this situation: "${prompt}". 
           Target learner level: ${level}.
           Interface language: ${language}.`,
@@ -2523,6 +3143,42 @@ const ImageGenView: FC<{ language: LanguageCode }> = ({ language }) => {
       setIsGenerating(false);
     }
   };
+
+  if (isAuthReady && !isPremiumOrAdmin) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0 }} 
+        animate={{ opacity: 1 }}
+        className="max-w-4xl mx-auto px-6 py-32 text-center space-y-8"
+      >
+        <div className="w-24 h-24 mx-auto bg-gold/10 rounded-full flex items-center justify-center text-gold">
+          <ShieldCheck size={48} />
+        </div>
+        <div className="space-y-4">
+          <h2 className="text-4xl font-serif">{language === 'ko' ? '프리미엄 전용 기능' : 'Premium Only Feature'}</h2>
+          <p className="text-lg opacity-60 font-serif italic max-w-md mx-auto">
+            {language === 'ko' 
+              ? 'AI 학습 자료 생성 기능은 프리미엄 회원 및 관리자만 이용 가능합니다. 박사님의 깊이 있는 커리큘럼과 AI 기술의 만남을 경험해 보세요.' 
+              : 'AI Learning Material Generation is available only for Premium members and Admins. Experience the fusion of Dr. Lee\'s deep curriculum and AI technology.'}
+          </p>
+        </div>
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+          <button 
+            onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
+            className="px-10 py-4 bg-gold text-ink font-bold rounded-full text-xs uppercase tracking-widest hover:scale-105 transition-transform"
+          >
+            {language === 'ko' ? '프리미엄 플랜 보기' : 'View Premium Plans'}
+          </button>
+          <button 
+            onClick={() => setView('landing')}
+            className="px-10 py-4 border border-ink/10 rounded-full text-xs uppercase tracking-widest hover:bg-ink/5 transition-all"
+          >
+            {language === 'ko' ? '홈으로 돌아가기' : 'Back to Home'}
+          </button>
+        </div>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div 

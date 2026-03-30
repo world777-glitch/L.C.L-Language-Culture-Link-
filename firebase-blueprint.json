@@ -56,6 +56,8 @@
         "fileUrl": { "type": "string", "format": "uri" },
         "fileType": { "type": "string", "enum": ["pdf", "mp3", "image"] },
         "accessLevel": { "type": "string", "enum": ["public", "member", "premium"] },
+        "author": { "type": "string" },
+        "tags": { "type": "array", "items": { "type": "string" } },
         "downloadCount": { "type": "integer" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -109,6 +111,9 @@
         "key": { "type": "string", "description": "The translation key or unique identifier (e.g., 'hero.title')" },
         "language": { "type": "string", "description": "The language code (e.g., 'ko')" },
         "value": { "type": "string", "description": "The overridden text or image URL" },
+        "fontFamily": { "type": "string" },
+        "fontSize": { "type": "string" },
+        "color": { "type": "string" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["key", "language", "value"]
