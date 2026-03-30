@@ -33,17 +33,20 @@ import {
   MessageCircle,
   Send,
   Filter,
-  MoreVertical
+  MoreVertical,
+  Upload,
+  Edit
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { GoogleGenAI, Modality } from "@google/genai";
+import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { COURSES, calculatePrice, RESOURCE_GROUPS } from './constants';
 import { cn } from './lib/utils';
 import { LANGUAGES, TRANSLATIONS, LanguageCode } from './translations';
 
-import { auth, loginWithGoogle, logout as firebaseLogout, db, handleFirestoreError, OperationType } from './firebase';
+import { auth, loginWithGoogle, logout as firebaseLogout, db, storage, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, addDoc, serverTimestamp, onSnapshot, query, where, orderBy, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, setDoc, serverTimestamp, onSnapshot, query, where, orderBy, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 
 // Helper to convert raw PCM from Gemini TTS to a playable WAV Blob
 const pcmToWav = (pcmBase64: string, sampleRate: number = 24000) => {
@@ -84,15 +87,47 @@ export default function App() {
   const [language, setLanguage] = useState<LanguageCode>('ko');
   const t = TRANSLATIONS[language];
 
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [siteContent, setSiteContent] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'siteContent'), (snapshot) => {
+      const content: Record<string, string> = {};
+      snapshot.docs.forEach(doc => {
+        const data = doc.data();
+        if (data.language === language) {
+          content[data.key] = data.value;
+        }
+      });
+      setSiteContent(content);
+    });
+    return () => unsubscribe();
+  }, [language]);
+
+  const [showScrollTop, setShowScrollTop] = useState(false);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      setShowScrollTop(window.scrollY > 400);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (u) => {
       setUser(u);
       if (u) {
         const userRef = doc(db, 'users', u.uid);
         const userSnap = await getDoc(userRef);
-        if (userSnap.exists()) {
-          setUserProfile(userSnap.data());
+        let profile = userSnap.exists() ? userSnap.data() : { role: 'user' };
+        
+        // Fallback for default admin
+        if (u.email === 'lhbin777@gmail.com') {
+          profile.role = 'admin';
         }
+        
+        setUserProfile(profile);
       } else {
         setUserProfile(null);
       }
@@ -118,8 +153,37 @@ export default function App() {
     }
   };
 
+  const scrollToSection = (sectionId: string) => {
+    if (view !== 'landing') {
+      setView('landing');
+      // Small delay to ensure LandingView is mounted before scrolling
+      setTimeout(() => {
+        const element = document.getElementById(sectionId);
+        if (element) element.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    } else {
+      const element = document.getElementById(sectionId);
+      if (element) element.scrollIntoView({ behavior: 'smooth' });
+    }
+  };
+
   return (
     <div className="min-h-screen flex flex-col">
+      {/* Scroll to Top Button */}
+      <AnimatePresence>
+        {showScrollTop && (
+          <motion.button 
+            initial={{ opacity: 0, scale: 0.5 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.5 }}
+            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+            className="fixed bottom-8 right-8 z-50 w-12 h-12 bg-ink text-paper rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-transform"
+          >
+            <Plus className="rotate-45" size={24} />
+          </motion.button>
+        )}
+      </AnimatePresence>
+
       {/* Navigation */}
       <nav className="sticky top-0 z-50 bg-paper/80 backdrop-blur-md border-b border-ink/10">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
@@ -154,20 +218,32 @@ export default function App() {
                 ))}
               </div>
             </div>
-            <button onClick={() => setView('landing')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.curriculum}</button>
-            <button onClick={() => setView('landing')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.pricing}</button>
+            <button onClick={() => scrollToSection('curriculum')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.curriculum}</button>
+            <button onClick={() => scrollToSection('pricing')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.pricing}</button>
+            <button onClick={() => scrollToSection('library')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.archive.title}</button>
             <button onClick={() => setView('archive')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.archive}</button>
             <button onClick={() => setView('community')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.community}</button>
             <button onClick={() => setView('image-gen')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.aiStudio}</button>
             {user ? (
               <div className="flex items-center gap-4">
                 {userProfile?.role === 'admin' && (
-                  <button 
-                    onClick={() => setView('admin')}
-                    className="flex items-center gap-2 text-xs uppercase tracking-widest text-gold font-bold hover:opacity-80 transition-colors"
-                  >
-                    <LayoutDashboard size={16} /> {t.nav.admin}
-                  </button>
+                  <div className="flex items-center gap-4 border-r border-ink/10 pr-4">
+                    <button 
+                      onClick={() => setIsEditMode(!isEditMode)}
+                      className={cn(
+                        "flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] px-3 py-1 rounded-full border transition-all",
+                        isEditMode ? "bg-gold text-ink border-gold font-bold" : "border-ink/20 opacity-50 hover:opacity-100"
+                      )}
+                    >
+                      {isEditMode ? 'Edit Mode ON' : 'Edit Mode OFF'}
+                    </button>
+                    <button 
+                      onClick={() => setView('admin')}
+                      className="flex items-center gap-2 text-xs uppercase tracking-widest text-gold font-bold hover:opacity-80 transition-colors"
+                    >
+                      <LayoutDashboard size={16} /> {t.nav.admin}
+                    </button>
+                  </div>
                 )}
                 <button 
                   onClick={() => setView('mypage')}
@@ -191,13 +267,39 @@ export default function App() {
 
       <main className="flex-grow">
         <AnimatePresence mode="wait">
-          {view === 'landing' && <LandingView key="landing" setView={setView} onBook={(course) => { setSelectedCourse(course); setView('booking'); }} setInitialArchiveFilter={setInitialArchiveFilter} language={language} />}
+          {view === 'landing' && <LandingView key="landing" setView={setView} onBook={(course) => { setSelectedCourse(course); setView('booking'); }} setInitialArchiveFilter={setInitialArchiveFilter} language={language} isEditMode={isEditMode} siteContent={siteContent} />}
           {view === 'booking' && <BookingView key="booking" course={selectedCourse} onComplete={() => setView('mypage')} />}
           {view === 'mypage' && <MyPageView key="mypage" />}
           {view === 'admin' && <AdminView key="admin" language={language} />}
           {view === 'image-gen' && <ImageGenView key="image-gen" language={language} />}
           {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} />}
           {view === 'community' && <CommunityView key="community" language={language} />}
+        </AnimatePresence>
+
+        {/* Edit Mode Instruction Bar */}
+        <AnimatePresence>
+          {isEditMode && (
+            <motion.div 
+              initial={{ y: 100, x: '-50%' }}
+              animate={{ y: 0, x: '-50%' }}
+              exit={{ y: 100, x: '-50%' }}
+              className="fixed bottom-8 left-1/2 z-[100] bg-gold text-ink px-6 py-3 rounded-full shadow-2xl flex items-center gap-4 border border-ink/10"
+            >
+              <div className="w-8 h-8 bg-ink text-paper rounded-full flex items-center justify-center">
+                <Edit size={16} />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[10px] uppercase tracking-widest font-bold leading-none">Admin Edit Mode</span>
+                <span className="text-xs font-serif italic">Click on any text element to edit it directly.</span>
+              </div>
+              <button 
+                onClick={() => setIsEditMode(false)}
+                className="ml-4 p-1 hover:bg-ink/10 rounded-full transition-colors"
+              >
+                <Plus size={20} className="rotate-45" />
+              </button>
+            </motion.div>
+          )}
         </AnimatePresence>
       </main>
 
@@ -208,14 +310,16 @@ export default function App() {
               <div className="w-8 h-8 bg-paper text-ink rounded-full flex items-center justify-center font-serif text-lg font-bold">L</div>
               <span className="font-serif text-xl font-bold tracking-tight">{t.nav.systemName}</span>
             </div>
-            <p className="font-serif text-2xl font-light leading-relaxed opacity-80 max-w-md">
-              {t.footer.quote}
-            </p>
+            <div className="font-serif text-2xl font-light leading-relaxed opacity-80 max-w-md">
+              <EditableText contentKey="footer.quote" defaultValue={t.footer.quote} isEditMode={isEditMode} language={language} />
+            </div>
           </div>
           <div>
             <h4 className="text-xs uppercase tracking-widest mb-6 opacity-50">{t.footer.contact}</h4>
             <p className="text-sm">lhbin777@gmail.com</p>
-            <p className="text-sm mt-2">{language === 'ko' ? '20년 현지 경력 & 언어학 박사 직강' : '20 Years Local Experience & PhD Direct Instruction'}</p>
+            <div className="text-sm mt-2">
+              <EditableText contentKey="footer.experience" defaultValue={language === 'ko' ? '20년 현지 경력 & 언어학 박사 직강' : '20 Years Local Experience & PhD Direct Instruction'} isEditMode={isEditMode} language={language} />
+            </div>
           </div>
           <div>
             <h4 className="text-xs uppercase tracking-widest mb-6 opacity-50">{t.footer.social}</h4>
@@ -227,15 +331,88 @@ export default function App() {
         </div>
         <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-paper/10 flex justify-between items-center">
           <p className="text-[10px] uppercase tracking-widest opacity-40">{t.footer.rights}</p>
-          <p className="text-[10px] uppercase tracking-widest opacity-40">{t.footer.tagline}</p>
+          <div className="text-[10px] uppercase tracking-widest opacity-40">
+            <EditableText contentKey="footer.tagline" defaultValue={t.footer.tagline} isEditMode={isEditMode} language={language} />
+          </div>
         </div>
       </footer>
     </div>
   );
 }
 
-const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode }> = ({ setView, onBook, setInitialArchiveFilter, language }) => {
+const EditableText: FC<{ 
+  contentKey: string, 
+  defaultValue: string, 
+  isEditMode: boolean, 
+  language: string,
+  className?: string,
+  as?: any
+}> = ({ contentKey, defaultValue, isEditMode, language, className, as: Component = 'span' }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const [value, setValue] = useState(defaultValue);
+
+  useEffect(() => {
+    setValue(defaultValue);
+  }, [defaultValue]);
+
+  const handleSave = async () => {
+    const docId = `${language}_${contentKey.replace(/\./g, '_')}`;
+    try {
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: contentKey,
+        language,
+        value,
+        updatedAt: serverTimestamp()
+      });
+      setIsEditing(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
+  if (isEditMode) {
+    return (
+      <div className={cn("relative group", className)}>
+        {isEditing ? (
+          <div className="flex flex-col gap-2 w-full min-w-[200px]">
+            <textarea 
+              value={value} 
+              onChange={(e) => setValue(e.target.value)}
+              className="w-full p-2 bg-paper border border-gold rounded-lg text-ink font-serif text-sm focus:outline-none focus:ring-1 focus:ring-gold"
+              rows={3}
+              autoFocus
+            />
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-[10px] uppercase tracking-widest opacity-50 hover:opacity-100 transition-opacity">Cancel</button>
+              <button onClick={handleSave} className="px-3 py-1 bg-gold text-ink rounded-full text-[10px] uppercase tracking-widest font-bold hover:scale-105 transition-transform">Save</button>
+            </div>
+          </div>
+        ) : (
+          <div 
+            className="relative cursor-pointer group/item"
+            onClick={() => setIsEditing(true)}
+          >
+            <div className="absolute -inset-2 border border-dashed border-gold/0 group-hover/item:border-gold/40 rounded-lg transition-colors -z-10" />
+            <Component className={className}>{value}</Component>
+            <button 
+              className="absolute -top-2 -right-2 w-6 h-6 bg-gold text-ink rounded-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity shadow-lg z-10"
+            >
+              <Edit size={12} />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return <Component className={className}>{value}</Component>;
+};
+
+const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode, isEditMode: boolean, siteContent: Record<string, string> }> = ({ setView, onBook, setInitialArchiveFilter, language, isEditMode, siteContent }) => {
   const t = TRANSLATIONS[language];
+  
+  const getT = (key: string, defaultVal: string) => siteContent[key] || defaultVal;
+
   return (
     <motion.div 
       initial={{ opacity: 0 }} 
@@ -268,7 +445,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               transition={{ delay: 0.2 }}
               className="inline-block px-4 py-1 border border-gold text-gold text-[10px] uppercase tracking-[0.3em] rounded-full"
             >
-              {t.hero.badge}
+              <EditableText contentKey="hero.badge" defaultValue={t.hero.badge} isEditMode={isEditMode} language={language} />
             </motion.div>
             <motion.h1 
               initial={{ y: 30, opacity: 0 }}
@@ -276,22 +453,16 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               transition={{ delay: 0.4 }}
               className="text-7xl md:text-8xl font-serif font-light leading-[0.9] tracking-tighter"
             >
-              {language === 'ko' ? (
-                <>
-                  박사의 깊이를 <br />
-                  <span className="italic text-gold">더한</span> 프리미엄 <br />
-                  중국어
-                </>
-              ) : t.hero.title}
+              <EditableText contentKey="hero.title" defaultValue={t.hero.title} isEditMode={isEditMode} language={language} as="div" />
             </motion.h1>
-            <motion.p 
+            <motion.div 
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.6 }}
               className="text-lg font-serif max-w-md opacity-70 leading-relaxed"
             >
-              {t.hero.subtitle}
-            </motion.p>
+              <EditableText contentKey="hero.subtitle" defaultValue={t.hero.subtitle} isEditMode={isEditMode} language={language} as="div" />
+            </motion.div>
             <motion.div 
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -323,12 +494,16 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       <section id="curriculum" className="max-w-7xl mx-auto px-6 py-20">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
           <div className="space-y-4">
-            <span className="text-gold text-[10px] uppercase tracking-[0.4em]">{t.curriculum.badge}</span>
-            <h2 className="text-5xl font-serif font-light">{t.curriculum.title}</h2>
+            <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+              <EditableText contentKey="curriculum.badge" defaultValue={t.curriculum.badge} isEditMode={isEditMode} language={language} />
+            </span>
+            <h2 className="text-5xl font-serif font-light">
+              <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} />
+            </h2>
           </div>
-          <p className="max-w-xs text-sm opacity-60 font-serif italic">
-            {t.curriculum.subtitle}
-          </p>
+          <div className="max-w-xs text-sm opacity-60 font-serif italic">
+            <EditableText contentKey="curriculum.subtitle" defaultValue={t.curriculum.subtitle} isEditMode={isEditMode} language={language} />
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-px bg-ink/10 border border-ink/10">
@@ -366,14 +541,18 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       </section>
 
       {/* Pricing Section */}
-      <section className="bg-ink text-paper py-32 px-6">
+      <section id="pricing" className="bg-ink text-paper py-32 px-6">
         <div className="max-w-7xl mx-auto">
           <div className="text-center space-y-6 mb-20">
-            <span className="text-gold text-[10px] uppercase tracking-[0.4em]">{t.pricing.badge}</span>
-            <h2 className="text-5xl font-serif font-light">{t.pricing.title}</h2>
-            <p className="max-w-xl mx-auto opacity-60 font-serif italic">
-              {t.pricing.subtitle}
-            </p>
+            <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+              <EditableText contentKey="pricing.badge" defaultValue={t.pricing.badge} isEditMode={isEditMode} language={language} />
+            </span>
+            <h2 className="text-5xl font-serif font-light">
+              <EditableText contentKey="pricing.title" defaultValue={t.pricing.title} isEditMode={isEditMode} language={language} />
+            </h2>
+            <div className="max-w-xl mx-auto opacity-60 font-serif italic">
+              <EditableText contentKey="pricing.subtitle" defaultValue={t.pricing.subtitle} isEditMode={isEditMode} language={language} />
+            </div>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
@@ -422,29 +601,33 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       {/* Testimonials / Quote */}
       <section className="max-w-4xl mx-auto px-6 py-32 text-center space-y-12">
         <div className="w-12 h-12 mx-auto border border-ink/10 rounded-full flex items-center justify-center opacity-20">"</div>
-        <p className="text-4xl md:text-5xl font-serif font-light italic leading-tight">
-          {t.testimonial.quote}
-        </p>
+        <div className="text-4xl md:text-5xl font-serif font-light italic leading-tight">
+          <EditableText contentKey="testimonial.quote" defaultValue={t.testimonial.quote} isEditMode={isEditMode} language={language} />
+        </div>
         <div className="space-y-2">
-          <p className="text-xs uppercase tracking-widest font-bold">{t.testimonial.author}</p>
-          <p className="text-[10px] uppercase tracking-widest opacity-50">{t.testimonial.authorTitle}</p>
+          <div className="text-xs uppercase tracking-widest font-bold">
+            <EditableText contentKey="testimonial.author" defaultValue={t.testimonial.author} isEditMode={isEditMode} language={language} />
+          </div>
+          <div className="text-[10px] uppercase tracking-widest opacity-50">
+            <EditableText contentKey="testimonial.authorTitle" defaultValue={t.testimonial.authorTitle} isEditMode={isEditMode} language={language} />
+          </div>
         </div>
       </section>
 
       {/* Resource Marketing Section - Redesigned with Categories */}
-      <section className="bg-paper py-32 px-6 border-y border-ink/5">
+      <section id="library" className="bg-paper py-32 px-6 border-y border-ink/5">
         <div className="max-w-7xl mx-auto space-y-20">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
             <div className="space-y-8">
-              <span className="text-gold text-[10px] uppercase tracking-[0.4em]">Knowledge Library</span>
+              <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+                <EditableText contentKey="library.badge" defaultValue="Knowledge Library" isEditMode={isEditMode} language={language} />
+              </span>
               <h2 className="text-5xl md:text-6xl font-serif font-light leading-tight">
-                "언어는 고립된 기호가 아니라, <br />
-                <span className="italic text-gold">역사가 숨 쉬는 생명체</span>입니다."
+                <EditableText contentKey="library.title" defaultValue={language === 'ko' ? '"언어는 고립된 기호가 아니라, 역사가 숨 쉬는 생명체입니다."' : '"Language is not an isolated symbol, but a living organism where history breathes."'} isEditMode={isEditMode} language={language} as="div" />
               </h2>
-              <p className="text-lg opacity-70 font-serif leading-relaxed">
-                L.C.L Knowledge Library는 중국 언어학 박사의 학문적 엄격함과 20년 현지 체류의 직관을 결합한 지식의 정수입니다. 
-                단순한 학습 자료를 넘어, 언어의 구조적 원리와 문화적 맥락을 관통하는 통찰력을 제공합니다.
-              </p>
+              <div className="text-lg opacity-70 font-serif leading-relaxed">
+                <EditableText contentKey="library.description" defaultValue={language === 'ko' ? 'L.C.L Knowledge Library는 중국 언어학 박사의 학문적 엄격함과 20년 현지 체류의 직관을 결합한 지식의 정수입니다. 단순한 학습 자료를 넘어, 언어의 구조적 원리와 문화적 맥락을 관통하는 통찰력을 제공합니다.' : 'The L.C.L Knowledge Library is the essence of knowledge that combines the academic rigor of a PhD in Chinese linguistics with the intuition of 20 years of local residence. Beyond simple learning materials, it provides insight into the structural principles and cultural context of language.'} isEditMode={isEditMode} language={language} as="div" />
+              </div>
             </div>
             <div className="relative hidden md:block">
               <div className="aspect-[16/9] bg-ink/5 rounded-[40px] overflow-hidden rotate-1">
@@ -771,11 +954,14 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
   const [resources, setResources] = useState<any[]>([]);
   const [downloads, setDownloads] = useState<any[]>([]);
   const [communityPosts, setCommunityPosts] = useState<any[]>([]);
+  const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'reservations' | 'resources' | 'community' | 'stats'>('reservations');
+  const [activeTab, setActiveTab] = useState<'reservations' | 'resources' | 'community' | 'users' | 'stats'>('reservations');
   
   const [feedbackText, setFeedbackText] = useState<{ [key: string]: string }>({});
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
+  const [editingResource, setEditingResource] = useState<any>(null);
+  const [uploading, setUploading] = useState(false);
   
   // Resource Form State
   const [newResource, setNewResource] = useState({
@@ -809,6 +995,10 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
       setCommunityPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'community'));
 
+    const unsubFeedbacks = onSnapshot(collection(db, 'feedback'), (snapshot) => {
+      setFeedbacks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'feedback'));
+
     setLoading(false);
 
     return () => {
@@ -817,6 +1007,7 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
       unsubResources();
       unsubDownloads();
       unsubCommunity();
+      unsubFeedbacks();
     };
   }, []);
 
@@ -834,16 +1025,25 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
     if (!content) return;
     const path = 'feedback';
     try {
-      await addDoc(collection(db, path), {
-        reservationId: resId,
-        studentUid,
-        content,
-        createdAt: serverTimestamp()
-      });
+      const existingFeedback = feedbacks.find(f => f.reservationId === resId);
+      if (existingFeedback) {
+        await updateDoc(doc(db, path, existingFeedback.id), {
+          content,
+          updatedAt: serverTimestamp()
+        });
+        alert(language === 'ko' ? '피드백이 수정되었습니다.' : 'Feedback has been updated.');
+      } else {
+        await addDoc(collection(db, path), {
+          reservationId: resId,
+          studentUid,
+          content,
+          createdAt: serverTimestamp()
+        });
+        alert(language === 'ko' ? '피드백이 전송되었습니다.' : 'Feedback has been sent.');
+      }
       setFeedbackText(prev => ({ ...prev, [resId]: '' }));
-      alert(language === 'ko' ? '피드백이 전송되었습니다.' : 'Feedback has been sent.');
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, path);
+      handleFirestoreError(error, OperationType.WRITE, path);
     }
   };
 
@@ -851,11 +1051,19 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
     e.preventDefault();
     const path = 'resources';
     try {
-      await addDoc(collection(db, path), {
-        ...newResource,
-        downloadCount: 0,
-        createdAt: serverTimestamp()
-      });
+      if (editingResource) {
+        await updateDoc(doc(db, path, editingResource.id), {
+          ...newResource,
+          updatedAt: serverTimestamp()
+        });
+        setEditingResource(null);
+      } else {
+        await addDoc(collection(db, path), {
+          ...newResource,
+          downloadCount: 0,
+          createdAt: serverTimestamp()
+        });
+      }
       setNewResource({
         title: '',
         description: '',
@@ -865,10 +1073,50 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
         fileType: 'pdf',
         accessLevel: 'member'
       });
-      alert(language === 'ko' ? '자료가 업로드되었습니다.' : 'Resource has been uploaded.');
+      alert(language === 'ko' ? '처리가 완료되었습니다.' : 'Operation completed.');
     } catch (error) {
-      handleFirestoreError(error, OperationType.CREATE, path);
+      handleFirestoreError(error, editingResource ? OperationType.UPDATE : OperationType.CREATE, path);
     }
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(true);
+    try {
+      const storageRef = ref(storage, `resources/${Date.now()}_${file.name}`);
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      let fileType: 'pdf' | 'mp3' | 'image' = 'pdf';
+      if (extension === 'mp3') fileType = 'mp3';
+      if (['jpg', 'jpeg', 'png', 'gif'].includes(extension || '')) fileType = 'image';
+      
+      setNewResource(prev => ({ ...prev, fileUrl: url, fileType }));
+      alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+    } catch (error) {
+      console.error('Upload error:', error);
+      alert(language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.');
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleEditResource = (res: any) => {
+    setEditingResource(res);
+    setNewResource({
+      title: res.title,
+      description: res.description,
+      groupId: res.groupId,
+      categoryId: res.categoryId,
+      fileUrl: res.fileUrl,
+      fileType: res.fileType,
+      accessLevel: res.accessLevel
+    });
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleDeleteResource = async (id: string) => {
@@ -936,6 +1184,24 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
     }
   };
 
+  const [editingPost, setEditingPost] = useState<any>(null);
+  const [editPostData, setEditPostData] = useState({ title: '', content: '' });
+
+  const handleEditPost = async (postId: string) => {
+    const path = 'community';
+    try {
+      await updateDoc(doc(db, path, postId), {
+        title: editPostData.title,
+        content: editPostData.content,
+        updatedAt: serverTimestamp()
+      });
+      setEditingPost(null);
+      alert(language === 'ko' ? '게시글이 수정되었습니다.' : 'Post updated.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  };
+
   if (loading) return <div className="py-20 text-center font-serif italic opacity-50">{t.community.loading}</div>;
 
   return (
@@ -950,7 +1216,7 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
           <h2 className="text-5xl font-serif font-light">{t.nav.systemName}</h2>
         </div>
         <div className="flex bg-ink/5 p-1 rounded-2xl">
-          {(['reservations', 'resources', 'community', 'stats'] as const).map(tab => (
+          {(['reservations', 'resources', 'community', 'users', 'stats'] as const).map(tab => (
             <button 
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -959,10 +1225,35 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                 activeTab === tab ? "bg-ink text-paper shadow-lg" : "opacity-40 hover:opacity-100"
               )}
             >
-              {t.admin[tab]}
+              {t.admin[tab] || tab}
             </button>
           ))}
         </div>
+      </div>
+
+      {/* Quick Actions Bar */}
+      <div className="flex flex-wrap gap-4 p-6 bg-gold/5 border border-gold/10 rounded-3xl">
+        <button 
+          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', fileType: 'pdf', accessLevel: 'member' }); }}
+          className="flex items-center gap-2 px-6 py-3 bg-ink text-paper rounded-xl text-[10px] uppercase tracking-widest font-bold hover:bg-gold transition-all"
+        >
+          <Upload size={14} />
+          {language === 'ko' ? '신규 자료 업로드' : 'Upload New Resource'}
+        </button>
+        <button 
+          onClick={() => setActiveTab('resources')}
+          className="flex items-center gap-2 px-6 py-3 bg-white border border-ink/10 text-ink rounded-xl text-[10px] uppercase tracking-widest font-bold hover:border-gold transition-all"
+        >
+          <Edit size={14} />
+          {language === 'ko' ? '자료 수정/관리' : 'Edit/Manage Resources'}
+        </button>
+        <button 
+          onClick={() => setActiveTab('reservations')}
+          className="flex items-center gap-2 px-6 py-3 bg-white border border-ink/10 text-ink rounded-xl text-[10px] uppercase tracking-widest font-bold hover:border-gold transition-all"
+        >
+          <Calendar size={14} />
+          {language === 'ko' ? '예약 현황 수정' : 'Edit Reservations'}
+        </button>
       </div>
 
       {activeTab === 'reservations' && (
@@ -983,6 +1274,34 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                   </div>
                   <div className="flex items-center gap-4">
                     <select 
+                      value={res.courseId}
+                      onChange={async (e) => {
+                        const path = 'reservations';
+                        try {
+                          await updateDoc(doc(db, path, res.id), { courseId: e.target.value });
+                        } catch (error) {
+                          handleFirestoreError(error, OperationType.UPDATE, path);
+                        }
+                      }}
+                      className="px-4 py-2 border border-ink/10 rounded-xl text-[10px] uppercase tracking-widest bg-paper font-bold"
+                    >
+                      {COURSES.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                    </select>
+                    <select 
+                      value={res.level}
+                      onChange={async (e) => {
+                        const path = 'reservations';
+                        try {
+                          await updateDoc(doc(db, path, res.id), { level: e.target.value });
+                        } catch (error) {
+                          handleFirestoreError(error, OperationType.UPDATE, path);
+                        }
+                      }}
+                      className="px-4 py-2 border border-ink/10 rounded-xl text-[10px] uppercase tracking-widest bg-paper font-bold"
+                    >
+                      {['intro', 'beginner', 'intermediate', 'advanced', 'expert'].map(l => <option key={l} value={l}>{l}</option>)}
+                    </select>
+                    <select 
                       value={res.status}
                       onChange={(e) => updateStatus(res.id, e.target.value)}
                       className="px-4 py-2 border border-ink/10 rounded-xl text-xs uppercase tracking-widest bg-paper"
@@ -991,6 +1310,20 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                       <option value="confirmed">Confirmed</option>
                       <option value="completed">Completed</option>
                     </select>
+                    <button 
+                      onClick={async () => {
+                        if (!confirm(language === 'ko' ? '정말 삭제하시겠습니까?' : 'Are you sure you want to delete this reservation?')) return;
+                        const path = 'reservations';
+                        try {
+                          await deleteDoc(doc(db, path, res.id));
+                        } catch (error) {
+                          handleFirestoreError(error, OperationType.DELETE, path);
+                        }
+                      }}
+                      className="p-2 text-ink/20 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
                     <div className={cn(
                       "px-3 py-1 text-[10px] uppercase tracking-widest rounded-full font-bold",
                       res.status === 'confirmed' ? "bg-green-100 text-green-700" : 
@@ -1025,10 +1358,17 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                 </div>
 
                 <div className="space-y-4">
-                  <label className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.feedback}</label>
+                  <div className="flex justify-between items-center">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.feedback}</label>
+                    {feedbacks.find(f => f.reservationId === res.id) && (
+                      <span className="text-[8px] uppercase tracking-widest text-gold font-bold">
+                        {language === 'ko' ? '기존 피드백 있음' : 'Existing Feedback'}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex gap-4">
                     <textarea 
-                      value={feedbackText[res.id] || ''}
+                      value={feedbackText[res.id] !== undefined ? feedbackText[res.id] : (feedbacks.find(f => f.reservationId === res.id)?.content || '')}
                       onChange={(e) => setFeedbackText(prev => ({ ...prev, [res.id]: e.target.value }))}
                       placeholder={language === 'ko' ? "수강생에게 전달할 피드백을 입력하세요..." : "Enter feedback for the student..."}
                       className="flex-grow p-4 border border-ink/10 rounded-2xl text-sm bg-paper/50 focus:border-gold outline-none transition-colors"
@@ -1038,7 +1378,7 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                       onClick={() => submitFeedback(res.id, res.studentUid)}
                       className="px-6 py-4 bg-ink text-paper rounded-2xl text-[10px] uppercase tracking-widest hover:bg-gold transition-colors self-end"
                     >
-                      {t.community.submit}
+                      {feedbacks.find(f => f.reservationId === res.id) ? (language === 'ko' ? '수정' : 'Update') : t.community.submit}
                     </button>
                   </div>
                 </div>
@@ -1053,7 +1393,28 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
           {/* Upload Form */}
           <div className="md:col-span-1 space-y-8">
             <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6 sticky top-32">
-              <h3 className="text-xl font-serif">{t.admin.upload}</h3>
+              <div className="flex justify-between items-center">
+              <h3 className="text-xl font-serif">{editingResource ? (language === 'ko' ? '자료 수정' : 'Edit Resource') : t.admin.upload}</h3>
+              {editingResource && (
+                <button 
+                  onClick={() => {
+                    setEditingResource(null);
+                    setNewResource({
+                      title: '',
+                      description: '',
+                      groupId: RESOURCE_GROUPS[0].id,
+                      categoryId: RESOURCE_GROUPS[0].categories[0].id,
+                      fileUrl: '',
+                      fileType: 'pdf',
+                      accessLevel: 'member'
+                    });
+                  }}
+                  className="text-xs text-gold underline"
+                >
+                  {language === 'ko' ? '취소' : 'Cancel'}
+                </button>
+              )}
+            </div>
               <form onSubmit={handleCreateResource} className="space-y-4">
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest opacity-50">{t.community.titleLabel}</label>
@@ -1121,18 +1482,41 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                     </select>
                   </div>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest opacity-50">File URL</label>
-                  <input 
-                    type="url" required
-                    value={newResource.fileUrl}
-                    onChange={(e) => setNewResource(prev => ({ ...prev, fileUrl: e.target.value }))}
-                    placeholder="https://..."
-                    className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-sm"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">File URL</label>
+                    <input 
+                      type="url" required
+                      value={newResource.fileUrl}
+                      onChange={(e) => setNewResource(prev => ({ ...prev, fileUrl: e.target.value }))}
+                      placeholder="https://..."
+                      className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">{language === 'ko' ? '파일 직접 업로드' : 'Upload File Directly'}</label>
+                    <div className="relative">
+                      <input 
+                        type="file" 
+                        onChange={handleFileUpload}
+                        disabled={uploading}
+                        className="hidden"
+                        id="file-upload"
+                      />
+                      <label 
+                        htmlFor="file-upload"
+                        className={`flex items-center justify-center gap-2 w-full p-3 bg-ink/5 border border-dashed border-ink/20 rounded-xl cursor-pointer hover:border-gold transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      >
+                        <Upload size={14} />
+                        <span className="text-[10px] uppercase tracking-widest font-bold">
+                          {uploading ? (language === 'ko' ? '업로드 중...' : 'Uploading...') : (language === 'ko' ? '파일 선택' : 'Select File')}
+                        </span>
+                      </label>
+                    </div>
+                  </div>
                 </div>
                 <button type="submit" className="w-full py-4 bg-ink text-paper rounded-xl text-xs uppercase tracking-widest hover:bg-gold transition-colors">
-                  {t.admin.upload}
+                  {editingResource ? (language === 'ko' ? '수정 완료' : 'Update Resource') : t.admin.upload}
                 </button>
               </form>
             </div>
@@ -1170,6 +1554,12 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                     <p className="text-[8px] uppercase tracking-widest opacity-40">Downloads</p>
                   </div>
                   <button 
+                    onClick={() => handleEditResource(res)}
+                    className="p-2 text-ink/20 hover:text-gold transition-colors"
+                  >
+                    <Edit size={18} />
+                  </button>
+                  <button 
                     onClick={() => handleDeleteResource(res.id)}
                     className="p-2 text-ink/20 hover:text-red-500 transition-colors"
                   >
@@ -1195,18 +1585,72 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                     )}>
                       {post.type}
                     </span>
-                    <h3 className="text-xl font-bold">{post.title}</h3>
+                    {editingPost === post.id ? (
+                      <input 
+                        type="text"
+                        value={editPostData.title}
+                        onChange={(e) => setEditPostData(prev => ({ ...prev, title: e.target.value }))}
+                        className="text-xl font-bold p-2 border border-ink/10 rounded-xl w-full"
+                      />
+                    ) : (
+                      <h3 className="text-xl font-bold">{post.title}</h3>
+                    )}
                   </div>
                   <p className="text-[10px] uppercase tracking-widest opacity-40">{post.userName} • {post.createdAt?.toDate().toLocaleDateString()}</p>
                 </div>
+                <div className="flex items-center gap-2">
+                  <button 
+                    onClick={() => {
+                      if (editingPost === post.id) {
+                        handleEditPost(post.id);
+                      } else {
+                        setEditingPost(post.id);
+                        setEditPostData({ title: post.title, content: post.content });
+                      }
+                    }}
+                    className="p-2 text-ink/20 hover:text-gold transition-colors"
+                  >
+                    {editingPost === post.id ? <Check size={18} /> : <Edit size={18} />}
+                  </button>
+                  {editingPost === post.id && (
+                    <button 
+                      onClick={() => setEditingPost(null)}
+                      className="p-2 text-ink/20 hover:text-gold transition-colors"
+                    >
+                      <Plus className="rotate-45" size={18} />
+                    </button>
+                  )}
+                  <button 
+                    onClick={async () => {
+                      if (confirm(language === 'ko' ? '정말 삭제하시겠습니까?' : 'Are you sure you want to delete this post?')) {
+                        try {
+                          await deleteDoc(doc(db, 'community', post.id));
+                        } catch (error) {
+                          handleFirestoreError(error, OperationType.DELETE, 'community');
+                        }
+                      }
+                    }}
+                    className="p-2 text-ink/20 hover:text-red-500 transition-colors"
+                  >
+                    <Trash2 size={18} />
+                  </button>
+                </div>
               </div>
-              <p className="text-sm opacity-70 leading-relaxed">{post.content}</p>
+              {editingPost === post.id ? (
+                <textarea 
+                  value={editPostData.content}
+                  onChange={(e) => setEditPostData(prev => ({ ...prev, content: e.target.value }))}
+                  className="text-sm opacity-70 leading-relaxed w-full p-4 border border-ink/10 rounded-2xl h-32"
+                />
+              ) : (
+                <p className="text-sm opacity-70 leading-relaxed">{post.content}</p>
+              )}
               
               <div className="space-y-4 pt-6 border-t border-ink/5">
                 <label className="text-[10px] uppercase tracking-widest opacity-50">답변 작성</label>
                 <div className="flex gap-4">
                   <textarea 
-                    value={replyText[post.id] || post.reply || ''}
+                    value={replyText[post.id] !== undefined ? replyText[post.id] : (post.reply || '')}
                     onChange={(e) => setReplyText(prev => ({ ...prev, [post.id]: e.target.value }))}
                     placeholder="답변을 입력하세요..."
                     className="flex-grow p-4 border border-ink/10 rounded-2xl text-sm bg-paper/50 focus:border-gold outline-none transition-colors"
@@ -1222,6 +1666,52 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
               </div>
             </div>
           ))}
+        </div>
+      )}
+
+      {activeTab === 'users' && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-1 gap-4">
+            {users.map(u => (
+              <div key={u.id} className="p-6 border border-ink/10 rounded-3xl bg-white flex items-center justify-between gap-6">
+                <div className="flex items-center gap-4">
+                  <div className="w-12 h-12 rounded-full overflow-hidden bg-ink/5">
+                    <img src={u.photoURL || "https://i.pravatar.cc/100"} alt="Profile" referrerPolicy="no-referrer" />
+                  </div>
+                  <div>
+                    <h4 className="font-bold">{u.displayName || u.email}</h4>
+                    <p className="text-[10px] uppercase tracking-widest opacity-50">{u.email} • {u.uid}</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-4">
+                  <select 
+                    value={u.role}
+                    onChange={async (e) => {
+                      const path = 'users';
+                      try {
+                        await updateDoc(doc(db, path, u.id), { role: e.target.value });
+                        alert(language === 'ko' ? '권한이 변경되었습니다.' : 'Role updated.');
+                      } catch (error) {
+                        handleFirestoreError(error, OperationType.UPDATE, path);
+                      }
+                    }}
+                    className="px-4 py-2 border border-ink/10 rounded-xl text-[10px] uppercase tracking-widest bg-paper font-bold"
+                  >
+                    <option value="student">Student</option>
+                    <option value="member">Member</option>
+                    <option value="premium">Premium</option>
+                    <option value="admin">Admin</option>
+                  </select>
+                  <div className={cn(
+                    "px-3 py-1 text-[8px] uppercase tracking-widest rounded-full font-bold",
+                    u.role === 'admin' ? "bg-gold/20 text-gold" : "bg-ink/5 text-ink/40"
+                  )}>
+                    {u.role}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -1882,7 +2372,7 @@ const ImageGenView: FC<{ language: LanguageCode }> = ({ language }) => {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
   const [generatedAudio, setGeneratedAudio] = useState<string | null>(null);
-  const [learningContent, setLearningContent] = useState<string | null>(null);
+  const [learningContent, setLearningContent] = useState<any | null>(null);
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [finalTime, setFinalTime] = useState<number | null>(null);
@@ -1912,47 +2402,11 @@ const ImageGenView: FC<{ language: LanguageCode }> = ({ language }) => {
     const startTime = Date.now();
     
     try {
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY! });
+      if (!process.env.GEMINI_API_KEY) {
+        throw new Error("GEMINI_API_KEY is not defined. Please set it in the environment variables.");
+      }
+      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
       
-      // Parallel generation for speed
-      const isBasicLevel = level === 'intro' || level === 'beginner';
-      const formattingInstructions = `
-          DIALOGUE FORMATTING (STRICT LINE-BY-LINE):
-          ${isBasicLevel ? `
-          - For every dialogue turn, you MUST provide exactly 4 lines:
-            1. Pinyin (Top line, aligned with Hanzi)
-            2. Speaker Label + Chinese (Hanzi)
-            3. Korean Translation
-            4. English Translation
-          - Example:
-                     Fúwùyuán wǒ yào diǎncài
-            고객 :  服务员,         我要点菜.
-                       여기요, 요리를 주문할게요.
-                       Waiter, I would like to order.
-          ` : `
-          - For every dialogue turn, you MUST provide exactly 3 lines (NO PINYIN):
-            1. Speaker Label + Chinese (Hanzi)
-            2. Korean Translation
-            3. English Translation
-          - Example:
-            고객 :   服务员,    我要点菜.
-                       여기요, 요리를 주문할게요.
-                       Waiter, I would like to order.
-          `}
-
-          VOCABULARY LIST FORMATTING (MANDATORY FOR ALL LEVELS):
-          - Every word in the vocabulary list MUST include Pinyin.
-          - Structure for each word:
-            1. Chinese (Hanzi)
-            2. Pinyin
-            3. Korean Meaning
-            4. English Meaning
-          - Format this as a clean list or table.
-
-          CULTURAL NOTE:
-          - Add a short 'Cultural Note' if relevant.
-      `;
-
       const [imageResponse, textResponse] = await Promise.all([
         ai.models.generateContent({
           model: 'gemini-2.5-flash-image',
@@ -1970,13 +2424,45 @@ const ImageGenView: FC<{ language: LanguageCode }> = ({ language }) => {
           }
         }),
         ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
-          contents: `Generate a short, practical Chinese dialogue (3-4 exchanges) and a vocabulary list (5-8 words) based on this situation: "${prompt}". 
-          The target learner level is: ${level} (where intro is absolute beginner and expert is near-native).
-          
-          ${formattingInstructions}
-          
-          The user's interface language is ${language}. Please provide translations in ${language} where appropriate.`,
+          model: 'gemini-3.1-pro-preview',
+          contents: `Generate a practical Chinese dialogue and vocabulary list based on this situation: "${prompt}". 
+          Target learner level: ${level}.
+          Interface language: ${language}.`,
+          config: {
+            responseMimeType: "application/json",
+            responseSchema: {
+              type: Type.OBJECT,
+              properties: {
+                dialogue: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      speaker: { type: Type.STRING, description: "Speaker name in Chinese" },
+                      hanzi: { type: Type.STRING, description: "Chinese characters" },
+                      pinyin: { type: Type.STRING, description: "Pinyin pronunciation" },
+                      translation: { type: Type.STRING, description: `Translation in ${language}` }
+                    },
+                    required: ["speaker", "hanzi", "pinyin", "translation"]
+                  }
+                },
+                vocabulary: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      hanzi: { type: Type.STRING },
+                      pinyin: { type: Type.STRING },
+                      translation: { type: Type.STRING }
+                    },
+                    required: ["hanzi", "pinyin", "translation"]
+                  }
+                },
+                culturalNote: { type: Type.STRING }
+              },
+              required: ["dialogue", "vocabulary"]
+            }
+          }
         })
       ]);
 
@@ -1990,14 +2476,20 @@ const ImageGenView: FC<{ language: LanguageCode }> = ({ language }) => {
       }
 
       // Handle Text
-      const text = textResponse.text || "Failed to generate text content.";
-      setLearningContent(text);
+      let data;
+      try {
+        data = JSON.parse(textResponse.text || "{}");
+      } catch (e) {
+        console.error("JSON parse error", e);
+        data = { dialogue: [], vocabulary: [], culturalNote: "Failed to parse content." };
+      }
+      setLearningContent(data);
       
       // Generate Audio (TTS)
       setIsGeneratingAudio(true);
       try {
         // Extract only Hanzi for cleaner TTS
-        const hanziOnly = text.match(/[\u4e00-\u9fa5]+/g)?.join(' ') || text;
+        const hanziOnly = data.dialogue.map((d: any) => d.hanzi).join(' ');
 
         const audioResponse = await ai.models.generateContent({
           model: "gemini-2.5-flash-preview-tts",
@@ -2144,13 +2636,42 @@ const ImageGenView: FC<{ language: LanguageCode }> = ({ language }) => {
             </div>
             <div className="min-h-[400px] h-full p-8 bg-ink/5 rounded-3xl border border-ink/10 overflow-y-auto">
               {learningContent ? (
-                <div className="markdown-body">
-                  <Markdown 
-                    remarkPlugins={[remarkGfm]} 
-                    rehypePlugins={[rehypeRaw]}
-                  >
-                    {learningContent}
-                  </Markdown>
+                <div className="space-y-8">
+                  <div className="space-y-6">
+                    <h4 className="text-[10px] uppercase tracking-[0.3em] text-gold font-bold border-b border-gold/20 pb-2">Dialogue</h4>
+                    {learningContent.dialogue.map((item: any, idx: number) => (
+                      <div key={idx} className="space-y-1">
+                        <div className="text-[10px] text-gold/60 font-mono tracking-wider">{item.pinyin}</div>
+                        <div className="flex gap-3">
+                          <span className="text-xs font-bold opacity-40 min-w-[3rem]">{item.speaker}</span>
+                          <span className="text-lg font-serif">{item.hanzi}</span>
+                        </div>
+                        <div className="text-xs opacity-60 italic">{item.translation}</div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-4">
+                    <h4 className="text-[10px] uppercase tracking-[0.3em] text-gold font-bold border-b border-gold/20 pb-2">Vocabulary</h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {learningContent.vocabulary.map((item: any, idx: number) => (
+                        <div key={idx} className="p-3 bg-ink/5 rounded-xl border border-ink/5 flex items-center justify-between">
+                          <div>
+                            <div className="text-base font-serif">{item.hanzi}</div>
+                            <div className="text-[10px] opacity-40 font-mono">{item.pinyin}</div>
+                          </div>
+                          <div className="text-xs font-medium text-gold">{item.translation}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {learningContent.culturalNote && (
+                    <div className="p-4 bg-gold/5 rounded-2xl border border-gold/10">
+                      <h4 className="text-[10px] uppercase tracking-[0.3em] text-gold font-bold mb-2">Cultural Note</h4>
+                      <p className="text-xs opacity-80 leading-relaxed">{learningContent.culturalNote}</p>
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="h-full flex items-center justify-center text-center space-y-4 opacity-20">

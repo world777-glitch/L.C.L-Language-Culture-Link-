@@ -100,6 +100,18 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["userUid", "title", "content", "type"]
+    },
+    "siteContent": {
+      "title": "Site Content Override",
+      "description": "Stores overrides for landing page text and images.",
+      "type": "object",
+      "properties": {
+        "key": { "type": "string", "description": "The translation key or unique identifier (e.g., 'hero.title')" },
+        "language": { "type": "string", "description": "The language code (e.g., 'ko')" },
+        "value": { "type": "string", "description": "The overridden text or image URL" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["key", "language", "value"]
     }
   },
   "firestore": {
@@ -109,6 +121,7 @@
     "/resources/{resourceId}": { "schema": "resources", "description": "Learning materials" },
     "/downloads/{downloadId}": { "schema": "downloads", "description": "Download tracking" },
     "/comments/{commentId}": { "schema": "comments", "description": "Resource comments" },
-    "/community/{postId}": { "schema": "community", "description": "Community posts" }
+    "/community/{postId}": { "schema": "community", "description": "Community posts" },
+    "/siteContent/{contentId}": { "schema": "siteContent", "description": "Landing page content overrides" }
   }
 }
