@@ -1116,7 +1116,8 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
     groupId: RESOURCE_GROUPS[0].id,
     categoryId: RESOURCE_GROUPS[0].categories[0].id,
     fileUrl: '',
-    fileType: 'pdf' as 'pdf' | 'mp3' | 'image',
+    textContent: '',
+    fileType: 'pdf' as 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text',
     accessLevel: 'member' as 'public' | 'member' | 'premium',
     author: '',
     tags: ''
@@ -1220,6 +1221,7 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
         groupId: RESOURCE_GROUPS[0].id,
         categoryId: RESOURCE_GROUPS[0].categories[0].id,
         fileUrl: '',
+        textContent: '',
         fileType: 'pdf',
         accessLevel: 'member',
         author: '',
@@ -1242,9 +1244,12 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
       const url = await getDownloadURL(storageRef);
       
       const extension = file.name.split('.').pop()?.toLowerCase();
-      let fileType: 'pdf' | 'mp3' | 'image' = 'pdf';
+      let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
       if (extension === 'mp3') fileType = 'mp3';
       if (['jpg', 'jpeg', 'png', 'gif'].includes(extension || '')) fileType = 'image';
+      if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
+      if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
+      if (extension === 'txt') fileType = 'text';
       
       setNewResource(prev => ({ ...prev, fileUrl: url, fileType }));
       alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
@@ -1263,7 +1268,8 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
       description: res.description,
       groupId: res.groupId,
       categoryId: res.categoryId,
-      fileUrl: res.fileUrl,
+      fileUrl: res.fileUrl || '',
+      textContent: res.textContent || '',
       fileType: res.fileType,
       accessLevel: res.accessLevel,
       author: res.author || '',
@@ -1287,6 +1293,28 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
     const path = 'resources';
     const samples = [
       // Group A: Standard & Test
+      { 
+        title: 'HSK 5급 필수 어휘 2500 (Part 1)', 
+        description: 'HSK 5급 합격을 위한 필수 어휘 리스트와 예문. 언어학 박사가 엄선한 핵심 단어입니다.', 
+        groupId: 'group-a', 
+        categoryId: 'hsk', 
+        fileType: 'text', 
+        accessLevel: 'public', 
+        textContent: `HSK 5급 필수 어휘 (1-50)
+
+1. 哎 (āi) - [감탄사] 아이구, 어머나
+2. 唉 (āi) - [감탄사] 네, 예 (대답할 때)
+3. 爱护 (àihù) - [동사] 아끼고 보호하다
+4. 爱惜 (àixī) - [동사] 아끼다, 소중히 여기다
+5. 爱心 (àixīn) - [명사] 애심, 사랑하는 마음
+6. 安慰 (ānwèi) - [동사] 위로하다
+7. 安装 (ānzhuāng) - [동사] 설치하다
+8. 岸 (àn) - [명사] 언덕, 기슭
+9. 暗 (àn) - [형용사] 어둡다
+10. 熬夜 (áoyè) - [동사] 밤을 새우다
+... (중략) ...
+다운로드 버튼을 눌러 전체 PDF를 확인하세요.`
+      },
       { title: 'HSK 6급 핵심 요약집', description: '급수별 핵심 요약집, 최신 기출 변형 문제.', groupId: 'group-a', categoryId: 'hsk', fileType: 'pdf', accessLevel: 'member', fileUrl: 'https://example.com/hsk6_summary.pdf' },
       { title: 'HSK 5급 필수 단어 2500', description: '5급 합격을 위한 필수 어휘 리스트와 예문.', groupId: 'group-a', categoryId: 'hsk', fileType: 'pdf', accessLevel: 'public', fileUrl: 'https://example.com/hsk5_words.pdf' },
       { title: '상황별 필수 회화 100선', description: '박사님이 엄선한 상황별 필수 문장 리스트.', groupId: 'group-a', categoryId: 'conversation', fileType: 'pdf', accessLevel: 'public', fileUrl: 'https://example.com/conv100.pdf' },
@@ -1388,7 +1416,7 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
       {/* Quick Actions Bar */}
       <div className="flex flex-wrap gap-4 p-6 bg-gold/5 border border-gold/10 rounded-3xl">
         <button 
-          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '' }); }}
+          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', textContent: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '' }); }}
           className="flex items-center gap-2 px-6 py-3 bg-ink text-paper rounded-xl text-[10px] uppercase tracking-widest font-bold hover:bg-gold transition-all"
         >
           <Upload size={14} />
@@ -1559,6 +1587,7 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                       groupId: RESOURCE_GROUPS[0].id,
                       categoryId: RESOURCE_GROUPS[0].categories[0].id,
                       fileUrl: '',
+                      textContent: '',
                       fileType: 'pdf',
                       accessLevel: 'member',
                       author: '',
@@ -1623,6 +1652,9 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                       <option value="pdf">PDF</option>
                       <option value="mp3">MP3</option>
                       <option value="image">Image</option>
+                      <option value="ppt">PPT / PowerPoint</option>
+                      <option value="word">Word / Document</option>
+                      <option value="text">Text / Content</option>
                     </select>
                   </div>
                   <div className="space-y-2">
@@ -1660,11 +1692,20 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                     />
                   </div>
                 </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50">Text Content (Optional for Text type)</label>
+                  <textarea 
+                    value={newResource.textContent}
+                    onChange={(e) => setNewResource(prev => ({ ...prev, textContent: e.target.value }))}
+                    className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-sm min-h-[100px]"
+                    placeholder="Attach text content here..."
+                  />
+                </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] uppercase tracking-widest opacity-50">File URL</label>
                     <input 
-                      type="url" required
+                      type="url"
                       value={newResource.fileUrl}
                       onChange={(e) => setNewResource(prev => ({ ...prev, fileUrl: e.target.value }))}
                       placeholder="https://..."
@@ -1718,6 +1759,9 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                     {res.fileType === 'pdf' && <FileText size={20} />}
                     {res.fileType === 'mp3' && <Music size={20} />}
                     {res.fileType === 'image' && <ImageIcon size={20} />}
+                    {res.fileType === 'ppt' && <FileText size={20} className="text-orange-500" />}
+                    {res.fileType === 'word' && <FileText size={20} className="text-blue-500" />}
+                    {res.fileType === 'text' && <FileText size={20} className="text-gray-500" />}
                   </div>
                   <div>
                     <h4 className="font-bold">{res.title}</h4>
@@ -2117,7 +2161,8 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     groupId: RESOURCE_GROUPS[0].id,
     categoryId: RESOURCE_GROUPS[0].categories[0].id,
     fileUrl: '',
-    fileType: 'pdf' as 'pdf' | 'mp3' | 'image',
+    textContent: '',
+    fileType: 'pdf' as 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text',
     accessLevel: 'member' as 'public' | 'member' | 'premium',
     author: '',
     tags: ''
@@ -2199,6 +2244,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
         groupId: RESOURCE_GROUPS[0].id,
         categoryId: RESOURCE_GROUPS[0].categories[0].id,
         fileUrl: '',
+        textContent: '',
         fileType: 'pdf',
         accessLevel: 'member',
         author: '',
@@ -2220,9 +2266,13 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
       await uploadBytes(storageRef, file);
       const url = await getDownloadURL(storageRef);
       const extension = file.name.split('.').pop()?.toLowerCase();
-      let fileType: 'pdf' | 'mp3' | 'image' = 'pdf';
+      let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
       if (extension === 'mp3') fileType = 'mp3';
       if (['jpg', 'jpeg', 'png', 'gif'].includes(extension || '')) fileType = 'image';
+      if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
+      if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
+      if (extension === 'txt') fileType = 'text';
+      
       setNewResource(prev => ({ ...prev, fileUrl: url, fileType }));
       alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
     } catch (error) {
@@ -2240,7 +2290,8 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
       description: res.description,
       groupId: res.groupId,
       categoryId: res.categoryId,
-      fileUrl: res.fileUrl,
+      fileUrl: res.fileUrl || '',
+      textContent: res.textContent || '',
       fileType: res.fileType,
       accessLevel: res.accessLevel,
       author: res.author || '',
@@ -2418,6 +2469,9 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                   {res.fileType === 'pdf' && <FileText size={20} />}
                   {res.fileType === 'mp3' && <Music size={20} />}
                   {res.fileType === 'image' && <ImageIcon size={20} />}
+                  {res.fileType === 'ppt' && <FileText size={20} className="text-orange-500" />}
+                  {res.fileType === 'word' && <FileText size={20} className="text-blue-500" />}
+                  {res.fileType === 'text' && <FileText size={20} className="text-gray-500" />}
                 </div>
                 <div className="flex items-center gap-2">
                   {isAdmin && (
@@ -2586,6 +2640,9 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                           <option value="pdf">PDF</option>
                           <option value="mp3">MP3</option>
                           <option value="image">Image</option>
+                          <option value="ppt">PPT / PowerPoint</option>
+                          <option value="word">Word / Document</option>
+                          <option value="text">Text / Content</option>
                         </select>
                       </div>
                       <div className="space-y-2">
@@ -2602,10 +2659,19 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                       </div>
                     </div>
                     <div className="space-y-2">
+                      <label className="text-[10px] uppercase tracking-widest opacity-50">Text Content (Optional for Text type)</label>
+                      <textarea 
+                        value={newResource.textContent}
+                        onChange={(e) => setNewResource(prev => ({ ...prev, textContent: e.target.value }))}
+                        className="w-full p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm min-h-[150px] focus:outline-none focus:border-gold transition-all"
+                        placeholder="Attach text content here..."
+                      />
+                    </div>
+                    <div className="space-y-2">
                       <label className="text-[10px] uppercase tracking-widest opacity-50">File URL / Upload</label>
                       <div className="flex gap-2">
                         <input 
-                          type="url" required
+                          type="url"
                           value={newResource.fileUrl}
                           onChange={(e) => setNewResource(prev => ({ ...prev, fileUrl: e.target.value }))}
                           className="flex-grow p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm focus:outline-none focus:border-gold transition-all"
@@ -2670,6 +2736,9 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                         {selectedResource.fileType === 'pdf' && <FileText size={20} />}
                         {selectedResource.fileType === 'mp3' && <Music size={20} />}
                         {selectedResource.fileType === 'image' && <ImageIcon size={20} />}
+                        {selectedResource.fileType === 'ppt' && <FileText size={20} />}
+                        {selectedResource.fileType === 'word' && <FileText size={20} />}
+                        {selectedResource.fileType === 'text' && <FileText size={20} />}
                       </div>
                       <span className="text-[10px] uppercase tracking-widest font-bold opacity-40">
                         {selectedResource.fileType} Resource
@@ -2699,6 +2768,15 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                     {selectedResource.description}
                   </div>
                 </div>
+
+                {selectedResource.textContent && (
+                  <div className="space-y-4 p-6 bg-ink/5 rounded-3xl border border-ink/10">
+                    <h4 className="text-[10px] uppercase tracking-widest font-bold opacity-40">Text Content</h4>
+                    <div className="text-sm font-serif whitespace-pre-wrap leading-relaxed">
+                      {selectedResource.textContent}
+                    </div>
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-4 py-8 border-y border-ink/5">
                   <div className="space-y-1">
@@ -3013,7 +3091,14 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
   }, [isGenerating]);
 
   const handleGenerate = async () => {
-    if (!prompt || !isPremiumOrAdmin) return;
+    if (!prompt) return;
+    
+    // Double check permissions
+    if (!isPremiumOrAdmin) {
+      alert(language === 'ko' ? '프리미엄 회원만 이용 가능합니다.' : 'Only available for Premium members.');
+      return;
+    }
+
     setIsGenerating(true);
     setIsGeneratingAudio(false);
     setGeneratedImage(null);
@@ -3022,10 +3107,13 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
     const startTime = Date.now();
     
     try {
-      if (!process.env.GEMINI_API_KEY) {
-        throw new Error("GEMINI_API_KEY is not defined. Please set it in the environment variables.");
+      const apiKey = process.env.GEMINI_API_KEY;
+      if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+        throw new Error("GEMINI_API_KEY is not configured. Please set it in the Secrets panel.");
       }
-      const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+      const ai = new GoogleGenAI({ apiKey });
+      
+      console.log("Starting AI generation for prompt:", prompt);
       
       const [imageResponse, textResponse] = await Promise.all([
         ai.models.generateContent({
@@ -3044,7 +3132,7 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
           }
         }),
         ai.models.generateContent({
-          model: 'gemini-3-flash-preview',
+          model: 'gemini-3.1-pro-preview', // Upgraded to Pro for better JSON reliability
           contents: `Generate a practical Chinese dialogue and vocabulary list based on this situation: "${prompt}". 
           Target learner level: ${level}.
           Interface language: ${language}.`,
@@ -3085,6 +3173,8 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
           }
         })
       ]);
+
+      console.log("AI Responses received");
 
       // Handle Image
       for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {

@@ -54,14 +54,15 @@
         "categoryId": { "type": "string" },
         "groupId": { "type": "string" },
         "fileUrl": { "type": "string", "format": "uri" },
-        "fileType": { "type": "string", "enum": ["pdf", "mp3", "image"] },
+        "fileType": { "type": "string", "enum": ["pdf", "mp3", "image", "ppt", "word", "text"] },
+        "textContent": { "type": "string", "description": "Optional text content for text-based resources." },
         "accessLevel": { "type": "string", "enum": ["public", "member", "premium"] },
         "author": { "type": "string" },
         "tags": { "type": "array", "items": { "type": "string" } },
         "downloadCount": { "type": "integer" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
-      "required": ["title", "categoryId", "groupId", "fileUrl", "fileType", "accessLevel"]
+      "required": ["title", "categoryId", "groupId", "accessLevel"]
     },
     "downloads": {
       "title": "Resource Download",
