@@ -47,6 +47,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       pricing: '수강료',
       archive: '자료실',
       community: '커뮤니티',
+      inquiry: '수강 문의',
       aiStudio: 'AI 스튜디오',
       admin: '관리자',
       myPage: '마이페이지',
@@ -158,6 +159,36 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
         advanced: '고급',
         expert: '초고급',
       }
+    },
+    inquiry: {
+      title: '[라떼언어연구소] 수강 문의 및 레벨 진단 신청서',
+      subtitle: '"응용언어학 박사 이 쌤이 직접 분석하여 가장 적합한 그룹을 매칭해 드립니다."',
+      badge: 'Consultation & Diagnosis',
+      nameLabel: '1. 성함',
+      namePlaceholder: '(예: 홍길동)',
+      contactLabel: '2. 연락처 (카카오톡 ID 또는 이메일)',
+      contactPlaceholder: '상담 안내를 받으실 수 있는 연락처를 남겨주세요.',
+      historyLabel: '3. 중국어 학습 이력 및 현지 경험',
+      historyPlaceholder: '학습 기간이나 중국 거주/유학 경험이 있다면 간단히 적어주세요. (예: 독학 1년, 상하이 유학 6개월 등)',
+      levelLabel: '4. 현재 나의 중국어 수준 및 고민',
+      levelOptions: [
+        '기초 문법의 원리를 체계적으로 정리하고 싶다.',
+        'HSK 급수(4~6급) 취득 및 고득점이 목표다.',
+        '원어민처럼 자연스러운 회화 표현을 익히고 싶다.',
+        '비즈니스/전문 분야(IT, 기술 등) 중국어가 필요하다.',
+        '기타 (직접 입력)'
+      ],
+      classLabel: '5. 희망 수강 클래스',
+      classOptions: [
+        '[입문/기초] 성조부터 탄탄하게 시작하는 첫걸음',
+        '[HSK 집중] 4~6급 단기 합격 및 고득점 전략',
+        '[실전 회화] 상황별 바로 쓰는 생생한 중국어',
+        '[비즈니스/시사] 전문 분야 통번역 및 심화 토론',
+        '[1:1 맞춤] 개인별 목표에 맞춘 집중 케어'
+      ],
+      submit: '진단 신청하기',
+      successTitle: '신청 완료!',
+      successMessage: '신청이 완료되었습니다. 박사님께서 직접 분석 후 곧 연락드릴 예정입니다.'
     }
   },
   en: {
@@ -167,10 +198,41 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       pricing: 'Pricing',
       archive: 'Archive',
       community: 'Community',
+      inquiry: 'Inquiry',
       aiStudio: 'AI Studio',
       admin: 'Admin',
       myPage: 'My Page',
       login: 'Login',
+    },
+    inquiry: {
+      title: '[L.C.L] Course Inquiry & Level Diagnosis',
+      subtitle: 'Dr. Lee, a PhD in Applied Linguistics, will analyze and match you with the best group.',
+      badge: 'Consultation & Diagnosis',
+      nameLabel: '1. Name',
+      namePlaceholder: '(e.g., John Doe)',
+      contactLabel: '2. Contact (KakaoTalk ID or Email)',
+      contactPlaceholder: 'Please leave a contact where you can receive consultation guidance.',
+      historyLabel: '3. Chinese Learning History & Local Experience',
+      historyPlaceholder: 'Briefly describe your learning period or experience living/studying in China. (e.g., 1 year self-study, 6 months in Shanghai, etc.)',
+      levelLabel: '4. Current Level & Concerns',
+      levelOptions: [
+        'I want to systematically organize basic grammar principles.',
+        'My goal is to obtain HSK level (4-6) and high scores.',
+        'I want to learn natural conversation expressions like a native speaker.',
+        'I need Chinese for business/professional fields (IT, technology, etc.).',
+        'Other (Enter directly)'
+      ],
+      classLabel: '5. Desired Class',
+      classOptions: [
+        '[Intro/Basic] First step starting from tones',
+        '[HSK Intensive] Short-term HSK 4-6 passing & high score strategy',
+        '[Practical Conversation] Vivid Chinese for situational use',
+        '[Business/Current Affairs] Professional translation & in-depth discussion',
+        '[1:1 Custom] Intensive care tailored to individual goals'
+      ],
+      submit: 'Apply for Diagnosis',
+      successTitle: 'Application Complete!',
+      successMessage: 'Your application has been submitted. Dr. Lee will contact you soon after analysis.'
     },
     footer: {
       quote: '"Premium Chinese with academic depth, starting at the price of a cup of coffee."',
@@ -291,6 +353,36 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       admin: '管理员',
       myPage: '个人中心',
       login: '登录',
+    },
+    inquiry: {
+      title: '[L.C.L] 课程咨询与水平诊断申请表',
+      subtitle: '应用语言学博士李老师将直接分析并为您匹配最合适的课程。',
+      badge: '咨询与诊断',
+      nameLabel: '1. 姓名',
+      namePlaceholder: '(例：张三)',
+      contactLabel: '2. 联系方式 (KakaoTalk ID 或 邮箱)',
+      contactPlaceholder: '请留下可以接收咨询指导的联系方式。',
+      historyLabel: '3. 汉语学习经历及当地经验',
+      historyPlaceholder: '请简要说明学习时间或在中国居住/留学的经历。(例：自学1年，上海留学6个月等)',
+      levelLabel: '4. 目前的汉语水平及困扰',
+      levelOptions: [
+        '想系统地整理基础语法原理。',
+        '目标是取得 HSK 等级(4-6级)及高分。',
+        '想学习像母语者一样自然的会话表达。',
+        '需要商务/专业领域(IT、技术等)汉语。',
+        '其他 (直接输入)'
+      ],
+      classLabel: '5. 希望参加的课程',
+      classOptions: [
+        '[入门/基础] 从声调开始的坚实第一步',
+        '[HSK 强化] HSK 4-6级短期合格及高分策略',
+        '[实战会话] 不同场景下即学即用的生动汉语',
+        '[商务/时事] 专业领域笔译口译及深度讨论',
+        '[1:1 定制] 针对个人目标的集中护理'
+      ],
+      submit: '申请诊断',
+      successTitle: '申请完成！',
+      successMessage: '申请已提交。李老师将在分析后尽快与您联系。'
     },
     footer: {
       quote: '"富有学术深度的优质中文课程，仅需一杯咖啡的价格即可开始。"',

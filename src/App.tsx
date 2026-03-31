@@ -37,7 +37,8 @@ import {
   Upload,
   Edit,
   X,
-  ExternalLink
+  ExternalLink,
+  Copy
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
@@ -83,7 +84,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [view, setView] = useState<'landing' | 'booking' | 'mypage' | 'admin' | 'image-gen' | 'archive' | 'community'>('landing');
+  const [view, setView] = useState<'landing' | 'booking' | 'mypage' | 'admin' | 'image-gen' | 'archive' | 'community' | 'inquiry'>('landing');
   const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
   const [initialArchiveFilter, setInitialArchiveFilter] = useState<{ groupId: string | null, categoryId: string | null }>({ groupId: null, categoryId: null });
   const [language, setLanguage] = useState<LanguageCode>('ko');
@@ -201,10 +202,10 @@ export default function App() {
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-8">
+          <div className="hidden md:flex items-center gap-3 lg:gap-4 xl:gap-6">
             <div className="relative group">
-              <button className="flex items-center gap-2 text-xs uppercase tracking-widest hover:text-gold transition-colors">
-                <Globe size={14} /> {LANGUAGES.find(l => l.code === language)?.nativeName}
+              <button className="flex items-center gap-1 text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors">
+                <Globe size={12} /> {LANGUAGES.find(l => l.code === language)?.nativeName}
               </button>
               <div className="absolute top-full right-0 mt-2 w-48 bg-paper border border-ink/10 rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] max-h-[60vh] overflow-y-auto p-2">
                 {LANGUAGES.map(lang => (
@@ -221,15 +222,16 @@ export default function App() {
                 ))}
               </div>
             </div>
-            <button onClick={() => scrollToSection('curriculum')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.curriculum}</button>
-            <button onClick={() => scrollToSection('pricing')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.pricing}</button>
-            <button onClick={() => scrollToSection('library')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.archive.title}</button>
-            <button onClick={() => setView('archive')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.archive}</button>
-            <button onClick={() => setView('community')} className="text-xs uppercase tracking-widest hover:text-gold transition-colors">{t.nav.community}</button>
+            <button onClick={() => scrollToSection('curriculum')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.curriculum}</button>
+            <button onClick={() => scrollToSection('pricing')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.pricing}</button>
+            <button onClick={() => scrollToSection('library')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.archive.title}</button>
+            <button onClick={() => setView('archive')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.archive}</button>
+            <button onClick={() => setView('community')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.community}</button>
+            <button onClick={() => setView('inquiry')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors font-bold text-gold whitespace-nowrap">{t.nav.inquiry}</button>
             <button 
               onClick={() => setView('image-gen')} 
               className={cn(
-                "text-xs uppercase tracking-widest transition-colors flex items-center gap-1",
+                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors flex items-center gap-1 whitespace-nowrap",
                 view === 'image-gen' ? "text-gold font-bold" : "hover:text-gold"
               )}
             >
@@ -237,38 +239,38 @@ export default function App() {
               {!isAdmin && userProfile?.role !== 'premium' && <ShieldCheck size={10} className="text-gold/50" />}
             </button>
             {user ? (
-              <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2 lg:gap-4">
                 {userProfile?.role === 'admin' && (
-                  <div className="flex items-center gap-4 border-r border-ink/10 pr-4">
+                  <div className="flex items-center gap-2 lg:gap-4 border-r border-ink/10 pr-2 lg:pr-4">
                     <button 
                       onClick={() => setIsEditMode(!isEditMode)}
                       className={cn(
-                        "flex items-center gap-2 text-[10px] uppercase tracking-[0.2em] px-3 py-1 rounded-full border transition-all",
+                        "flex items-center gap-1 text-[9px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border transition-all whitespace-nowrap",
                         isEditMode ? "bg-gold text-ink border-gold font-bold" : "border-ink/20 opacity-50 hover:opacity-100"
                       )}
                     >
-                      {isEditMode ? 'Edit Mode ON' : 'Edit Mode OFF'}
+                      {isEditMode ? 'Edit ON' : 'Edit OFF'}
                     </button>
                     <button 
                       onClick={() => setView('admin')}
-                      className="flex items-center gap-2 text-xs uppercase tracking-widest text-gold font-bold hover:opacity-80 transition-colors"
+                      className="flex items-center gap-1 text-[10px] lg:text-xs uppercase tracking-widest text-gold font-bold hover:opacity-80 transition-colors whitespace-nowrap"
                     >
-                      <LayoutDashboard size={16} /> {t.nav.admin}
+                      <LayoutDashboard size={14} /> {t.nav.admin}
                     </button>
                   </div>
                 )}
                 <button 
                   onClick={() => setView('mypage')}
-                  className="flex items-center gap-2 text-xs uppercase tracking-widest hover:text-gold transition-colors"
+                  className="flex items-center gap-1 text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap"
                 >
-                  <User size={16} /> {t.nav.myPage}
+                  <User size={14} /> {t.nav.myPage}
                 </button>
-                <button onClick={handleLogout} className="text-xs uppercase tracking-widest opacity-50 hover:opacity-100"><LogOut size={16} /></button>
+                <button onClick={handleLogout} className="text-[10px] lg:text-xs uppercase tracking-widest opacity-50 hover:opacity-100"><LogOut size={14} /></button>
               </div>
             ) : (
               <button 
                 onClick={handleLogin}
-                className="px-6 py-2 border border-ink rounded-full text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-all"
+                className="px-4 py-1.5 border border-ink rounded-full text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-all whitespace-nowrap"
               >
                 {t.nav.login}
               </button>
@@ -286,6 +288,7 @@ export default function App() {
           {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} />}
           {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} />}
           {view === 'community' && <CommunityView key="community" language={language} />}
+          {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} />}
         </AnimatePresence>
 
         {/* Edit Mode Instruction Bar */}
@@ -327,17 +330,29 @@ export default function App() {
             </div>
           </div>
           <div>
-            <h4 className="text-xs uppercase tracking-widest mb-6 opacity-50">{t.footer.contact}</h4>
-            <p className="text-sm">lhbin777@gmail.com</p>
-            <div className="text-sm mt-2">
+            <h4 className="text-xs uppercase tracking-widest mb-6 opacity-50">
+              <EditableText contentKey="footer.contact_label" defaultValue={t.footer.contact} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+            </h4>
+            <div className="space-y-2">
+              <EditableText contentKey="footer.contact_1" defaultValue="lhbin777@gmail.com" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm block" />
+              <EditableText contentKey="footer.contact_2" defaultValue="" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm block" />
+              <EditableText contentKey="footer.contact_3" defaultValue="" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm block" />
+            </div>
+            <div className="text-sm mt-4">
               <EditableText contentKey="footer.experience" defaultValue={language === 'ko' ? '20년 현지 경력 & 언어학 박사 직강' : '20 Years Local Experience & PhD Direct Instruction'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
             </div>
           </div>
           <div>
-            <h4 className="text-xs uppercase tracking-widest mb-6 opacity-50">{t.footer.social}</h4>
-            <div className="flex gap-4">
-              <span className="text-sm hover:text-gold cursor-pointer">Instagram</span>
-              <span className="text-sm hover:text-gold cursor-pointer">Blog</span>
+            <h4 className="text-xs uppercase tracking-widest mb-6 opacity-50">
+              <EditableText contentKey="footer.social_label" defaultValue={t.footer.social} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+            </h4>
+            <div className="flex flex-col gap-3">
+              <div className="flex flex-wrap gap-4">
+                <EditableLink contentKey="footer.social_1" defaultText="Instagram" defaultUrl="#" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm hover:text-gold transition-colors" />
+                <EditableLink contentKey="footer.social_2" defaultText="Blog" defaultUrl="#" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm hover:text-gold transition-colors" />
+                <EditableLink contentKey="footer.social_3" defaultText="" defaultUrl="#" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm hover:text-gold transition-colors" />
+                <EditableLink contentKey="footer.social_4" defaultText="" defaultUrl="#" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm hover:text-gold transition-colors" />
+              </div>
             </div>
           </div>
         </div>
@@ -377,17 +392,25 @@ const EditableText: FC<{
   language: string,
   siteContent: Record<string, any>,
   className?: string,
-  as?: any
-}> = ({ contentKey, defaultValue, isEditMode, language, siteContent, className, as: Component = 'span' }) => {
+  as?: any,
+  highlight?: string,
+  highlightClassName?: string
+}> = ({ contentKey, defaultValue, isEditMode, language, siteContent, className, as: Component = 'span', highlight, highlightClassName }) => {
   const [isEditing, setIsEditing] = useState(false);
   const content = siteContent[contentKey] || {};
-  const [value, setValue] = useState(content.value || defaultValue);
+  const [value, setValue] = useState(content.value !== undefined ? content.value : defaultValue);
   const [fontFamily, setFontFamily] = useState(content.fontFamily || "");
   const [fontSize, setFontSize] = useState(content.fontSize || "");
   const [color, setColor] = useState(content.color || "");
 
+  const displayValue = value || (isEditMode ? `[+ ${contentKey}]` : "");
+
   useEffect(() => {
-    setValue(content.value || defaultValue);
+    if (content.value !== undefined) {
+      setValue(content.value);
+    } else {
+      setValue(defaultValue);
+    }
     setFontFamily(content.fontFamily || "");
     setFontSize(content.fontSize || "");
     setColor(content.color || "");
@@ -417,6 +440,22 @@ const EditableText: FC<{
     color: color || undefined
   };
 
+  const renderContent = () => {
+    if (highlight && typeof displayValue === 'string' && displayValue.includes(highlight)) {
+      const parts = displayValue.split(highlight);
+      return (
+        <>
+          {parts[0]}
+          <span className={highlightClassName}>{highlight}</span>
+          {parts[1]}
+        </>
+      );
+    }
+    return displayValue;
+  };
+
+  if (!isEditMode && !value) return null;
+
   if (isEditMode) {
     return (
       <div className={cn("relative group", className)}>
@@ -428,6 +467,7 @@ const EditableText: FC<{
               className="w-full p-2 bg-paper border border-ink/10 rounded-lg text-ink font-serif text-sm focus:outline-none focus:ring-1 focus:ring-gold"
               rows={3}
               autoFocus
+              placeholder="Enter text..."
             />
             <div className="grid grid-cols-2 gap-2">
               <select 
@@ -468,7 +508,7 @@ const EditableText: FC<{
             onClick={() => setIsEditing(true)}
           >
             <div className="absolute -inset-2 border border-dashed border-gold/0 group-hover/item:border-gold/40 rounded-lg transition-colors -z-10" />
-            <Component className={className} style={currentStyles}>{value}</Component>
+            <Component className={cn(className, !value && "opacity-30 italic")} style={currentStyles}>{renderContent()}</Component>
             <button 
               className="absolute -top-2 -right-2 w-6 h-6 bg-gold text-ink rounded-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity shadow-lg z-10"
             >
@@ -480,7 +520,7 @@ const EditableText: FC<{
     );
   }
 
-  return <Component className={className} style={currentStyles}>{value}</Component>;
+  return <Component className={className} style={currentStyles}>{renderContent()}</Component>;
 };
 
 const EditableImage: FC<{ 
@@ -550,6 +590,94 @@ const EditableImage: FC<{
   return <img src={url} alt={alt} className={className} referrerPolicy="no-referrer" />;
 };
 
+const EditableLink: FC<{ 
+  contentKey: string, 
+  defaultText: string, 
+  defaultUrl: string,
+  isEditMode: boolean, 
+  language: string,
+  siteContent: Record<string, any>,
+  className?: string
+}> = ({ contentKey, defaultText, defaultUrl, isEditMode, language, siteContent, className }) => {
+  const [isEditing, setIsEditing] = useState(false);
+  const content = siteContent[contentKey] || {};
+  const [text, setText] = useState(content.value !== undefined ? content.value : defaultText);
+  const [url, setUrl] = useState(content.url !== undefined ? content.url : defaultUrl);
+
+  const displayValue = text || (isEditMode ? `[+ ${contentKey}]` : "");
+
+  useEffect(() => {
+    if (content.value !== undefined) setText(content.value);
+    if (content.url !== undefined) setUrl(content.url);
+  }, [content.value, content.url]);
+
+  const handleSave = async () => {
+    const docId = `${language}_${contentKey.replace(/\./g, '_')}`;
+    try {
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: contentKey,
+        language,
+        value: text,
+        url,
+        updatedAt: serverTimestamp()
+      });
+      setIsEditing(false);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
+  if (!isEditMode && !text) return null;
+
+  if (isEditMode) {
+    return (
+      <div className={cn("relative group inline-block", className)}>
+        {isEditing ? (
+          <div className="flex flex-col gap-3 w-full min-w-[300px] bg-white p-4 rounded-xl border border-gold shadow-2xl z-[100] absolute bottom-full left-0 mb-2">
+            <div className="space-y-1">
+              <label className="text-[8px] uppercase tracking-widest opacity-50">Link Text</label>
+              <input 
+                value={text} 
+                onChange={(e) => setText(e.target.value)}
+                className="w-full p-2 bg-paper border border-ink/10 rounded-lg text-ink text-xs focus:outline-none focus:ring-1 focus:ring-gold"
+                placeholder="Enter link text..."
+              />
+            </div>
+            <div className="space-y-1">
+              <label className="text-[8px] uppercase tracking-widest opacity-50">URL</label>
+              <input 
+                value={url} 
+                onChange={(e) => setUrl(e.target.value)}
+                className="w-full p-2 bg-paper border border-ink/10 rounded-lg text-ink text-xs focus:outline-none focus:ring-1 focus:ring-gold"
+                placeholder="Enter URL (e.g., https://...)"
+              />
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-[10px] uppercase tracking-widest opacity-50 hover:opacity-100 transition-opacity">Cancel</button>
+              <button onClick={handleSave} className="px-3 py-1 bg-gold text-ink rounded-full text-[10px] uppercase tracking-widest font-bold hover:scale-105 transition-transform">Save</button>
+            </div>
+          </div>
+        ) : (
+          <div 
+            className="relative cursor-pointer group/item"
+            onClick={() => setIsEditing(true)}
+          >
+            <div className="absolute -inset-1 border border-dashed border-gold/0 group-hover/item:border-gold/40 rounded transition-colors -z-10" />
+            <span className={cn(className, !text && "opacity-30 italic")}>{displayValue}</span>
+            <button 
+              className="absolute -top-2 -right-2 w-5 h-5 bg-gold text-ink rounded-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity shadow-lg z-10"
+            >
+              <Edit size={10} />
+            </button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return <a href={url} target="_blank" rel="noopener noreferrer" className={className}>{text}</a>;
+};
+
 const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode, isEditMode: boolean, siteContent: Record<string, any> }> = ({ setView, onBook, setInitialArchiveFilter, language, isEditMode, siteContent }) => {
   const t = TRANSLATIONS[language];
   
@@ -596,7 +724,16 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               transition={{ delay: 0.4 }}
               className="text-7xl md:text-8xl font-serif font-light leading-[0.9] tracking-tighter"
             >
-              <EditableText contentKey="hero.title" defaultValue={t.hero.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
+              <EditableText 
+                contentKey="hero.title" 
+                defaultValue={t.hero.title} 
+                isEditMode={isEditMode} 
+                language={language} 
+                siteContent={siteContent} 
+                as="div" 
+                highlight={language === 'ko' ? "프리미엄 중국어" : "Premium Chinese"}
+                highlightClassName="text-gold"
+              />
             </motion.h1>
             <motion.div 
               initial={{ y: 30, opacity: 0 }}
@@ -610,13 +747,19 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.8 }}
-              className="flex items-center gap-6"
+              className="flex flex-wrap items-center gap-6"
             >
               <button 
                 onClick={() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' })}
                 className="px-10 py-4 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:scale-105 transition-transform"
               >
                 {t.hero.cta}
+              </button>
+              <button 
+                onClick={() => setView('inquiry')}
+                className="px-10 py-4 border border-ink text-ink rounded-full text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-all"
+              >
+                {t.inquiry.title}
               </button>
               <div className="flex items-center gap-3">
                 <div className="flex -space-x-2">
@@ -1098,11 +1241,12 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
   const [reservations, setReservations] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
   const [resources, setResources] = useState<any[]>([]);
+  const [inquiries, setInquiries] = useState<any[]>([]);
   const [downloads, setDownloads] = useState<any[]>([]);
   const [communityPosts, setCommunityPosts] = useState<any[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'reservations' | 'resources' | 'community' | 'users' | 'stats'>('reservations');
+  const [activeTab, setActiveTab] = useState<'reservations' | 'resources' | 'community' | 'users' | 'stats' | 'inquiries'>('reservations');
   
   const [feedbackText, setFeedbackText] = useState<{ [key: string]: string }>({});
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
@@ -1148,6 +1292,10 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
       setFeedbacks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'feedback'));
 
+    const unsubInquiries = onSnapshot(query(collection(db, 'inquiries'), orderBy('createdAt', 'desc')), (snapshot) => {
+      setInquiries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'inquiries'));
+
     setLoading(false);
 
     return () => {
@@ -1157,6 +1305,7 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
       unsubDownloads();
       unsubCommunity();
       unsubFeedbacks();
+      unsubInquiries();
     };
   }, []);
 
@@ -1246,12 +1395,22 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
       const extension = file.name.split('.').pop()?.toLowerCase();
       let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
       if (extension === 'mp3') fileType = 'mp3';
-      if (['jpg', 'jpeg', 'png', 'gif'].includes(extension || '')) fileType = 'image';
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
       if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
       if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
-      if (extension === 'txt') fileType = 'text';
+      if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
       
-      setNewResource(prev => ({ ...prev, fileUrl: url, fileType }));
+      let textContent = '';
+      if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
+        textContent = await file.text();
+      }
+      
+      setNewResource(prev => ({ 
+        ...prev, 
+        fileUrl: url, 
+        fileType,
+        textContent: textContent || prev.textContent
+      }));
       alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
     } catch (error) {
       console.error('Upload error:', error);
@@ -1398,7 +1557,7 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
           <h2 className="text-5xl font-serif font-light">{t.nav.systemName}</h2>
         </div>
         <div className="flex bg-ink/5 p-1 rounded-2xl">
-          {(['reservations', 'resources', 'community', 'users', 'stats'] as const).map(tab => (
+          {(['reservations', 'resources', 'community', 'inquiries', 'users', 'stats'] as const).map(tab => (
             <button 
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -1407,7 +1566,7 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                 activeTab === tab ? "bg-ink text-paper shadow-lg" : "opacity-40 hover:opacity-100"
               )}
             >
-              {t.admin[tab] || tab}
+              {tab === 'inquiries' ? (language === 'ko' ? '수강 문의' : 'Inquiries') : (t.admin[tab] || tab)}
             </button>
           ))}
         </div>
@@ -1937,6 +2096,62 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
         </div>
       )}
 
+      {activeTab === 'inquiries' && (
+        <div className="grid grid-cols-1 gap-8">
+          {inquiries.length === 0 ? (
+            <div className="py-20 text-center opacity-30 italic">No inquiries found.</div>
+          ) : (
+            inquiries.map(inq => (
+              <div key={inq.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
+                <div className="flex justify-between items-start">
+                  <div className="space-y-1">
+                    <h4 className="text-xl font-bold">{inq.name}</h4>
+                    <p className="text-sm text-gold font-bold">{inq.contact}</p>
+                    <p className="text-[10px] opacity-40 uppercase tracking-widest">
+                      {inq.createdAt?.toDate ? inq.createdAt.toDate().toLocaleString() : 'Just now'}
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={async () => {
+                        if (!confirm('Delete this inquiry?')) return;
+                        await deleteDoc(doc(db, 'inquiries', inq.id));
+                      }}
+                      className="p-2 text-ink/20 hover:text-red-500 transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t border-ink/5">
+                  <div className="space-y-2">
+                    <p className="text-[10px] uppercase tracking-widest opacity-50">Learning History</p>
+                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{inq.history}</p>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[10px] uppercase tracking-widest opacity-50">Level & Concerns</p>
+                    <div className="flex flex-wrap gap-2">
+                      {inq.levelConcerns?.map((item: string, idx: number) => (
+                        <span key={idx} className="px-3 py-1 bg-ink/5 rounded-full text-[10px]">{item}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <p className="text-[10px] uppercase tracking-widest opacity-50">Desired Class</p>
+                    <div className="flex flex-wrap gap-2">
+                      {inq.desiredClass?.map((item: string, idx: number) => (
+                        <span key={idx} className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold">{item}</span>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      )}
+
       {activeTab === 'stats' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-4">
@@ -2207,7 +2422,22 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
         downloadCount: (resource.downloadCount || 0) + 1
       });
       
-      window.open(resource.fileUrl, '_blank');
+      if (resource.fileUrl) {
+        window.open(resource.fileUrl, '_blank');
+      } else if (resource.textContent) {
+        // Download text content as a file if no fileUrl exists
+        const blob = new Blob([resource.textContent], { type: 'text/plain' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = `${resource.title.replace(/\s+/g, '_')}.txt`;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      } else {
+        alert(language === 'ko' ? '다운로드할 수 있는 파일이 없습니다.' : 'No file available for download.');
+      }
       
       await addDoc(collection(db, downloadPath), {
         resourceId: resource.id,
@@ -2268,12 +2498,22 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
       const extension = file.name.split('.').pop()?.toLowerCase();
       let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
       if (extension === 'mp3') fileType = 'mp3';
-      if (['jpg', 'jpeg', 'png', 'gif'].includes(extension || '')) fileType = 'image';
+      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
       if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
       if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
-      if (extension === 'txt') fileType = 'text';
+      if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
       
-      setNewResource(prev => ({ ...prev, fileUrl: url, fileType }));
+      let textContent = '';
+      if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
+        textContent = await file.text();
+      }
+      
+      setNewResource(prev => ({ 
+        ...prev, 
+        fileUrl: url, 
+        fileType,
+        textContent: textContent || prev.textContent 
+      }));
       alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
     } catch (error) {
       console.error('Upload error:', error);
@@ -2762,6 +3002,18 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                   </button>
                 </div>
 
+                {/* Preview Section */}
+                {selectedResource.fileUrl && selectedResource.fileType === 'image' && (
+                  <div className="rounded-3xl overflow-hidden border border-ink/10 bg-ink/5">
+                    <img 
+                      src={selectedResource.fileUrl} 
+                      alt={selectedResource.title} 
+                      className="w-full h-auto max-h-[400px] object-contain"
+                      referrerPolicy="no-referrer"
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-4">
                   <h4 className="text-[10px] uppercase tracking-widest font-bold opacity-40">Description</h4>
                   <div className="text-lg font-serif italic opacity-70 leading-relaxed">
@@ -2770,9 +3022,21 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                 </div>
 
                 {selectedResource.textContent && (
-                  <div className="space-y-4 p-6 bg-ink/5 rounded-3xl border border-ink/10">
-                    <h4 className="text-[10px] uppercase tracking-widest font-bold opacity-40">Text Content</h4>
-                    <div className="text-sm font-serif whitespace-pre-wrap leading-relaxed">
+                  <div className="space-y-4 p-6 bg-ink/5 rounded-3xl border border-ink/10 relative group/text">
+                    <div className="flex justify-between items-center">
+                      <h4 className="text-[10px] uppercase tracking-widest font-bold opacity-40">Text Content</h4>
+                      <button 
+                        onClick={() => {
+                          navigator.clipboard.writeText(selectedResource.textContent);
+                          alert(language === 'ko' ? '클립보드에 복사되었습니다.' : 'Copied to clipboard.');
+                        }}
+                        className="p-2 bg-white border border-ink/10 rounded-lg opacity-0 group-hover/text:opacity-100 transition-opacity hover:border-gold"
+                        title="Copy Text"
+                      >
+                        <Copy size={12} />
+                      </button>
+                    </div>
+                    <div className="text-sm font-serif whitespace-pre-wrap leading-relaxed max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
                       {selectedResource.textContent}
                     </div>
                   </div>
@@ -2804,9 +3068,16 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                   >
                     <Download size={16} /> {t.archive.download}
                   </button>
-                  {selectedResource.fileType === 'pdf' && (
+                  {selectedResource.fileUrl && (selectedResource.fileType === 'pdf' || selectedResource.fileType === 'ppt' || selectedResource.fileType === 'word') && (
                     <button 
-                      onClick={() => window.open(selectedResource.fileUrl, '_blank')}
+                      onClick={() => {
+                        if (selectedResource.fileType === 'pdf') {
+                          window.open(selectedResource.fileUrl, '_blank');
+                        } else {
+                          // Use Google Docs Viewer for PPT and Word
+                          window.open(`https://docs.google.com/viewer?url=${encodeURIComponent(selectedResource.fileUrl)}&embedded=true`, '_blank');
+                        }
+                      }}
                       className="flex-grow md:flex-none px-10 py-4 border border-ink/10 rounded-full text-xs uppercase tracking-widest font-bold hover:border-ink transition-all flex items-center justify-center gap-3"
                     >
                       <ExternalLink size={16} /> {language === 'ko' ? '미리보기' : 'Preview'}
@@ -2846,6 +3117,244 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
           </motion.div>
         )}
       </AnimatePresence>
+    </motion.div>
+  );
+};
+
+const InquiryView: FC<{ language: LanguageCode, onComplete: () => void }> = ({ language, onComplete }) => {
+  const t = TRANSLATIONS[language];
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+  
+  const [formData, setFormData] = useState({
+    name: '',
+    contact: '',
+    history: '',
+    levelConcerns: [] as string[],
+    otherLevelConcern: '',
+    desiredClass: [] as string[],
+    otherDesiredClass: ''
+  });
+
+  const toggleSelection = (field: 'levelConcerns' | 'desiredClass', value: string) => {
+    setFormData(prev => ({
+      ...prev,
+      [field]: prev[field].includes(value) 
+        ? prev[field].filter(v => v !== value)
+        : [...prev[field], value]
+    }));
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!formData.name || !formData.contact) {
+      alert(language === 'ko' ? '이름과 연락처는 필수입니다.' : 'Name and Contact are required.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      // Merge "Other" values into the arrays if they exist
+      const finalLevelConcerns = [...formData.levelConcerns];
+      if (formData.otherLevelConcern) {
+        finalLevelConcerns.push(`Other: ${formData.otherLevelConcern}`);
+      }
+
+      const finalDesiredClass = [...formData.desiredClass];
+      if (formData.otherDesiredClass) {
+        finalDesiredClass.push(`Other: ${formData.otherDesiredClass}`);
+      }
+
+      await addDoc(collection(db, 'inquiries'), {
+        name: formData.name,
+        contact: formData.contact,
+        history: formData.history,
+        levelConcerns: finalLevelConcerns,
+        desiredClass: finalDesiredClass,
+        createdAt: serverTimestamp()
+      });
+      setIsSuccess(true);
+      setTimeout(() => {
+        onComplete();
+      }, 3000);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, 'inquiries');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isSuccess) {
+    return (
+      <div className="min-h-[70vh] flex flex-col items-center justify-center text-center px-6">
+        <motion.div 
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="w-20 h-20 bg-green-100 text-green-600 rounded-full flex items-center justify-center mb-8"
+        >
+          <Check size={40} />
+        </motion.div>
+        <h2 className="text-4xl font-serif mb-4">{t.inquiry.successTitle}</h2>
+        <p className="text-lg opacity-60 max-w-md mx-auto">{t.inquiry.successMessage}</p>
+      </div>
+    );
+  }
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="max-w-3xl mx-auto px-6 py-20"
+    >
+      <div className="text-center space-y-4 mb-16">
+        <span className="text-gold text-[10px] uppercase tracking-[0.4em]">{t.inquiry.badge}</span>
+        <h2 className="text-5xl font-serif font-light">{t.inquiry.title}</h2>
+        <p className="text-lg opacity-60 font-serif italic">{t.inquiry.subtitle}</p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-12">
+        {/* 1. Name */}
+        <div className="space-y-4">
+          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">1</span>
+            {t.inquiry.nameLabel}
+          </label>
+          <input 
+            type="text"
+            required
+            placeholder={t.inquiry.namePlaceholder}
+            value={formData.name}
+            onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+            className="w-full p-6 bg-ink/5 border border-ink/10 rounded-3xl focus:border-gold outline-none transition-colors text-lg"
+          />
+        </div>
+
+        {/* 2. Contact */}
+        <div className="space-y-4">
+          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">2</span>
+            {t.inquiry.contactLabel}
+          </label>
+          <input 
+            type="text"
+            required
+            placeholder={t.inquiry.contactPlaceholder}
+            value={formData.contact}
+            onChange={(e) => setFormData(prev => ({ ...prev, contact: e.target.value }))}
+            className="w-full p-6 bg-ink/5 border border-ink/10 rounded-3xl focus:border-gold outline-none transition-colors text-lg"
+          />
+        </div>
+
+        {/* 3. History */}
+        <div className="space-y-4">
+          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">3</span>
+            {t.inquiry.historyLabel}
+          </label>
+          <textarea 
+            placeholder={t.inquiry.historyPlaceholder}
+            value={formData.history}
+            onChange={(e) => setFormData(prev => ({ ...prev, history: e.target.value }))}
+            className="w-full p-6 bg-ink/5 border border-ink/10 rounded-3xl focus:border-gold outline-none transition-colors text-lg min-h-[150px]"
+          />
+        </div>
+
+        {/* 4. Level & Concerns */}
+        <div className="space-y-6">
+          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">4</span>
+            {t.inquiry.levelLabel}
+          </label>
+          <div className="grid grid-cols-1 gap-3">
+            {t.inquiry.levelOptions.map((option: string) => (
+              <div key={option} className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => toggleSelection('levelConcerns', option)}
+                  className={cn(
+                    "w-full p-5 rounded-2xl border text-left transition-all flex items-center justify-between group",
+                    formData.levelConcerns.includes(option) 
+                      ? "bg-gold/10 border-gold text-gold font-bold" 
+                      : "bg-paper border-ink/10 hover:border-gold/50"
+                  )}
+                >
+                  <span className="text-sm">{option}</span>
+                  <div className={cn(
+                    "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
+                    formData.levelConcerns.includes(option) ? "bg-gold border-gold text-ink" : "border-ink/20 group-hover:border-gold"
+                  )}>
+                    {formData.levelConcerns.includes(option) && <Check size={12} />}
+                  </div>
+                </button>
+                {option.includes('(') && formData.levelConcerns.includes(option) && (
+                  <motion.input
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    type="text"
+                    placeholder={language === 'ko' ? '직접 입력해 주세요.' : 'Please enter directly.'}
+                    value={formData.otherLevelConcern}
+                    onChange={(e) => setFormData(prev => ({ ...prev, otherLevelConcern: e.target.value }))}
+                    className="w-full p-4 bg-white border border-gold/30 rounded-xl outline-none focus:border-gold text-sm"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* 5. Desired Class */}
+        <div className="space-y-6">
+          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">5</span>
+            {t.inquiry.classLabel}
+          </label>
+          <div className="grid grid-cols-1 gap-3">
+            {t.inquiry.classOptions.map((option: string) => (
+              <div key={option} className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => toggleSelection('desiredClass', option)}
+                  className={cn(
+                    "w-full p-5 rounded-2xl border text-left transition-all flex items-center justify-between group",
+                    formData.desiredClass.includes(option) 
+                      ? "bg-ink text-paper border-ink font-bold" 
+                      : "bg-paper border-ink/10 hover:border-gold/50"
+                  )}
+                >
+                  <span className="text-sm">{option}</span>
+                  <div className={cn(
+                    "w-5 h-5 rounded-full border flex items-center justify-center transition-colors",
+                    formData.desiredClass.includes(option) ? "bg-gold border-gold text-ink" : "border-ink/20 group-hover:border-gold"
+                  )}>
+                    {formData.desiredClass.includes(option) && <Check size={12} />}
+                  </div>
+                </button>
+                {option.includes('(') && formData.desiredClass.includes(option) && (
+                  <motion.input
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    type="text"
+                    placeholder={language === 'ko' ? '직접 입력해 주세요.' : 'Please enter directly.'}
+                    value={formData.otherDesiredClass}
+                    onChange={(e) => setFormData(prev => ({ ...prev, otherDesiredClass: e.target.value }))}
+                    className="w-full p-4 bg-white border border-gold/30 rounded-xl outline-none focus:border-gold text-sm"
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="pt-12">
+          <button 
+            type="submit"
+            disabled={isSubmitting}
+            className="w-full py-6 bg-ink text-paper rounded-full text-sm uppercase tracking-[0.2em] font-bold hover:bg-gold hover:text-ink transition-all shadow-2xl disabled:opacity-50"
+          >
+            {isSubmitting ? 'Submitting...' : t.inquiry.submit}
+          </button>
+        </div>
+      </form>
     </motion.div>
   );
 };

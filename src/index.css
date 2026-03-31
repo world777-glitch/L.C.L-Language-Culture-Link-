@@ -54,3 +54,14 @@
 .markdown-body ruby { @apply inline-flex flex-col-reverse items-center leading-none align-middle mx-1; }
 .markdown-body rt { @apply block text-[12px] font-sans font-medium text-gold mb-1 tracking-wider; }
 
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: #c5a059;
+  border-radius: 10px;
+}
+
