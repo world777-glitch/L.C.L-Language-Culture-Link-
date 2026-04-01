@@ -42,7 +42,7 @@ export const LANGUAGES: Language[] = [
 export const TRANSLATIONS: Record<LanguageCode, any> = {
   ko: {
     nav: {
-      systemName: 'L.C.L 통합 관리 시스템',
+      systemName: 'Language & Culture Link',
       curriculum: '커리큘럼',
       pricing: '수강료',
       archive: '자료실',
@@ -57,7 +57,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       quote: '"박사의 깊이를 더한 프리미엄 중국어, 이제 커피 한 잔 값으로 시작하세요."',
       contact: '연락처',
       social: '소셜',
-      rights: '© 2026 L.C.L 통합 관리 시스템. All rights reserved.',
+      rights: '© 2026 Language & Culture Link. All rights reserved.',
       tagline: 'Excellence in Language & Culture',
     },
     hero: {
@@ -193,7 +193,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
   },
   en: {
     nav: {
-      systemName: 'L.C.L Integrated Management System',
+      systemName: 'Language & Culture Link',
       curriculum: 'Curriculum',
       pricing: 'Pricing',
       archive: 'Archive',
@@ -238,7 +238,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       quote: '"Premium Chinese with academic depth, starting at the price of a cup of coffee."',
       contact: 'Contact',
       social: 'Social',
-      rights: '© 2026 L.C.L Integrated Management System. All rights reserved.',
+      rights: '© 2026 Language & Culture Link. All rights reserved.',
       tagline: 'Excellence in Language & Culture',
     },
     hero: {
@@ -344,7 +344,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
   },
   zh: {
     nav: {
-      systemName: 'L.C.L 综合管理系统',
+      systemName: 'Language & Culture Link',
       curriculum: '课程体系',
       pricing: '学费',
       archive: '资料库',
@@ -388,7 +388,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       quote: '"富有学术深度的优质中文课程，仅需一杯咖啡的价格即可开始。"',
       contact: '联系方式',
       social: '社交媒体',
-      rights: '© 2026 L.C.L 综合管理系统. 版权所有.',
+      rights: '© 2026 Language & Culture Link. 版权所有.',
       tagline: '卓越的语言与文化',
     },
     hero: {
@@ -468,7 +468,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
   },
   ja: {
     nav: {
-      systemName: 'L.C.L 統合管理システム',
+      systemName: 'Language & Culture Link',
       curriculum: 'カリキュ럼',
       pricing: '受講料',
       archive: '資料室',
@@ -482,7 +482,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       quote: '"博士の深みを加えたプレミアム中国語、コーヒー1杯の価格から始めましょう。"',
       contact: 'お問い合わせ',
       social: 'ソーシャル',
-      rights: '© 2026 L.C.L 統合管理システム. All rights reserved.',
+      rights: '© 2026 Language & Culture Link. All rights reserved.',
       tagline: 'Excellence in Language & Culture',
     },
     hero: {

@@ -49,7 +49,7 @@ import { LANGUAGES, TRANSLATIONS, LanguageCode } from './translations';
 import { auth, loginWithGoogle, logout as firebaseLogout, db, storage, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
 import { collection, addDoc, setDoc, serverTimestamp, onSnapshot, query, where, orderBy, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
+import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 
 // Helper to convert raw PCM from Gemini TTS to a playable WAV Blob
 const pcmToWav = (pcmBase64: string, sampleRate: number = 24000) => {
@@ -1214,6 +1214,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
   const [editingResource, setEditingResource] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   
   // Resource Form State
   const [newResource, setNewResource] = useState({
@@ -1351,35 +1352,49 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
     if (!file) return;
 
     setUploading(true);
+    setUploadProgress(0);
     try {
       const storageRef = ref(storage, `resources/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      
-      const extension = file.name.split('.').pop()?.toLowerCase();
-      let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
-      if (extension === 'mp3') fileType = 'mp3';
-      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
-      if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
-      if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
-      if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
-      
-      let textContent = '';
-      if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
-        textContent = await file.text();
-      }
-      
-      setNewResource(prev => ({ 
-        ...prev, 
-        fileUrl: url, 
-        fileType,
-        textContent: textContent || prev.textContent
-      }));
-      alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+        }, 
+        (error) => {
+          console.error('Upload error:', error);
+          alert(language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.');
+          setUploading(false);
+        }, 
+        async () => {
+          const url = await getDownloadURL(storageRef);
+          const extension = file.name.split('.').pop()?.toLowerCase();
+          let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
+          if (extension === 'mp3') fileType = 'mp3';
+          if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
+          if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
+          if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
+          if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
+          
+          let textContent = '';
+          if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
+            textContent = await file.text();
+          }
+          
+          setNewResource(prev => ({ 
+            ...prev, 
+            fileUrl: url, 
+            fileType,
+            textContent: textContent || prev.textContent
+          }));
+          alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+          setUploading(false);
+        }
+      );
     } catch (error) {
       console.error('Upload error:', error);
       alert(language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.');
-    } finally {
       setUploading(false);
     }
   };
@@ -1906,12 +1921,17 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
                       />
                       <label 
                         htmlFor="file-upload"
-                        className={`flex items-center justify-center gap-2 w-full p-3 bg-ink/5 border border-dashed border-ink/20 rounded-xl cursor-pointer hover:border-gold transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`flex flex-col items-center justify-center gap-1 w-full p-3 bg-ink/5 border border-dashed border-ink/20 rounded-xl cursor-pointer hover:border-gold transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
-                        <Upload size={14} />
-                        <span className="text-[10px] uppercase tracking-widest font-bold">
-                          {uploading ? (language === 'ko' ? '업로드 중...' : 'Uploading...') : (language === 'ko' ? '파일 선택' : 'Select File')}
-                        </span>
+                        <div className="flex items-center gap-2">
+                          <Upload size={14} />
+                          <span className="text-[10px] uppercase tracking-widest font-bold">
+                            {uploading ? (language === 'ko' ? '업로드 중...' : 'Uploading...') : (language === 'ko' ? '파일 선택' : 'Select File')}
+                          </span>
+                        </div>
+                        {uploading && (
+                          <span className="text-[8px] font-bold text-gold">{Math.round(uploadProgress)}%</span>
+                        )}
                       </label>
                     </div>
                   </div>
@@ -2396,6 +2416,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
   const [isManaging, setIsManaging] = useState(false);
   const [editingResource, setEditingResource] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [newResource, setNewResource] = useState({
     title: '',
     description: '',
@@ -2518,35 +2539,51 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
   const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
     setUploading(true);
+    setUploadProgress(0);
     try {
       const storageRef = ref(storage, `resources/${Date.now()}_${file.name}`);
-      await uploadBytes(storageRef, file);
-      const url = await getDownloadURL(storageRef);
-      const extension = file.name.split('.').pop()?.toLowerCase();
-      let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
-      if (extension === 'mp3') fileType = 'mp3';
-      if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
-      if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
-      if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
-      if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
-      
-      let textContent = '';
-      if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
-        textContent = await file.text();
-      }
-      
-      setNewResource(prev => ({ 
-        ...prev, 
-        fileUrl: url, 
-        fileType,
-        textContent: textContent || prev.textContent 
-      }));
-      alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+        }, 
+        (error) => {
+          console.error('Upload error:', error);
+          alert(language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.');
+          setUploading(false);
+        }, 
+        async () => {
+          const url = await getDownloadURL(storageRef);
+          const extension = file.name.split('.').pop()?.toLowerCase();
+          let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
+          if (extension === 'mp3') fileType = 'mp3';
+          if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
+          if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
+          if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
+          if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
+          
+          let textContent = '';
+          if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
+            textContent = await file.text();
+          }
+          
+          setNewResource(prev => ({ 
+            ...prev, 
+            fileUrl: url, 
+            fileType,
+            textContent: textContent || prev.textContent 
+          }));
+          alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+          setUploading(false);
+        }
+      );
     } catch (error) {
       console.error('Upload error:', error);
       alert(language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.');
-    } finally {
       setUploading(false);
     }
   };
@@ -2816,9 +2853,9 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
               animate={{ scale: 1, opacity: 1, y: 0 }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-paper w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden"
+              className="bg-paper w-full max-w-2xl rounded-[40px] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
             >
-              <div className="p-8 md:p-12 space-y-8">
+              <div className="p-8 md:p-12 space-y-8 overflow-y-auto flex-grow scrollbar-hide">
                 <div className="flex justify-between items-center">
                   <h3 className="text-3xl font-serif italic">
                     {editingResource ? (language === 'ko' ? '자료 수정' : 'Edit Resource') : (language === 'ko' ? '새 자료 추가' : 'Add New Resource')}
@@ -2976,11 +3013,16 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                         <label 
                           htmlFor="archive-file-upload"
                           className={cn(
-                            "px-6 py-4 rounded-2xl flex items-center justify-center cursor-pointer transition-all",
+                            "px-6 py-4 rounded-2xl flex items-center justify-center cursor-pointer transition-all min-w-[120px]",
                             uploading ? "bg-ink/10 text-ink/30" : "bg-gold text-ink hover:bg-gold/90"
                           )}
                         >
-                          {uploading ? <div className="w-5 h-5 border-2 border-ink/30 border-t-ink rounded-full animate-spin" /> : <Upload size={20} />}
+                          {uploading ? (
+                            <div className="flex flex-col items-center gap-1">
+                              <div className="w-4 h-4 border-2 border-ink/30 border-t-ink rounded-full animate-spin" />
+                              <span className="text-[8px] font-bold">{Math.round(uploadProgress)}%</span>
+                            </div>
+                          ) : <Upload size={20} />}
                         </label>
                       </div>
                     </div>
@@ -3257,14 +3299,22 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
             <motion.div 
               initial={{ opacity: 0, scale: 0.9 }}
               animate={{ opacity: 1, scale: 1 }}
-              className="inline-block mt-8 px-6 py-3 border border-gold/30 rounded-2xl bg-gold/5"
+              className="inline-block mt-8 px-8 py-4 border border-gold/30 rounded-3xl bg-gold/5 relative overflow-hidden group"
             >
-              <p className="text-[10px] uppercase tracking-widest text-gold font-bold mb-1">
+              <div className="absolute inset-0 bg-gold/5 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000" />
+              <p className="text-[10px] uppercase tracking-[0.3em] text-gold font-bold mb-2">
                 {language === 'ko' ? '특별 할인 이벤트 기간' : 'Special Discount Event Period'}
               </p>
-              <p className="text-sm font-serif italic opacity-80">
-                {event.startDate} ~ {event.endDate}
-              </p>
+              <div className="flex items-center justify-center gap-3 text-lg font-serif italic text-gold">
+                <span>{event.startDate}</span>
+                <span className="opacity-30">/</span>
+                <span>{event.endDate}</span>
+              </div>
+              {customRate && (
+                <div className="mt-2 text-[10px] uppercase tracking-widest font-bold text-gold/60">
+                  {Math.round(customRate * 100)}% {language === 'ko' ? '추가 할인 적용 중' : 'Additional Discount Applied'}
+                </div>
+              )}
             </motion.div>
           )}
         </div>
@@ -3867,6 +3917,7 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
   const [isGeneratingAudio, setIsGeneratingAudio] = useState(false);
   const [elapsedTime, setElapsedTime] = useState(0);
   const [finalTime, setFinalTime] = useState<number | null>(null);
+  const [error, setGenerationError] = useState<string | null>(null);
   const timerRef = useRef<any>(null);
 
   const isPremiumOrAdmin = userProfile?.role === 'admin' || userProfile?.role === 'premium';
@@ -3886,7 +3937,7 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
   }, [isGenerating]);
 
   const handleGenerate = async () => {
-    if (!prompt) return;
+    if (!prompt.trim()) return;
     
     // Double check permissions
     if (!isPremiumOrAdmin) {
@@ -3895,7 +3946,7 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
     }
 
     setIsGenerating(true);
-    setIsGeneratingAudio(false);
+    setGenerationError(null);
     setGeneratedImage(null);
     setGeneratedAudio(null);
     setLearningContent(null);
@@ -3925,12 +3976,21 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
               aspectRatio: "1:1",
             }
           }
+        }).catch(err => {
+          console.error("Image generation failed:", err);
+          return { candidates: [] };
         }),
         ai.models.generateContent({
-          model: 'gemini-3.1-pro-preview', // Upgraded to Pro for better JSON reliability
+          model: 'gemini-3.1-pro-preview',
           contents: `Generate a practical Chinese dialogue and vocabulary list based on this situation: "${prompt}". 
           Target learner level: ${level}.
-          Interface language: ${language}.`,
+          Interface language: ${language}.
+          Return the result in strictly JSON format with the following structure:
+          {
+            "dialogue": [{"speaker": "...", "hanzi": "...", "pinyin": "...", "translation": "..."}],
+            "vocabulary": [{"hanzi": "...", "pinyin": "...", "translation": "..."}],
+            "culturalNote": "..."
+          }`,
           config: {
             responseMimeType: "application/json",
             responseSchema: {
@@ -3941,10 +4001,10 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
                   items: {
                     type: Type.OBJECT,
                     properties: {
-                      speaker: { type: Type.STRING, description: "Speaker name in Chinese" },
-                      hanzi: { type: Type.STRING, description: "Chinese characters" },
-                      pinyin: { type: Type.STRING, description: "Pinyin pronunciation" },
-                      translation: { type: Type.STRING, description: `Translation in ${language}` }
+                      speaker: { type: Type.STRING },
+                      hanzi: { type: Type.STRING },
+                      pinyin: { type: Type.STRING },
+                      translation: { type: Type.STRING }
                     },
                     required: ["speaker", "hanzi", "pinyin", "translation"]
                   }
@@ -3972,11 +4032,13 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
       console.log("AI Responses received");
 
       // Handle Image
-      for (const part of imageResponse.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          const base64EncodeString = part.inlineData.data;
-          setGeneratedImage(`data:image/png;base64,${base64EncodeString}`);
-          break;
+      if (imageResponse.candidates?.[0]?.content?.parts) {
+        for (const part of imageResponse.candidates[0].content.parts) {
+          if (part.inlineData) {
+            const base64EncodeString = part.inlineData.data;
+            setGeneratedImage(`data:image/png;base64,${base64EncodeString}`);
+            break;
+          }
         }
       }
 
@@ -3991,39 +4053,39 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
       setLearningContent(data);
       
       // Generate Audio (TTS)
-      setIsGeneratingAudio(true);
-      try {
-        // Extract only Hanzi for cleaner TTS
-        const hanziOnly = data.dialogue.map((d: any) => d.hanzi).join(' ');
-
-        const audioResponse = await ai.models.generateContent({
-          model: "gemini-2.5-flash-preview-tts",
-          contents: [{ parts: [{ text: `Read this Chinese dialogue naturally: ${hanziOnly}` }] }],
-          config: {
-            responseModalities: [Modality.AUDIO],
-            speechConfig: {
-              voiceConfig: {
-                prebuiltVoiceConfig: { voiceName: 'Kore' },
+      if (data.dialogue && data.dialogue.length > 0) {
+        setIsGeneratingAudio(true);
+        try {
+          const hanziOnly = data.dialogue.map((d: any) => d.hanzi).join(' ');
+          const audioResponse = await ai.models.generateContent({
+            model: "gemini-2.5-flash-preview-tts",
+            contents: [{ parts: [{ text: `Read this Chinese dialogue naturally: ${hanziOnly}` }] }],
+            config: {
+              responseModalities: [Modality.AUDIO],
+              speechConfig: {
+                voiceConfig: {
+                  prebuiltVoiceConfig: { voiceName: 'Kore' },
+                },
               },
             },
-          },
-        });
+          });
 
-        const base64Audio = audioResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-        if (base64Audio) {
-          const audioUrl = pcmToWav(base64Audio, 24000);
-          setGeneratedAudio(audioUrl);
+          const base64Audio = audioResponse.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
+          if (base64Audio) {
+            const audioUrl = pcmToWav(base64Audio, 24000);
+            setGeneratedAudio(audioUrl);
+          }
+        } catch (audioErr) {
+          console.error('Audio generation error:', audioErr);
+        } finally {
+          setIsGeneratingAudio(false);
         }
-      } catch (audioErr) {
-        console.error('Audio generation error:', audioErr);
-      } finally {
-        setIsGeneratingAudio(false);
       }
       
       setFinalTime(Math.floor((Date.now() - startTime) / 100) / 10);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Generation error:', error);
-      alert(t.aiStudio.error);
+      setGenerationError(error.message || t.aiStudio.error);
     } finally {
       setIsGenerating(false);
     }
@@ -4085,6 +4147,16 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
           )}
         </div>
         <h2 className="text-5xl font-serif font-light">{t.aiStudio.title}</h2>
+        {error && (
+          <motion.div 
+            initial={{ opacity: 0, y: -10 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="max-w-md mx-auto p-4 bg-red-50 text-red-600 rounded-2xl text-xs flex items-center gap-3"
+          >
+            <AlertCircle size={16} className="shrink-0" />
+            <p>{error}</p>
+          </motion.div>
+        )}
         <p className="max-w-xl mx-auto opacity-60 font-serif italic">
           {t.aiStudio.subtitle} <br />
           {t.aiStudio.example}
