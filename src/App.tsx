@@ -42,7 +42,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
-import { COURSES, calculatePrice, RESOURCE_GROUPS } from './constants';
+import { COURSES, calculatePrice, RESOURCE_GROUPS, LEVEL_PRICES } from './constants';
 import { cn } from './lib/utils';
 import { LANGUAGES, TRANSLATIONS, LanguageCode } from './translations';
 
@@ -99,8 +99,8 @@ export default function App() {
       const content: Record<string, any> = {};
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        if (doc.id === 'event-discount' || data.language === language) {
-          content[doc.id] = data;
+        if (doc.id === 'event-discount' || doc.id === 'weeks-discounts' || doc.id === 'level-prices' || doc.id === 'ai-studio-access' || data.language === language) {
+          content[data.key || doc.id] = { ...data, id: doc.id };
         }
       });
       setSiteContent(content);
@@ -344,7 +344,7 @@ export default function App() {
           {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} siteContent={siteContent} />}
           {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} />}
           {view === 'community' && <CommunityView key="community" language={language} />}
-          {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} isEventPeriod={isEventPeriod} siteContent={siteContent} />}
+          {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} isEventPeriod={isEventPeriod} siteContent={siteContent} isEditMode={isEditMode} />}
         </AnimatePresence>
 
         {/* Edit Mode Instruction Bar */}
@@ -1327,6 +1327,39 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
     }
   };
 
+  const [editingInquiry, setEditingInquiry] = useState<any>(null);
+  const [inquiryForm, setInquiryForm] = useState<any>({});
+
+  const handleEditInquiry = (inq: any) => {
+    setEditingInquiry(inq);
+    setInquiryForm({ ...inq });
+  };
+
+  const handleUpdateInquiry = async (e: FormEvent) => {
+    e.preventDefault();
+    const path = 'inquiries';
+    try {
+      await updateDoc(doc(db, path, editingInquiry.id), {
+        ...inquiryForm,
+        updatedAt: serverTimestamp()
+      });
+      setEditingInquiry(null);
+      alert(language === 'ko' ? '수정되었습니다.' : 'Updated successfully.');
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  };
+
+  const handleDeleteInquiry = async (id: string) => {
+    if (!confirm(language === 'ko' ? '정말 삭제하시겠습니까?' : 'Are you sure you want to delete this?')) return;
+    const path = 'inquiries';
+    try {
+      await deleteDoc(doc(db, path, id));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  };
+
   const submitFeedback = async (resId: string, studentUid: string) => {
     const content = feedbackText[resId];
     if (!content) return;
@@ -1406,12 +1439,16 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
     setUploading(true);
     setUploadProgress(0);
     
+    console.log('Starting upload for file:', file.name, 'Size:', file.size);
+    
     try {
       if (!storage) {
+        console.error('Firebase Storage is not initialized!');
         throw new Error('Storage not initialized');
       }
 
       const storageRef = ref(storage, `resources/${Date.now()}_${file.name}`);
+      console.log('Storage reference created:', storageRef.fullPath);
       
       // Use uploadBytesResumable for progress tracking
       const uploadTask = uploadBytesResumable(storageRef, file);
@@ -1420,22 +1457,27 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
         (snapshot) => {
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(progress);
-          console.log(`Upload progress: ${progress}%`);
+          console.log(`Upload progress: ${Math.round(progress)}% (${snapshot.bytesTransferred}/${snapshot.totalBytes})`);
         }, 
-        (error) => {
+        (error: any) => {
           console.error('Upload error details:', error);
           let message = language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.';
           if (error.code === 'storage/unauthorized') {
-            message = language === 'ko' ? '업로드 권한이 없습니다.' : 'No permission to upload.';
+            message = language === 'ko' ? '업로드 권한이 없습니다. (관리자 권한 확인 필요)' : 'No permission to upload. (Check admin role)';
           } else if (error.code === 'storage/canceled') {
             message = language === 'ko' ? '업로드가 취소되었습니다.' : 'Upload canceled.';
+          } else if (error.code === 'storage/unknown') {
+            message = language === 'ko' ? '알 수 없는 오류가 발생했습니다.' : 'Unknown storage error.';
           }
-          alert(`${message} (${error.code})`);
+          alert(`${message}\nCode: ${error.code}\nMessage: ${error.message}`);
           setUploading(false);
         }, 
         async () => {
           try {
+            console.log('Upload completed successfully. Getting download URL...');
             const url = await getDownloadURL(storageRef);
+            console.log('Download URL obtained:', url);
+            
             const extension = file.name.split('.').pop()?.toLowerCase();
             let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
             if (extension === 'mp3') fileType = 'mp3';
@@ -1456,9 +1498,9 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
               textContent: textContent || prev.textContent
             }));
             alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
-          } catch (err) {
+          } catch (err: any) {
             console.error('Error getting download URL:', err);
-            alert(language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.');
+            alert(`${language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.'} (${err.message})`);
           } finally {
             setUploading(false);
           }
@@ -1664,45 +1706,45 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
           </select>
         </div>
         <div className="flex-grow" />
-        <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-ink/5">
-          <span className="text-[10px] uppercase tracking-widest font-bold opacity-50">Event Discount</span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-ink/5">
+            <span className="text-[10px] uppercase tracking-widest font-bold opacity-50">Event Discount</span>
+            <div className="flex items-center gap-2">
+              <input 
+                type="number" 
+                min="0" 
+                max="100"
+                value={Math.round((siteContent['event-discount']?.discountRate ?? 0.20) * 100)}
+                onChange={async (e) => {
+                  const path = 'siteContent';
+                  const rate = parseFloat(e.target.value) / 100;
+                  await setDoc(doc(db, path, 'event-discount'), { ...siteContent['event-discount'], discountRate: rate }, { merge: true });
+                }}
+                className="w-12 text-[10px] p-1 border rounded text-center"
+              />
+              <span className="text-[10px] font-bold">%</span>
+            </div>
+            <div className="h-4 w-px bg-ink/10 mx-2" />
+            <span className="text-[10px] uppercase tracking-widest font-bold opacity-50">Period</span>
             <input 
-              type="number" 
-              min="0" 
-              max="100"
-              value={(siteContent['event-discount']?.discountRate ?? 0.20) * 100}
+              type="date" 
+              value={siteContent['event-discount']?.startDate || ''}
               onChange={async (e) => {
                 const path = 'siteContent';
-                const rate = parseFloat(e.target.value) / 100;
-                await setDoc(doc(db, path, 'event-discount'), { ...siteContent['event-discount'], discountRate: rate }, { merge: true });
+                await setDoc(doc(db, path, 'event-discount'), { ...siteContent['event-discount'], startDate: e.target.value }, { merge: true });
               }}
-              className="w-12 text-[10px] p-1 border rounded text-center"
+              className="text-[10px] p-1 border rounded"
             />
-            <span className="text-[10px] font-bold">%</span>
+            <span className="text-[10px] opacity-30">to</span>
+            <input 
+              type="date" 
+              value={siteContent['event-discount']?.endDate || ''}
+              onChange={async (e) => {
+                const path = 'siteContent';
+                await setDoc(doc(db, path, 'event-discount'), { ...siteContent['event-discount'], endDate: e.target.value }, { merge: true });
+              }}
+              className="text-[10px] p-1 border rounded"
+            />
           </div>
-          <div className="h-4 w-px bg-ink/10 mx-2" />
-          <span className="text-[10px] uppercase tracking-widest font-bold opacity-50">Period</span>
-          <input 
-            type="date" 
-            value={siteContent['event-discount']?.startDate || ''}
-            onChange={async (e) => {
-              const path = 'siteContent';
-              await setDoc(doc(db, path, 'event-discount'), { ...siteContent['event-discount'], startDate: e.target.value }, { merge: true });
-            }}
-            className="text-[10px] p-1 border rounded"
-          />
-          <span className="text-[10px] opacity-30">to</span>
-          <input 
-            type="date" 
-            value={siteContent['event-discount']?.endDate || ''}
-            onChange={async (e) => {
-              const path = 'siteContent';
-              await setDoc(doc(db, path, 'event-discount'), { ...siteContent['event-discount'], endDate: e.target.value }, { merge: true });
-            }}
-            className="text-[10px] p-1 border rounded"
-          />
-        </div>
       </div>
 
       {activeTab === 'reservations' && (
@@ -2232,56 +2274,142 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
 
       {activeTab === 'inquiries' && (
         <div className="grid grid-cols-1 gap-8">
-          {inquiries.length === 0 ? (
-            <div className="py-20 text-center opacity-30 italic">No inquiries found.</div>
-          ) : (
-            inquiries.map(inq => (
-              <div key={inq.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
-                <div className="flex justify-between items-start">
-                  <div className="space-y-1">
-                    <h4 className="text-xl font-bold">{inq.name}</h4>
-                    <p className="text-sm text-gold font-bold">{inq.contact}</p>
-                    <p className="text-[10px] opacity-40 uppercase tracking-widest">
-                      {inq.createdAt?.toDate ? inq.createdAt.toDate().toLocaleString() : 'Just now'}
-                    </p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button 
-                      onClick={async () => {
-                        if (!confirm('Delete this inquiry?')) return;
-                        await deleteDoc(doc(db, 'inquiries', inq.id));
-                      }}
-                      className="p-2 text-ink/20 hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t border-ink/5">
-                  <div className="space-y-2">
-                    <p className="text-[10px] uppercase tracking-widest opacity-50">Learning History</p>
-                    <p className="text-sm leading-relaxed whitespace-pre-wrap">{inq.history}</p>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-[10px] uppercase tracking-widest opacity-50">Level & Concerns</p>
-                    <div className="flex flex-wrap gap-2">
-                      {inq.levelConcerns?.map((item: string, idx: number) => (
-                        <span key={idx} className="px-3 py-1 bg-ink/5 rounded-full text-[10px]">{item}</span>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="space-y-2">
-                    <p className="text-[10px] uppercase tracking-widest opacity-50">Desired Class</p>
-                    <div className="flex flex-wrap gap-2">
-                      {inq.desiredClass?.map((item: string, idx: number) => (
-                        <span key={idx} className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold">{item}</span>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+          {editingInquiry ? (
+            <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
+              <div className="flex justify-between items-center">
+                <h3 className="text-xl font-serif">Edit Inquiry</h3>
+                <button onClick={() => setEditingInquiry(null)} className="text-xs text-gold underline">Cancel</button>
               </div>
-            ))
+              <form onSubmit={handleUpdateInquiry} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">Name</label>
+                    <input 
+                      value={inquiryForm.name || ''} 
+                      onChange={e => setInquiryForm({...inquiryForm, name: e.target.value})}
+                      className="w-full bg-ink/5 border border-ink/10 rounded-xl p-3 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">Contact</label>
+                    <input 
+                      value={inquiryForm.contact || ''} 
+                      onChange={e => setInquiryForm({...inquiryForm, contact: e.target.value})}
+                      className="w-full bg-ink/5 border border-ink/10 rounded-xl p-3 text-sm"
+                    />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50">History</label>
+                  <textarea 
+                    value={inquiryForm.history || ''} 
+                    onChange={e => setInquiryForm({...inquiryForm, history: e.target.value})}
+                    className="w-full bg-ink/5 border border-ink/10 rounded-xl p-3 text-sm h-32"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50">Concerns</label>
+                  <textarea 
+                    value={inquiryForm.concerns || ''} 
+                    onChange={e => setInquiryForm({...inquiryForm, concerns: e.target.value})}
+                    className="w-full bg-ink/5 border border-ink/10 rounded-xl p-3 text-sm h-32"
+                  />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">Desired Class</label>
+                    <input 
+                      value={inquiryForm.desiredClass || ''} 
+                      onChange={e => setInquiryForm({...inquiryForm, desiredClass: e.target.value})}
+                      className="w-full bg-ink/5 border border-ink/10 rounded-xl p-3 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">Duration (Weeks)</label>
+                    <input 
+                      type="number"
+                      value={inquiryForm.duration || ''} 
+                      onChange={e => setInquiryForm({...inquiryForm, duration: e.target.value})}
+                      className="w-full bg-ink/5 border border-ink/10 rounded-xl p-3 text-sm"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">Hours (per Session)</label>
+                    <input 
+                      type="number"
+                      step="0.5"
+                      value={inquiryForm.desiredHours || ''} 
+                      onChange={e => setInquiryForm({...inquiryForm, desiredHours: e.target.value})}
+                      className="w-full bg-ink/5 border border-ink/10 rounded-xl p-3 text-sm"
+                    />
+                  </div>
+                </div>
+                <button type="submit" className="w-full py-4 bg-ink text-paper rounded-xl text-xs uppercase tracking-widest hover:bg-gold transition-colors">
+                  Save Changes
+                </button>
+              </form>
+            </div>
+          ) : (
+            inquiries.length === 0 ? (
+              <div className="py-20 text-center opacity-30 italic">No inquiries found.</div>
+            ) : (
+              inquiries.map(inq => (
+                <div key={inq.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
+                  <div className="flex justify-between items-start">
+                    <div className="space-y-1">
+                      <h4 className="text-xl font-bold">{inq.name}</h4>
+                      <p className="text-sm text-gold font-bold">{inq.contact}</p>
+                      <p className="text-[10px] opacity-40 uppercase tracking-widest">
+                        {inq.createdAt?.toDate ? inq.createdAt.toDate().toLocaleString() : 'Just now'}
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <div className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold uppercase tracking-widest">
+                        {inq.desiredWeeks}{t.pricing.weeks} / {inq.desiredHours || 1}{language === 'ko' ? '시간' : 'h'}
+                      </div>
+                      <div className="px-3 py-1 bg-ink/5 text-ink/40 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                        ₩{inq.priceInfo?.discountedPrice?.toLocaleString()}
+                      </div>
+                      <button 
+                        onClick={() => handleEditInquiry(inq)}
+                        className="p-2 text-ink/20 hover:text-gold transition-colors"
+                      >
+                        <Edit size={18} />
+                      </button>
+                      <button 
+                        onClick={() => handleDeleteInquiry(inq.id)}
+                        className="p-2 text-ink/20 hover:text-red-500 transition-colors"
+                      >
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t border-ink/5">
+                    <div className="space-y-2">
+                      <p className="text-[10px] uppercase tracking-widest opacity-50">Learning History</p>
+                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{inq.history}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[10px] uppercase tracking-widest opacity-50">Level & Concerns</p>
+                      <div className="flex flex-wrap gap-2">
+                        {Array.isArray(inq.levelConcerns) ? inq.levelConcerns.map((item: string, idx: number) => (
+                          <span key={idx} className="px-3 py-1 bg-ink/5 rounded-full text-[10px]">{item}</span>
+                        )) : <span className="px-3 py-1 bg-ink/5 rounded-full text-[10px]">{inq.concerns}</span>}
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[10px] uppercase tracking-widest opacity-50">Desired Class</p>
+                      <div className="flex flex-wrap gap-2">
+                        {Array.isArray(inq.desiredClass) ? inq.desiredClass.map((item: string, idx: number) => (
+                          <span key={idx} className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold">{item}</span>
+                        )) : <span className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold">{inq.desiredClass}</span>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))
+            )
           )}
         </div>
       )}
@@ -2630,48 +2758,71 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
 
     setUploading(true);
     setUploadProgress(0);
+    console.log('Starting upload for file (Archive):', file.name, 'Size:', file.size);
+    
     try {
+      if (!storage) {
+        console.error('Firebase Storage is not initialized!');
+        throw new Error('Storage not initialized');
+      }
+
       const storageRef = ref(storage, `resources/${Date.now()}_${file.name}`);
+      console.log('Storage reference created (Archive):', storageRef.fullPath);
+      
       const uploadTask = uploadBytesResumable(storageRef, file);
 
       uploadTask.on('state_changed', 
         (snapshot) => {
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(progress);
+          console.log(`Upload progress (Archive): ${Math.round(progress)}%`);
         }, 
-        (error) => {
-          console.error('Upload error:', error);
-          alert(language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.');
+        (error: any) => {
+          console.error('Upload error details (Archive):', error);
+          let message = language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.';
+          if (error.code === 'storage/unauthorized') {
+            message = language === 'ko' ? '업로드 권한이 없습니다. (관리자 권한 확인 필요)' : 'No permission to upload. (Check admin role)';
+          }
+          alert(`${message}\nCode: ${error.code}\nMessage: ${error.message}`);
           setUploading(false);
         }, 
         async () => {
-          const url = await getDownloadURL(storageRef);
-          const extension = file.name.split('.').pop()?.toLowerCase();
-          let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
-          if (extension === 'mp3') fileType = 'mp3';
-          if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
-          if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
-          if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
-          if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
-          
-          let textContent = '';
-          if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
-            textContent = await file.text();
+          try {
+            console.log('Upload completed (Archive). Getting download URL...');
+            const url = await getDownloadURL(storageRef);
+            console.log('Download URL obtained (Archive):', url);
+            
+            const extension = file.name.split('.').pop()?.toLowerCase();
+            let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
+            if (extension === 'mp3') fileType = 'mp3';
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
+            if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
+            if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
+            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
+            
+            let textContent = '';
+            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
+              textContent = await file.text();
+            }
+            
+            setNewResource(prev => ({ 
+              ...prev, 
+              fileUrl: url, 
+              fileType,
+              textContent: textContent || prev.textContent 
+            }));
+            alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+          } catch (err: any) {
+            console.error('Error getting download URL (Archive):', err);
+            alert(`${language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.'} (${err.message})`);
+          } finally {
+            setUploading(false);
           }
-          
-          setNewResource(prev => ({ 
-            ...prev, 
-            fileUrl: url, 
-            fileType,
-            textContent: textContent || prev.textContent 
-          }));
-          alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
-          setUploading(false);
         }
       );
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert(language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.');
+    } catch (error: any) {
+      console.error('Upload catch error (Archive):', error);
+      alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${error.message})`);
       setUploading(false);
     }
   };
@@ -3363,18 +3514,59 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
   const t = TRANSLATIONS[language];
   const event = siteContent['event-discount'];
   const customRate = event?.discountRate;
+  
+  const weeksDiscounts = siteContent['weeks-discounts']?.rates || {};
+  const levelPrices = siteContent['level-prices']?.prices || {};
 
   const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
   const [selectedLevel, setSelectedLevel] = useState(COURSES[0].levels[0]);
   const [selectedWeeks, setSelectedWeeks] = useState(12);
   const [sessionsPerWeek, setSessionsPerWeek] = useState(1);
+  const [selectedHours, setSelectedHours] = useState(1);
 
   // Update level when course changes
   useEffect(() => {
     setSelectedLevel(selectedCourse.levels[0]);
   }, [selectedCourse]);
 
-  const priceInfo = calculatePrice(selectedLevel, selectedWeeks, sessionsPerWeek, 1, isEventPeriod, customRate);
+  const priceInfo = calculatePrice(selectedLevel, selectedWeeks, sessionsPerWeek, selectedHours, isEventPeriod, customRate, weeksDiscounts, levelPrices);
+
+  const handleUpdateDiscount = async (weeks: number, rate: number) => {
+    const newRates = { ...weeksDiscounts, [weeks]: rate };
+    await setDoc(doc(db, 'siteContent', 'weeks-discounts'), {
+      key: 'weeks-discounts',
+      rates: newRates,
+      updatedAt: serverTimestamp()
+    });
+  };
+
+  const handleUpdateLevelPrice = async (level: string, price: number) => {
+    const newPrices = { ...levelPrices, [level]: price };
+    await setDoc(doc(db, 'siteContent', 'level-prices'), {
+      key: 'level-prices',
+      prices: newPrices,
+      updatedAt: serverTimestamp()
+    });
+  };
+
+  const handleUpdateEventDiscount = async (rate: number) => {
+    await setDoc(doc(db, 'siteContent', 'event-discount'), {
+      key: 'event-discount',
+      discountRate: rate,
+      startDate: event?.startDate || new Date().toISOString().split('T')[0],
+      endDate: event?.endDate || new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  };
+
+  const handleUpdateEventDates = async (start: string, end: string) => {
+    await setDoc(doc(db, 'siteContent', 'event-discount'), {
+      key: 'event-discount',
+      startDate: start,
+      endDate: end,
+      updatedAt: serverTimestamp()
+    }, { merge: true });
+  };
 
   return (
     <motion.div 
@@ -3413,6 +3605,86 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
             </motion.div>
           )}
         </div>
+
+        {isEditMode && (
+          <div className="mb-20 p-8 border border-gold/20 rounded-3xl bg-gold/5 space-y-10">
+            <div className="space-y-6">
+              <h3 className="text-xs uppercase tracking-[0.3em] text-gold font-bold">Admin: Duration Discounts (%)</h3>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                {[4, 8, 10, 12].map(w => (
+                  <div key={w} className="space-y-2">
+                    <label className="text-[10px] opacity-50">{w} Weeks Discount</label>
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="number" 
+                        step="0.01"
+                        value={weeksDiscounts[w] !== undefined ? weeksDiscounts[w] : (w === 4 ? 0 : w === 8 ? 0.10 : w === 10 ? 0.12 : 0.15)}
+                        onChange={(e) => handleUpdateDiscount(w, parseFloat(e.target.value))}
+                        className="w-full bg-ink/50 border border-gold/20 rounded-lg p-2 text-sm text-gold"
+                      />
+                      <span className="text-xs opacity-50">%</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <h3 className="text-xs uppercase tracking-[0.3em] text-gold font-bold">Admin: Level Base Prices (₩)</h3>
+              <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {Object.keys(LEVEL_PRICES).map(lvl => (
+                  <div key={lvl} className="space-y-2">
+                    <label className="text-[10px] opacity-50">{lvl}</label>
+                    <input 
+                      type="number" 
+                      value={levelPrices[lvl] !== undefined ? levelPrices[lvl] : LEVEL_PRICES[lvl]}
+                      onChange={(e) => handleUpdateLevelPrice(lvl, parseInt(e.target.value))}
+                      className="w-full bg-ink/50 border border-gold/20 rounded-lg p-2 text-sm text-gold"
+                    />
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-6 pt-6 border-t border-gold/10">
+              <h3 className="text-xs uppercase tracking-[0.3em] text-gold font-bold">Admin: Special Event Discount</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] opacity-50">Discount Rate (%)</label>
+                  <div className="flex items-center gap-2">
+                    <input 
+                      type="number" 
+                      step="0.01"
+                      value={customRate !== undefined ? customRate : 0.10}
+                      onChange={(e) => handleUpdateEventDiscount(parseFloat(e.target.value))}
+                      className="w-full bg-ink/50 border border-gold/20 rounded-lg p-2 text-sm text-gold"
+                    />
+                    <span className="text-xs opacity-50">%</span>
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] opacity-50">Start Date</label>
+                  <input 
+                    type="date" 
+                    value={event?.startDate || ''}
+                    onChange={(e) => handleUpdateEventDates(e.target.value, event?.endDate || '')}
+                    className="w-full bg-ink/50 border border-gold/20 rounded-lg p-2 text-sm text-gold"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] opacity-50">End Date</label>
+                  <input 
+                    type="date" 
+                    value={event?.endDate || ''}
+                    onChange={(e) => handleUpdateEventDates(event?.startDate || '', e.target.value)}
+                    className="w-full bg-ink/50 border border-gold/20 rounded-lg p-2 text-sm text-gold"
+                  />
+                </div>
+              </div>
+              <p className="text-[10px] opacity-40 italic">* {language === 'ko' ? '이벤트 기간 내에만 할인이 적용됩니다.' : 'Discounts apply only during the event period.'}</p>
+            </div>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
           {/* Selection Panel */}
@@ -3471,27 +3743,52 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
                       )}
                     >
                       {weeks} {t.pricing.weeks}
+                      {weeksDiscounts[weeks] > 0 && (
+                        <span className="block text-[8px] text-gold mt-1">-{Math.round(weeksDiscounts[weeks] * 100)}% OFF</span>
+                      )}
                     </button>
                   ))}
                 </div>
               </div>
 
-              {/* Frequency Selection */}
-              <div className="space-y-6">
-                <h3 className="text-xs uppercase tracking-[0.3em] opacity-50">4. {language === 'ko' ? '수업 횟수' : 'Sessions per Week'}</h3>
-                <div className="grid grid-cols-2 gap-3">
-                  {[1, 2].map(num => (
-                    <button
-                      key={num}
-                      onClick={() => setSessionsPerWeek(num)}
-                      className={cn(
-                        "py-4 rounded-xl border text-xs uppercase tracking-widest transition-all",
-                        sessionsPerWeek === num ? "bg-gold text-ink border-gold font-bold" : "border-paper/10 hover:border-paper/30"
-                      )}
-                    >
-                      {language === 'ko' ? `주 ${num}회` : `Weekly ${num}`}
-                    </button>
-                  ))}
+              {/* Frequency & Duration Selection */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+                {/* Frequency Selection */}
+                <div className="space-y-6">
+                  <h3 className="text-xs uppercase tracking-[0.3em] opacity-50">4. {language === 'ko' ? '수업 횟수' : 'Sessions per Week'}</h3>
+                  <div className="grid grid-cols-2 gap-3">
+                    {[1, 2].map(num => (
+                      <button
+                        key={num}
+                        onClick={() => setSessionsPerWeek(num)}
+                        className={cn(
+                          "py-4 rounded-xl border text-xs uppercase tracking-widest transition-all",
+                          sessionsPerWeek === num ? "bg-gold text-ink border-gold font-bold" : "border-paper/10 hover:border-paper/30"
+                        )}
+                      >
+                        {language === 'ko' ? `주 ${num}회` : `Weekly ${num}`}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Class Duration Selection */}
+                <div className="space-y-6">
+                  <h3 className="text-xs uppercase tracking-[0.3em] opacity-50">5. {language === 'ko' ? '수업 시간' : 'Class Duration'}</h3>
+                  <div className="grid grid-cols-3 gap-3">
+                    {[1, 1.5, 2].map(h => (
+                      <button
+                        key={h}
+                        onClick={() => setSelectedHours(h)}
+                        className={cn(
+                          "py-4 rounded-xl border text-xs uppercase tracking-widest transition-all",
+                          selectedHours === h ? "bg-gold text-ink border-gold font-bold" : "border-paper/10 hover:border-paper/30"
+                        )}
+                      >
+                        {h}{language === 'ko' ? '시간' : 'h'}
+                      </button>
+                    ))}
+                  </div>
                 </div>
               </div>
             </div>
@@ -3503,7 +3800,7 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
               <div className="space-y-2">
                 <p className="text-[10px] uppercase tracking-[0.3em] opacity-40">{language === 'ko' ? '선택한 과정 합계' : 'Total for Selected Course'}</p>
                 <h4 className="text-xl font-serif">{selectedCourse.title}</h4>
-                <p className="text-xs opacity-60">{selectedLevel} / {selectedWeeks}{t.pricing.weeks} / {language === 'ko' ? `주 ${sessionsPerWeek}회` : `Weekly ${sessionsPerWeek}`}</p>
+                <p className="text-xs opacity-60">{selectedLevel} / {selectedWeeks}{t.pricing.weeks} / {language === 'ko' ? `주 ${sessionsPerWeek}회` : `Weekly ${sessionsPerWeek}`} / {selectedHours}{language === 'ko' ? '시간' : 'h'}</p>
               </div>
 
               <div className="h-px bg-paper/10" />
@@ -3517,7 +3814,20 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
                     </div>
                     <div className="flex justify-between items-end">
                       <span className="text-xs text-gold font-bold">Discounted</span>
-                      <span className="text-4xl font-serif text-gold">₩{priceInfo.discountedPrice.toLocaleString()}</span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-4xl font-serif text-gold">₩{priceInfo.discountedPrice.toLocaleString()}</span>
+                        {isEditMode && (
+                          <button 
+                            onClick={() => {
+                              const newPrice = prompt('Enter new base price for this level:', levelPrices[selectedLevel] || LEVEL_PRICES[selectedLevel]);
+                              if (newPrice) handleUpdateLevelPrice(selectedLevel, parseInt(newPrice));
+                            }}
+                            className="p-1 bg-gold/10 rounded text-gold hover:bg-gold hover:text-ink transition-colors"
+                          >
+                            <Edit size={12} />
+                          </button>
+                        )}
+                      </div>
                     </div>
                     <div className="flex justify-end">
                       <span className="px-3 py-1 bg-gold/10 text-gold text-[10px] font-bold rounded-full">
@@ -3528,7 +3838,20 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
                 ) : (
                   <div className="flex justify-between items-end">
                     <span className="text-xs opacity-40">Total</span>
-                    <span className="text-4xl font-serif">₩{priceInfo.originalPrice.toLocaleString()}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-4xl font-serif">₩{priceInfo.originalPrice.toLocaleString()}</span>
+                      {isEditMode && (
+                        <button 
+                          onClick={() => {
+                            const newPrice = prompt('Enter new base price for this level:', levelPrices[selectedLevel] || LEVEL_PRICES[selectedLevel]);
+                            if (newPrice) handleUpdateLevelPrice(selectedLevel, parseInt(newPrice));
+                          }}
+                          className="p-1 bg-gold/10 rounded text-gold hover:bg-gold hover:text-ink transition-colors"
+                        >
+                          <Edit size={12} />
+                        </button>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
@@ -3551,11 +3874,14 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
   );
 };
 
-const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventPeriod: boolean, siteContent: any }> = ({ language, onComplete, isEventPeriod, siteContent }) => {
+const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventPeriod: boolean, siteContent: any, isEditMode: boolean }> = ({ language, onComplete, isEventPeriod, siteContent, isEditMode }) => {
   const t = TRANSLATIONS[language];
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   
+  const weeksDiscounts = siteContent['weeks-discounts']?.rates || {};
+  const levelPrices = siteContent['level-prices']?.prices || {};
+
   const [formData, setFormData] = useState({
     name: '',
     contact: '',
@@ -3564,13 +3890,14 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
     otherLevelConcern: '',
     desiredClass: [] as string[],
     otherDesiredClass: '',
-    desiredWeeks: 12
+    desiredWeeks: 12,
+    desiredHours: 1
   });
 
   const priceResult = useMemo(() => {
     const customRate = siteContent['event-discount']?.discountRate;
-    return calculatePrice('입문', formData.desiredWeeks, 1, 1, isEventPeriod, customRate);
-  }, [formData.desiredWeeks, isEventPeriod, siteContent]);
+    return calculatePrice('입문', formData.desiredWeeks, 1, formData.desiredHours, isEventPeriod, customRate, weeksDiscounts, levelPrices);
+  }, [formData.desiredWeeks, formData.desiredHours, isEventPeriod, siteContent, weeksDiscounts, levelPrices]);
 
   const toggleSelection = (field: 'levelConcerns' | 'desiredClass', value: string) => {
     setFormData(prev => ({
@@ -3608,6 +3935,7 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
         levelConcerns: finalLevelConcerns,
         desiredClass: finalDesiredClass,
         desiredWeeks: formData.desiredWeeks,
+        desiredHours: formData.desiredHours,
         priceInfo: priceResult,
         createdAt: serverTimestamp()
       });
@@ -3645,9 +3973,15 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
       className="max-w-3xl mx-auto px-6 py-20"
     >
       <div className="text-center space-y-4 mb-16">
-        <span className="text-gold text-[10px] uppercase tracking-[0.4em]">{language === 'ko' ? 'COURSE APPLICATION' : t.inquiry.badge}</span>
-        <h2 className="text-5xl font-serif font-light">{language === 'ko' ? '수강 신청 및 레벨 진단' : t.inquiry.title}</h2>
-        <p className="text-lg opacity-60 font-serif italic">{t.inquiry.subtitle}</p>
+        <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+          <EditableText contentKey="inquiry.badge" defaultValue={t.inquiry.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+        </span>
+        <h2 className="text-5xl font-serif font-light">
+          <EditableText contentKey="inquiry.title" defaultValue={t.inquiry.title} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+        </h2>
+        <p className="text-lg opacity-60 font-serif italic">
+          <EditableText contentKey="inquiry.subtitle" defaultValue={t.inquiry.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+        </p>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-12">
@@ -3655,7 +3989,7 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
         <div className="space-y-4">
           <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">1</span>
-            {t.inquiry.nameLabel}
+            <EditableText contentKey="inquiry.nameLabel" defaultValue={t.inquiry.nameLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </label>
           <input 
             type="text"
@@ -3671,7 +4005,7 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
         <div className="space-y-4">
           <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">2</span>
-            {t.inquiry.contactLabel}
+            <EditableText contentKey="inquiry.contactLabel" defaultValue={t.inquiry.contactLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </label>
           <input 
             type="text"
@@ -3687,7 +4021,7 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
         <div className="space-y-4">
           <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">3</span>
-            {t.inquiry.historyLabel}
+            <EditableText contentKey="inquiry.historyLabel" defaultValue={t.inquiry.historyLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </label>
           <textarea 
             placeholder={t.inquiry.historyPlaceholder}
@@ -3701,7 +4035,7 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
         <div className="space-y-6">
           <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">4</span>
-            {t.inquiry.levelLabel}
+            <EditableText contentKey="inquiry.levelLabel" defaultValue={t.inquiry.levelLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </label>
           <div className="grid grid-cols-1 gap-3">
             {t.inquiry.levelOptions.map((option: string) => (
@@ -3740,30 +4074,53 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
           </div>
         </div>
 
-        {/* 5. Desired Duration */}
-        <div className="space-y-6">
-          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
-            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">5</span>
-            {language === 'ko' ? '희망 수강 기간' : 'Desired Duration'}
-          </label>
-          <div className="grid grid-cols-3 gap-4">
-            {[4, 8, 12].map(w => (
-              <button 
-                key={w}
-                type="button"
-                onClick={() => setFormData(prev => ({ ...prev, desiredWeeks: w }))}
-                className={cn(
-                  "py-4 border rounded-2xl text-sm transition-all",
-                  formData.desiredWeeks === w ? "border-gold bg-gold/10 text-gold font-bold" : "border-ink/10 hover:border-gold/50"
-                )}
-              >
-                {w}{t.pricing.weeks}
-              </button>
-            ))}
+        {/* 5. Desired Duration & Hours */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+          <div className="space-y-6">
+            <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+              <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">5</span>
+              <EditableText contentKey="inquiry.durationLabel" defaultValue={language === 'ko' ? '희망 수강 기간' : 'Desired Duration'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+            </label>
+            <div className="grid grid-cols-2 gap-3">
+              {[4, 8, 10, 12].map(w => (
+                <button 
+                  key={w}
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, desiredWeeks: w }))}
+                  className={cn(
+                    "py-4 border rounded-2xl text-sm transition-all",
+                    formData.desiredWeeks === w ? "border-gold bg-gold/10 text-gold font-bold" : "border-ink/10 hover:border-gold/50"
+                  )}
+                >
+                  {w}{t.pricing.weeks}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+              <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">6</span>
+              <EditableText contentKey="inquiry.hoursLabel" defaultValue={language === 'ko' ? '희망 수업 시간' : 'Desired Class Duration'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+            </label>
+            <div className="grid grid-cols-3 gap-3">
+              {[1, 1.5, 2].map(h => (
+                <button 
+                  key={h}
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, desiredHours: h }))}
+                  className={cn(
+                    "py-4 border rounded-2xl text-sm transition-all",
+                    formData.desiredHours === h ? "border-gold bg-gold/10 text-gold font-bold" : "border-ink/10 hover:border-gold/50"
+                  )}
+                >
+                  {h}{language === 'ko' ? '시간' : 'h'}
+                </button>
+              ))}
+            </div>
           </div>
         </div>
 
-        {/* Price Preview */}
         <div className="p-8 bg-gold/5 border border-gold/20 rounded-[32px] space-y-6">
           <div className="flex justify-between items-center">
             <h3 className="text-xl font-serif">{language === 'ko' ? '예상 수강료' : 'Estimated Tuition'}</h3>
@@ -3778,6 +4135,10 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
             <div className="flex justify-between items-center opacity-60">
               <span className="text-sm">{language === 'ko' ? '기본 수강료' : 'Base Tuition'}</span>
               <span className="line-through">₩{priceResult.originalPrice.toLocaleString()}</span>
+            </div>
+            
+            <div className="flex justify-between items-center text-xs opacity-60 italic">
+              <span>{formData.desiredWeeks}{t.pricing.weeks} / {formData.desiredHours}{language === 'ko' ? '시간' : 'h'}</span>
             </div>
             
             {priceResult.weeksDiscountRate > 0 && (
@@ -3810,7 +4171,7 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
         <div className="space-y-6">
           <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">6</span>
-            {t.inquiry.classLabel}
+            <EditableText contentKey="inquiry.classLabel" defaultValue={t.inquiry.classLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </label>
           <div className="grid grid-cols-1 gap-3">
             {t.inquiry.classOptions.map((option: string) => (

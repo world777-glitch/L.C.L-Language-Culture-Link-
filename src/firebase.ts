@@ -68,7 +68,7 @@ export const loginWithGoogle = async () => {
     const result = await signInWithPopup(auth, googleProvider);
     // Sync user profile to Firestore
     const userRef = doc(db, 'users', result.user.uid);
-    const isAdmin = result.user.email === 'lhbin777@gmail.com' && result.user.emailVerified;
+    const isAdmin = result.user.email === 'lhbin777@gmail.com';
     await setDoc(userRef, {
       uid: result.user.uid,
       email: result.user.email,

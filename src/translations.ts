@@ -163,22 +163,22 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
     inquiry: {
       title: '[라떼언어연구소] 수강 문의 및 레벨 진단 신청서',
       subtitle: '"응용언어학 박사 이 쌤이 직접 분석하여 가장 적합한 그룹을 매칭해 드립니다."',
-      badge: 'Consultation & Diagnosis',
-      nameLabel: '1. 성함',
+      badge: '상담 및 진단 (Consultation & Diagnosis)',
+      nameLabel: '1. 성함 (Name)',
       namePlaceholder: '(예: 홍길동)',
-      contactLabel: '2. 연락처 (카카오톡 ID 또는 이메일)',
+      contactLabel: '2. 연락처 (연락 가능한 카톡 ID 또는 이메일)',
       contactPlaceholder: '상담 안내를 받으실 수 있는 연락처를 남겨주세요.',
-      historyLabel: '3. 중국어 학습 이력 및 현지 경험',
+      historyLabel: '3. 중국어 학습 이력 및 현지 경험 (History)',
       historyPlaceholder: '학습 기간이나 중국 거주/유학 경험이 있다면 간단히 적어주세요. (예: 독학 1년, 상하이 유학 6개월 등)',
-      levelLabel: '4. 현재 나의 중국어 수준 및 고민',
+      levelLabel: '4. 현재 레벨 및 학습 고민 (Level & Concerns)',
       levelOptions: [
         '기초 문법의 원리를 체계적으로 정리하고 싶다.',
         'HSK 급수(4~6급) 취득 및 고득점이 목표다.',
-        '원어민처럼 자연스러운 회화 표현을 익히고 싶다.',
+        '원어민처럼 자연스러운 회회 표현을 익히고 싶다.',
         '비즈니스/전문 분야(IT, 기술 등) 중국어가 필요하다.',
         '기타 (직접 입력)'
       ],
-      classLabel: '5. 희망 수강 클래스',
+      classLabel: '5. 희망 수업 과정 (Desired Class)',
       classOptions: [
         '[입문/기초] 성조부터 탄탄하게 시작하는 첫걸음',
         '[HSK 집중] 4~6급 단기 합격 및 고득점 전략',
@@ -186,7 +186,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
         '[비즈니스/시사] 전문 분야 통번역 및 심화 토론',
         '[1:1 맞춤] 개인별 목표에 맞춘 집중 케어'
       ],
-      submit: '진단 신청하기',
+      submit: '신청 완료 (Confirm)',
       successTitle: '신청 완료!',
       successMessage: '신청이 완료되었습니다. 박사님께서 직접 분석 후 곧 연락드릴 예정입니다.'
     }
