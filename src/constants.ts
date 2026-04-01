@@ -13,14 +13,14 @@ export const COURSES: Course[] = [
     id: 'conv',
     category: 'Conversation',
     title: '회화 (Conversation)',
-    levels: ['입문', '초급', '중급', '고급'],
+    levels: ['입문', '초급', '중급', '고급', '초고급'],
     description: '일상 생활에서 즉각적으로 활용 가능한 실전 회화 중심 과정'
   },
   {
     id: 'hsk',
     category: 'HSK',
     title: 'HSK (Chinese Proficiency Test)',
-    levels: ['1-2급', '3급', '4급', '5급', '6급'],
+    levels: ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6'],
     description: '중국 언어학 박사의 노하우가 담긴 HSK 고득점 전략 과정'
   },
   {
@@ -98,11 +98,12 @@ export const LEVEL_PRICES: Record<string, number> = {
   '중급': 109000,
   '고급': 119000,
   '초고급': 129000,
-  '1-2급': 99000,
-  '3급': 99000,
-  '4급': 99000,
-  '5급': 109000,
-  '6급': 119000,
+  'HSK1': 99000,
+  'HSK2': 99000,
+  'HSK3': 99000,
+  'HSK4': 109000,
+  'HSK5': 119000,
+  'HSK6': 129000,
   'Special Session': 129000,
 };
 
@@ -130,6 +131,7 @@ export function calculatePrice(
   let weeksDiscountRate = 0;
   
   if (weeks === 8) weeksDiscountRate = 0.10;
+  if (weeks === 10) weeksDiscountRate = 0.12;
   if (weeks === 12) weeksDiscountRate = 0.15;
   
   const originalPrice = Math.floor(baseTotalPrice);

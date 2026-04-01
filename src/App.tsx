@@ -202,13 +202,13 @@ export default function App() {
       <nav className="sticky top-0 z-50 bg-paper/80 backdrop-blur-md border-b border-ink/10">
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div 
-            className="flex items-center gap-2 cursor-pointer" 
+            className="flex items-center gap-3 cursor-pointer group" 
             onClick={() => setView('landing')}
           >
-            <div className="w-10 h-10 bg-ink text-paper rounded-full flex items-center justify-center font-serif text-xl font-bold">L</div>
-            <div className="flex flex-col">
-              <span className="font-serif text-xl font-bold tracking-tight">{t.nav.systemName}</span>
-              <span className="text-[10px] uppercase tracking-[0.2em] opacity-60">Language & Culture Link</span>
+            <div className="flex flex-col items-start justify-center leading-none">
+              <span className="font-serif text-2xl font-bold tracking-tighter group-hover:text-gold transition-colors">L.C.L</span>
+              <div className="h-[1px] w-full bg-gold/20 my-1 group-hover:bg-gold/50 transition-colors" />
+              <span className="text-[8px] uppercase tracking-[0.25em] opacity-60 font-bold">Language & Culture Link</span>
             </div>
           </div>
 
@@ -232,21 +232,63 @@ export default function App() {
                 ))}
               </div>
             </div>
-            <button onClick={() => setView('curriculum')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.curriculum}</button>
-            <button onClick={() => setView('pricing')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.pricing}</button>
-            <button onClick={() => setView('archive')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.archive}</button>
-            <button onClick={() => setView('community')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.community}</button>
-            <button onClick={() => setView('inquiry')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors font-bold text-gold whitespace-nowrap">{t.nav.inquiry}</button>
             <button 
-              onClick={() => setView('image-gen')} 
+              onClick={() => setView('curriculum')} 
               className={cn(
-                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors flex items-center gap-1 whitespace-nowrap",
-                view === 'image-gen' ? "text-gold font-bold" : "hover:text-gold"
+                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
+                view === 'curriculum' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
             >
-              {t.nav.aiStudio}
-              {!isAdmin && userProfile?.role !== 'premium' && <ShieldCheck size={10} className="text-gold/50" />}
+              {t.nav.curriculum}
             </button>
+            <button 
+              onClick={() => setView('pricing')} 
+              className={cn(
+                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
+                view === 'pricing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
+              )}
+            >
+              {t.nav.pricing}
+            </button>
+            <button 
+              onClick={() => setView('archive')} 
+              className={cn(
+                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
+                view === 'archive' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
+              )}
+            >
+              {t.nav.archive}
+            </button>
+            <button 
+              onClick={() => setView('community')} 
+              className={cn(
+                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
+                view === 'community' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
+              )}
+            >
+              {t.nav.community}
+            </button>
+            <button 
+              onClick={() => setView('inquiry')} 
+              className={cn(
+                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors font-bold whitespace-nowrap",
+                view === 'inquiry' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
+              )}
+            >
+              {t.nav.inquiry}
+            </button>
+            {(isAdmin || siteContent['ai-studio-access']?.access === 'all' || (siteContent['ai-studio-access']?.access === 'premium' && userProfile?.role === 'premium') || (siteContent['ai-studio-access']?.access === 'member' && userProfile)) && (
+              <button 
+                onClick={() => setView('image-gen')} 
+                className={cn(
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors flex items-center gap-1 whitespace-nowrap",
+                  view === 'image-gen' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
+                )}
+              >
+                {t.nav.aiStudio}
+                {!isAdmin && <ShieldCheck size={10} className="text-gold/50" />}
+              </button>
+            )}
             {user ? (
               <div className="flex items-center gap-2 lg:gap-4">
                 {userProfile?.role === 'admin' && (
@@ -270,7 +312,10 @@ export default function App() {
                 )}
                 <button 
                   onClick={() => setView('mypage')}
-                  className="flex items-center gap-1 text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap"
+                  className={cn(
+                    "flex items-center gap-1 text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
+                    view === 'mypage' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
+                  )}
                 >
                   <User size={14} /> {t.nav.myPage}
                 </button>
@@ -296,7 +341,7 @@ export default function App() {
           {view === 'booking' && <BookingView key="booking" course={selectedCourse} onComplete={() => setView('mypage')} isEventPeriod={isEventPeriod} siteContent={siteContent} />}
           {view === 'mypage' && <MyPageView key="mypage" />}
           {view === 'admin' && <AdminView key="admin" language={language} siteContent={siteContent} />}
-          {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} />}
+          {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} siteContent={siteContent} />}
           {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} />}
           {view === 'community' && <CommunityView key="community" language={language} />}
           {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} isEventPeriod={isEventPeriod} siteContent={siteContent} />}
@@ -1351,50 +1396,77 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
     const file = e.target.files?.[0];
     if (!file) return;
 
+    // Basic validation
+    const maxSize = 50 * 1024 * 1024; // 50MB limit
+    if (file.size > maxSize) {
+      alert(language === 'ko' ? '파일 크기가 너무 큽니다 (최대 50MB).' : 'File is too large (max 50MB).');
+      return;
+    }
+
     setUploading(true);
     setUploadProgress(0);
+    
     try {
+      if (!storage) {
+        throw new Error('Storage not initialized');
+      }
+
       const storageRef = ref(storage, `resources/${Date.now()}_${file.name}`);
+      
+      // Use uploadBytesResumable for progress tracking
       const uploadTask = uploadBytesResumable(storageRef, file);
 
       uploadTask.on('state_changed', 
         (snapshot) => {
           const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
           setUploadProgress(progress);
+          console.log(`Upload progress: ${progress}%`);
         }, 
         (error) => {
-          console.error('Upload error:', error);
-          alert(language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.');
+          console.error('Upload error details:', error);
+          let message = language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.';
+          if (error.code === 'storage/unauthorized') {
+            message = language === 'ko' ? '업로드 권한이 없습니다.' : 'No permission to upload.';
+          } else if (error.code === 'storage/canceled') {
+            message = language === 'ko' ? '업로드가 취소되었습니다.' : 'Upload canceled.';
+          }
+          alert(`${message} (${error.code})`);
           setUploading(false);
         }, 
         async () => {
-          const url = await getDownloadURL(storageRef);
-          const extension = file.name.split('.').pop()?.toLowerCase();
-          let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
-          if (extension === 'mp3') fileType = 'mp3';
-          if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
-          if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
-          if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
-          if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
-          
-          let textContent = '';
-          if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
-            textContent = await file.text();
+          try {
+            const url = await getDownloadURL(storageRef);
+            const extension = file.name.split('.').pop()?.toLowerCase();
+            let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
+            if (extension === 'mp3') fileType = 'mp3';
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
+            if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
+            if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
+            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
+            
+            let textContent = '';
+            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
+              textContent = await file.text();
+            }
+            
+            setNewResource(prev => ({ 
+              ...prev, 
+              fileUrl: url, 
+              fileType,
+              textContent: textContent || prev.textContent
+            }));
+            alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+          } catch (err) {
+            console.error('Error getting download URL:', err);
+            alert(language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.');
+          } finally {
+            setUploading(false);
           }
-          
-          setNewResource(prev => ({ 
-            ...prev, 
-            fileUrl: url, 
-            fileType,
-            textContent: textContent || prev.textContent
-          }));
-          alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
-          setUploading(false);
         }
       );
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert(language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.');
+    } catch (error: any) {
+      console.error('Upload catch error:', error);
+      alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${error.message})`);
       setUploading(false);
     }
   };
@@ -1575,6 +1647,22 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
           <Calendar size={14} />
           {language === 'ko' ? '예약 현황 수정' : 'Edit Reservations'}
         </button>
+        <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-ink/5">
+          <span className="text-[10px] uppercase tracking-widest font-bold opacity-50">AI Studio Access</span>
+          <select 
+            value={siteContent['ai-studio-access']?.access || 'admin'}
+            onChange={async (e) => {
+              const path = 'siteContent';
+              await setDoc(doc(db, path, 'ai-studio-access'), { access: e.target.value }, { merge: true });
+            }}
+            className="text-[10px] p-1 border rounded bg-transparent font-bold"
+          >
+            <option value="admin">Admin Only</option>
+            <option value="premium">Premium & Admin</option>
+            <option value="member">Members & Admin</option>
+            <option value="all">Everyone</option>
+          </select>
+        </div>
         <div className="flex-grow" />
         <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-ink/5">
           <span className="text-[10px] uppercase tracking-widest font-bold opacity-50">Event Discount</span>
@@ -3276,12 +3364,24 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
   const event = siteContent['event-discount'];
   const customRate = event?.discountRate;
 
+  const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
+  const [selectedLevel, setSelectedLevel] = useState(COURSES[0].levels[0]);
+  const [selectedWeeks, setSelectedWeeks] = useState(12);
+  const [sessionsPerWeek, setSessionsPerWeek] = useState(1);
+
+  // Update level when course changes
+  useEffect(() => {
+    setSelectedLevel(selectedCourse.levels[0]);
+  }, [selectedCourse]);
+
+  const priceInfo = calculatePrice(selectedLevel, selectedWeeks, sessionsPerWeek, 1, isEventPeriod, customRate);
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }} 
       animate={{ opacity: 1, y: 0 }} 
       exit={{ opacity: 0, y: -20 }}
-      className="bg-ink text-paper py-32 px-6 min-h-screen flex items-center"
+      className="bg-ink text-paper py-32 px-6 min-h-screen"
     >
       <div className="max-w-7xl mx-auto w-full">
         <div className="text-center space-y-6 mb-20">
@@ -3310,74 +3410,142 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
                 <span className="opacity-30">/</span>
                 <span>{event.endDate}</span>
               </div>
-              {customRate && (
-                <div className="mt-2 text-[10px] uppercase tracking-widest font-bold text-gold/60">
-                  {Math.round(customRate * 100)}% {language === 'ko' ? '추가 할인 적용 중' : 'Additional Discount Applied'}
-                </div>
-              )}
             </motion.div>
           )}
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          {[4, 8, 12].map((weeks) => {
-            const priceInfo = calculatePrice('초급', weeks, 1, 1, isEventPeriod, customRate);
-            return (
-              <div 
-                key={weeks}
-                className={cn(
-                  "p-12 border border-paper/10 rounded-3xl flex flex-col items-center text-center space-y-8 relative overflow-hidden transition-all duration-500",
-                  weeks === 12 && "border-gold/50 bg-paper/5"
-                )}
-              >
-                {weeks === 12 && (
-                  <div className="absolute top-0 right-0 bg-gold text-ink text-[10px] font-bold uppercase tracking-widest px-6 py-2 rounded-bl-2xl">
-                    {t.pricing.bestValue}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+          {/* Selection Panel */}
+          <div className="lg:col-span-2 space-y-12">
+            {/* Course Selection */}
+            <div className="space-y-6">
+              <h3 className="text-xs uppercase tracking-[0.3em] opacity-50">1. {language === 'ko' ? '과정 선택' : 'Select Course'}</h3>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                {COURSES.slice(0, 3).map(course => (
+                  <button
+                    key={course.id}
+                    onClick={() => setSelectedCourse(course)}
+                    className={cn(
+                      "p-6 rounded-2xl border transition-all text-left group",
+                      selectedCourse.id === course.id ? "border-gold bg-gold/5" : "border-paper/10 hover:border-paper/30"
+                    )}
+                  >
+                    <p className={cn("text-sm font-bold mb-1", selectedCourse.id === course.id ? "text-gold" : "opacity-80")}>{course.title}</p>
+                    <p className="text-[10px] opacity-40 leading-relaxed">{course.description}</p>
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Level Selection */}
+            <div className="space-y-6">
+              <h3 className="text-xs uppercase tracking-[0.3em] opacity-50">2. {language === 'ko' ? '레벨 선택' : 'Select Level'}</h3>
+              <div className="flex flex-wrap gap-3">
+                {selectedCourse.levels.map(level => (
+                  <button
+                    key={level}
+                    onClick={() => setSelectedLevel(level)}
+                    className={cn(
+                      "px-6 py-3 rounded-full border text-xs uppercase tracking-widest transition-all",
+                      selectedLevel === level ? "bg-gold text-ink border-gold font-bold" : "border-paper/10 hover:border-paper/30"
+                    )}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              {/* Duration Selection */}
+              <div className="space-y-6">
+                <h3 className="text-xs uppercase tracking-[0.3em] opacity-50">3. {language === 'ko' ? '기간 선택' : 'Select Duration'}</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {[4, 8, 10, 12].map(weeks => (
+                    <button
+                      key={weeks}
+                      onClick={() => setSelectedWeeks(weeks)}
+                      className={cn(
+                        "py-4 rounded-xl border text-xs uppercase tracking-widest transition-all",
+                        selectedWeeks === weeks ? "bg-gold text-ink border-gold font-bold" : "border-paper/10 hover:border-paper/30"
+                      )}
+                    >
+                      {weeks} {t.pricing.weeks}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Frequency Selection */}
+              <div className="space-y-6">
+                <h3 className="text-xs uppercase tracking-[0.3em] opacity-50">4. {language === 'ko' ? '수업 횟수' : 'Sessions per Week'}</h3>
+                <div className="grid grid-cols-2 gap-3">
+                  {[1, 2].map(num => (
+                    <button
+                      key={num}
+                      onClick={() => setSessionsPerWeek(num)}
+                      className={cn(
+                        "py-4 rounded-xl border text-xs uppercase tracking-widest transition-all",
+                        sessionsPerWeek === num ? "bg-gold text-ink border-gold font-bold" : "border-paper/10 hover:border-paper/30"
+                      )}
+                    >
+                      {language === 'ko' ? `주 ${num}회` : `Weekly ${num}`}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Price Summary Panel */}
+          <div className="lg:col-span-1">
+            <div className="sticky top-32 p-10 border border-gold/30 rounded-3xl bg-paper/5 space-y-8">
+              <div className="space-y-2">
+                <p className="text-[10px] uppercase tracking-[0.3em] opacity-40">{language === 'ko' ? '선택한 과정 합계' : 'Total for Selected Course'}</p>
+                <h4 className="text-xl font-serif">{selectedCourse.title}</h4>
+                <p className="text-xs opacity-60">{selectedLevel} / {selectedWeeks}{t.pricing.weeks} / {language === 'ko' ? `주 ${sessionsPerWeek}회` : `Weekly ${sessionsPerWeek}`}</p>
+              </div>
+
+              <div className="h-px bg-paper/10" />
+
+              <div className="space-y-4">
+                {priceInfo.isEventDiscount || priceInfo.weeksDiscountRate > 0 ? (
+                  <>
+                    <div className="flex justify-between items-end">
+                      <span className="text-xs opacity-40">Original</span>
+                      <span className="text-sm opacity-30 line-through">₩{priceInfo.originalPrice.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-end">
+                      <span className="text-xs text-gold font-bold">Discounted</span>
+                      <span className="text-4xl font-serif text-gold">₩{priceInfo.discountedPrice.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-end">
+                      <span className="px-3 py-1 bg-gold/10 text-gold text-[10px] font-bold rounded-full">
+                        {Math.round((1 - priceInfo.discountedPrice / priceInfo.originalPrice) * 100)}% TOTAL SAVINGS
+                      </span>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex justify-between items-end">
+                    <span className="text-xs opacity-40">Total</span>
+                    <span className="text-4xl font-serif">₩{priceInfo.originalPrice.toLocaleString()}</span>
                   </div>
                 )}
-                <span className="text-xs uppercase tracking-widest opacity-50">{weeks} {t.pricing.weeks}</span>
-                
-                <div className="space-y-2">
-                  {priceInfo.isEventDiscount || priceInfo.weeksDiscountRate > 0 ? (
-                    <>
-                      <p className="text-sm opacity-30 line-through">₩{priceInfo.originalPrice.toLocaleString()}</p>
-                      <p className="text-4xl font-serif text-gold">₩{priceInfo.discountedPrice.toLocaleString()}</p>
-                      <p className="text-[10px] uppercase tracking-widest font-bold text-gold/60">
-                        {Math.round((1 - priceInfo.discountedPrice / priceInfo.originalPrice) * 100)}% OFF
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-4xl font-serif">₩{priceInfo.originalPrice.toLocaleString()}</p>
-                  )}
-                  <p className="text-[10px] uppercase tracking-widest opacity-30 mt-2">
-                    {language === 'ko' ? '주 1회 1시간 기준' : 'Based on 1 session/week (1hr)'}
-                  </p>
-                </div>
-
-                <ul className="space-y-4 w-full text-sm opacity-70">
-                  {t.pricing.features.map((feature: string, i: number) => (
-                    <li key={i} className="flex items-center justify-center gap-2">
-                      <CheckCircle2 size={14} className="text-gold" /> {feature}
-                    </li>
-                  ))}
-                </ul>
-                <button 
-                  onClick={() => setView('inquiry')}
-                  className={cn(
-                    "w-full py-4 rounded-full text-xs uppercase tracking-widest transition-all",
-                    weeks === 12 ? "bg-gold text-ink font-bold" : "bg-paper text-ink"
-                  )}
-                >
-                  {language === 'ko' ? '수강 신청하기' : t.pricing.selectPlan}
-                </button>
               </div>
-            );
-          })}
+
+              <button 
+                onClick={() => setView('inquiry')}
+                className="w-full py-5 bg-gold text-ink rounded-full text-xs uppercase tracking-widest font-bold hover:scale-105 transition-transform"
+              >
+                {language === 'ko' ? '이 과정으로 상담 신청하기' : 'Inquire for this Course'}
+              </button>
+
+              <p className="text-[10px] opacity-30 text-center leading-relaxed">
+                {language === 'ko' ? '* 최종 수강료는 상담을 통해 확정됩니다.' : '* Final tuition will be confirmed after consultation.'}
+              </p>
+            </div>
+          </div>
         </div>
-        
-        <p className="text-center mt-12 text-[10px] uppercase tracking-widest opacity-30">
-          {language === 'ko' ? '* 레벨 및 수업 횟수에 따라 금액이 변동될 수 있습니다.' : '* Prices may vary depending on level and number of sessions.'}
-        </p>
       </div>
     </motion.div>
   );
@@ -3906,7 +4074,7 @@ const CommunityView: FC<{ language: LanguageCode }> = ({ language }) => {
   );
 };
 
-const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: boolean, setView: (v: any) => void }> = ({ language, userProfile, isAuthReady, setView }) => {
+const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: boolean, setView: (v: any) => void, siteContent: any }> = ({ language, userProfile, isAuthReady, setView, siteContent }) => {
   const t = TRANSLATIONS[language];
   const [prompt, setPrompt] = useState('');
   const [level, setLevel] = useState('beginner');
@@ -3920,7 +4088,15 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
   const [error, setGenerationError] = useState<string | null>(null);
   const timerRef = useRef<any>(null);
 
-  const isPremiumOrAdmin = userProfile?.role === 'admin' || userProfile?.role === 'premium';
+  const accessSetting = siteContent['ai-studio-access']?.access || 'admin';
+  const isAdmin = userProfile?.role === 'admin';
+  const isPremium = userProfile?.role === 'premium';
+  const isMember = !!userProfile;
+
+  const hasAccess = isAdmin || 
+                    (accessSetting === 'all') || 
+                    (accessSetting === 'premium' && isPremium) || 
+                    (accessSetting === 'member' && isMember);
 
   useEffect(() => {
     if (isGenerating) {
@@ -3940,8 +4116,8 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
     if (!prompt.trim()) return;
     
     // Double check permissions
-    if (!isPremiumOrAdmin) {
-      alert(language === 'ko' ? '프리미엄 회원만 이용 가능합니다.' : 'Only available for Premium members.');
+    if (!hasAccess) {
+      alert(language === 'ko' ? '이용 권한이 없습니다.' : 'You do not have permission to use this feature.');
       return;
     }
 
@@ -4091,7 +4267,7 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
     }
   };
 
-  if (isAuthReady && !isPremiumOrAdmin) {
+  if (isAuthReady && !hasAccess) {
     return (
       <motion.div 
         initial={{ opacity: 0 }} 
@@ -4102,20 +4278,22 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
           <ShieldCheck size={48} />
         </div>
         <div className="space-y-4">
-          <h2 className="text-4xl font-serif">{language === 'ko' ? '프리미엄 전용 기능' : 'Premium Only Feature'}</h2>
+          <h2 className="text-4xl font-serif">{language === 'ko' ? '이용 권한이 제한된 기능' : 'Restricted Access Feature'}</h2>
           <p className="text-lg opacity-60 font-serif italic max-w-md mx-auto">
             {language === 'ko' 
-              ? 'AI 학습 자료 생성 기능은 프리미엄 회원 및 관리자만 이용 가능합니다. 박사님의 깊이 있는 커리큘럼과 AI 기술의 만남을 경험해 보세요.' 
-              : 'AI Learning Material Generation is available only for Premium members and Admins. Experience the fusion of Dr. Lee\'s deep curriculum and AI technology.'}
+              ? `이 기능은 현재 ${accessSetting === 'admin' ? '관리자' : accessSetting === 'premium' ? '프리미엄 회원 및 관리자' : accessSetting === 'member' ? '회원 및 관리자' : '모든 사용자'}만 이용 가능합니다.` 
+              : `This feature is currently available only for ${accessSetting === 'admin' ? 'Admins' : accessSetting === 'premium' ? 'Premium members and Admins' : accessSetting === 'member' ? 'Members and Admins' : 'Everyone'}.`}
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-          <button 
-            onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-            className="px-10 py-4 bg-gold text-ink font-bold rounded-full text-xs uppercase tracking-widest hover:scale-105 transition-transform"
-          >
-            {language === 'ko' ? '프리미엄 플랜 보기' : 'View Premium Plans'}
-          </button>
+          {accessSetting === 'premium' && (
+            <button 
+              onClick={() => { setView('pricing'); setTimeout(() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' }), 100); }}
+              className="px-10 py-4 bg-gold text-ink font-bold rounded-full text-xs uppercase tracking-widest hover:scale-105 transition-transform"
+            >
+              {language === 'ko' ? '프리미엄 플랜 보기' : 'View Premium Plans'}
+            </button>
+          )}
           <button 
             onClick={() => setView('landing')}
             className="px-10 py-4 border border-ink/10 rounded-full text-xs uppercase tracking-widest hover:bg-ink/5 transition-all"

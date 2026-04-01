@@ -42,7 +42,7 @@ export const LANGUAGES: Language[] = [
 export const TRANSLATIONS: Record<LanguageCode, any> = {
   ko: {
     nav: {
-      systemName: 'Language & Culture Link',
+      systemName: 'L.C.L Language & Culture Link',
       curriculum: '커리큘럼',
       pricing: '수강료',
       archive: '자료실',
@@ -193,7 +193,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
   },
   en: {
     nav: {
-      systemName: 'Language & Culture Link',
+      systemName: 'L.C.L Language & Culture Link',
       curriculum: 'Curriculum',
       pricing: 'Pricing',
       archive: 'Archive',
@@ -344,7 +344,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
   },
   zh: {
     nav: {
-      systemName: 'Language & Culture Link',
+      systemName: 'L.C.L Language & Culture Link',
       curriculum: '课程体系',
       pricing: '学费',
       archive: '资料库',
@@ -468,7 +468,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
   },
   ja: {
     nav: {
-      systemName: 'Language & Culture Link',
+      systemName: 'L.C.L Language & Culture Link',
       curriculum: 'カリキュ럼',
       pricing: '受講料',
       archive: '資料室',
