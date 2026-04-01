@@ -20,6 +20,12 @@ service cloud.firestore {
       );
     }
 
+    function isValidInquiry(data) {
+      return data.keys().hasAll(['name', 'contact', 'createdAt']) &&
+             data.name is string && data.name.size() > 0 && data.name.size() < 100 &&
+             data.contact is string && data.contact.size() > 0 && data.contact.size() < 200;
+    }
+
     // ===============================================================
     // Rules
     // ===============================================================
@@ -27,6 +33,12 @@ service cloud.firestore {
     match /users/{uid} {
       allow read: if isOwner(uid) || isAdmin();
       allow write: if isOwner(uid) || isAdmin();
+    }
+
+    match /inquiries/{inquiryId} {
+      allow read: if isAdmin();
+      allow create: if isValidInquiry(request.resource.data);
+      allow update, delete: if isAdmin();
     }
 
     match /reservations/{reservationId} {

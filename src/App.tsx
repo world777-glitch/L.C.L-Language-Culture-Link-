@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, Component, ReactNode, FC, FormEvent } from 'react';
+import { useState, useEffect, useRef, useMemo, Component, ReactNode, FC, FormEvent } from 'react';
 import * as React from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -84,7 +84,7 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
-  const [view, setView] = useState<'landing' | 'booking' | 'mypage' | 'admin' | 'image-gen' | 'archive' | 'community' | 'inquiry'>('landing');
+  const [view, setView] = useState<'landing' | 'booking' | 'mypage' | 'admin' | 'image-gen' | 'archive' | 'community' | 'inquiry' | 'curriculum' | 'pricing'>('landing');
   const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
   const [initialArchiveFilter, setInitialArchiveFilter] = useState<{ groupId: string | null, categoryId: string | null }>({ groupId: null, categoryId: null });
   const [language, setLanguage] = useState<LanguageCode>('ko');
@@ -99,14 +99,24 @@ export default function App() {
       const content: Record<string, any> = {};
       snapshot.docs.forEach(doc => {
         const data = doc.data();
-        if (data.language === language) {
-          content[data.key] = data;
+        if (doc.id === 'event-discount' || data.language === language) {
+          content[doc.id] = data;
         }
       });
       setSiteContent(content);
     });
     return () => unsubscribe();
   }, [language]);
+
+  const isEventPeriod = useMemo(() => {
+    const event = siteContent['event-discount'];
+    if (!event?.startDate || !event?.endDate) return false;
+    const now = new Date();
+    const start = new Date(event.startDate);
+    const end = new Date(event.endDate);
+    end.setHours(23, 59, 59, 999);
+    return now >= start && now <= end;
+  }, [siteContent]);
 
   const [showScrollTop, setShowScrollTop] = useState(false);
 
@@ -222,9 +232,8 @@ export default function App() {
                 ))}
               </div>
             </div>
-            <button onClick={() => scrollToSection('curriculum')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.curriculum}</button>
-            <button onClick={() => scrollToSection('pricing')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.pricing}</button>
-            <button onClick={() => scrollToSection('library')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.archive.title}</button>
+            <button onClick={() => setView('curriculum')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.curriculum}</button>
+            <button onClick={() => setView('pricing')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.pricing}</button>
             <button onClick={() => setView('archive')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.archive}</button>
             <button onClick={() => setView('community')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors whitespace-nowrap">{t.nav.community}</button>
             <button onClick={() => setView('inquiry')} className="text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors font-bold text-gold whitespace-nowrap">{t.nav.inquiry}</button>
@@ -281,14 +290,16 @@ export default function App() {
 
       <main className="flex-grow">
         <AnimatePresence mode="wait">
-          {view === 'landing' && <LandingView key="landing" setView={setView} onBook={(course) => { setSelectedCourse(course); setView('booking'); }} setInitialArchiveFilter={setInitialArchiveFilter} language={language} isEditMode={isEditMode} siteContent={siteContent} />}
-          {view === 'booking' && <BookingView key="booking" course={selectedCourse} onComplete={() => setView('mypage')} />}
+          {view === 'landing' && <LandingView key="landing" setView={setView} onBook={(course) => { setSelectedCourse(course); setView('inquiry'); }} setInitialArchiveFilter={setInitialArchiveFilter} language={language} isEditMode={isEditMode} siteContent={siteContent} isEventPeriod={isEventPeriod} />}
+          {view === 'curriculum' && <CurriculumView key="curriculum" language={language} onBook={(course) => { setSelectedCourse(course); setView('inquiry'); }} isEditMode={isEditMode} siteContent={siteContent} />}
+          {view === 'pricing' && <PricingView key="pricing" language={language} setView={setView} isEditMode={isEditMode} siteContent={siteContent} isEventPeriod={isEventPeriod} />}
+          {view === 'booking' && <BookingView key="booking" course={selectedCourse} onComplete={() => setView('mypage')} isEventPeriod={isEventPeriod} siteContent={siteContent} />}
           {view === 'mypage' && <MyPageView key="mypage" />}
-          {view === 'admin' && <AdminView key="admin" language={language} />}
+          {view === 'admin' && <AdminView key="admin" language={language} siteContent={siteContent} />}
           {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} />}
           {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} />}
           {view === 'community' && <CommunityView key="community" language={language} />}
-          {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} />}
+          {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} isEventPeriod={isEventPeriod} siteContent={siteContent} />}
         </AnimatePresence>
 
         {/* Edit Mode Instruction Bar */}
@@ -678,7 +689,7 @@ const EditableLink: FC<{
   return <a href={url} target="_blank" rel="noopener noreferrer" className={className}>{text}</a>;
 };
 
-const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode, isEditMode: boolean, siteContent: Record<string, any> }> = ({ setView, onBook, setInitialArchiveFilter, language, isEditMode, siteContent }) => {
+const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode, isEditMode: boolean, siteContent: Record<string, any>, isEventPeriod: boolean }> = ({ setView, onBook, setInitialArchiveFilter, language, isEditMode, siteContent, isEventPeriod }) => {
   const t = TRANSLATIONS[language];
   
   return (
@@ -819,68 +830,10 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                 onClick={() => onBook(course)}
                 className="group flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold hover:text-gold transition-colors"
               >
-                {t.curriculum.bookNow} <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                {language === 'ko' ? '수강 신청' : t.curriculum.bookNow} <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
               </button>
             </motion.div>
           ))}
-        </div>
-      </section>
-
-      {/* Pricing Section */}
-      <section id="pricing" className="bg-ink text-paper py-32 px-6">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center space-y-6 mb-20">
-            <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
-              <EditableText contentKey="pricing.badge" defaultValue={t.pricing.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-            </span>
-            <h2 className="text-5xl font-serif font-light">
-              <EditableText contentKey="pricing.title" defaultValue={t.pricing.title} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-            </h2>
-            <div className="max-w-xl mx-auto opacity-60 font-serif italic">
-              <EditableText contentKey="pricing.subtitle" defaultValue={t.pricing.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {[4, 8, 12].map((weeks) => (
-              <div 
-                key={weeks}
-                className={cn(
-                  "p-12 border border-paper/10 rounded-3xl flex flex-col items-center text-center space-y-8 relative overflow-hidden",
-                  weeks === 12 && "border-gold/50 bg-paper/5"
-                )}
-              >
-                {weeks === 12 && (
-                  <div className="absolute top-0 right-0 bg-gold text-ink text-[10px] font-bold uppercase tracking-widest px-6 py-2 rounded-bl-2xl">
-                    {t.pricing.bestValue}
-                  </div>
-                )}
-                <span className="text-xs uppercase tracking-widest opacity-50">{weeks} {t.pricing.weeks}</span>
-                <div className="space-y-2">
-                  <span className="text-6xl font-serif font-light">
-                    ₩{calculatePrice('입문', weeks, 1, 1).toLocaleString()}
-                  </span>
-                  <p className="text-[10px] uppercase tracking-widest opacity-40">{t.pricing.startingFrom}</p>
-                </div>
-                <ul className="space-y-4 w-full text-sm opacity-70">
-                  {t.pricing.features.map((feature: string, i: number) => (
-                    <li key={i} className="flex items-center justify-center gap-2">
-                      <CheckCircle2 size={14} className="text-gold" /> {feature}
-                    </li>
-                  ))}
-                </ul>
-                <button 
-                  onClick={() => onBook(COURSES[0])}
-                  className={cn(
-                    "w-full py-4 rounded-full text-xs uppercase tracking-widest transition-all",
-                    weeks === 12 ? "bg-gold text-ink font-bold" : "bg-paper text-ink"
-                  )}
-                >
-                  {t.pricing.selectPlan}
-                </button>
-              </div>
-            ))}
-          </div>
         </div>
       </section>
 
@@ -986,7 +939,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
   );
 };
 
-const BookingView: FC<{ course: any, onComplete: () => void }> = ({ course, onComplete }) => {
+const BookingView: FC<{ course: any, onComplete: () => void, isEventPeriod: boolean, siteContent: any }> = ({ course, onComplete, isEventPeriod, siteContent }) => {
   const [level, setLevel] = useState(course.levels[0]);
   const [weeks, setWeeks] = useState(12);
   const [sessions, setSessions] = useState(1);
@@ -995,7 +948,12 @@ const BookingView: FC<{ course: any, onComplete: () => void }> = ({ course, onCo
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const price = calculatePrice(level, weeks, sessions, hours);
+  const priceResult = useMemo(() => {
+    const customRate = siteContent['event-discount']?.discountRate;
+    return calculatePrice(level, weeks, sessions, hours, isEventPeriod, customRate);
+  }, [level, weeks, sessions, hours, isEventPeriod, siteContent]);
+
+  const price = priceResult.discountedPrice;
 
   const toggleSlot = (slot: string) => {
     setSelectedSlots(prev => 
@@ -1173,8 +1131,13 @@ const BookingView: FC<{ course: any, onComplete: () => void }> = ({ course, onCo
                   <span className="text-sm opacity-60">Schedule</span>
                   <span>{weeks}주 / 주 {sessions}회 / {hours}시간</span>
                 </div>
-                {selectedSlots.length > 0 && (
-                  <div className="flex justify-between items-start border-b border-ink/10 pb-4">
+                {priceResult.isEventDiscount && (
+                  <div className="flex justify-between items-center border-b border-ink/10 pb-4 text-gold">
+                    <span className="text-sm">Event Discount</span>
+                    <span>-{priceResult.eventDiscountRate}%</span>
+                  </div>
+                )}
+                <div className="flex justify-between items-start border-b border-ink/10 pb-4">
                     <span className="text-sm opacity-60">Preferred Times</span>
                     <div className="text-right flex flex-wrap justify-end gap-1 max-w-[200px]">
                       {selectedSlots.map(s => (
@@ -1182,7 +1145,6 @@ const BookingView: FC<{ course: any, onComplete: () => void }> = ({ course, onCo
                       ))}
                     </div>
                   </div>
-                )}
                 <div className="flex justify-between items-center pt-4">
                   <span className="text-lg font-serif">Total Price</span>
                   <span className="text-3xl font-serif text-gold">₩{price.toLocaleString()}</span>
@@ -1236,7 +1198,7 @@ const BookingView: FC<{ course: any, onComplete: () => void }> = ({ course, onCo
   );
 }
 
-const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
+const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language, siteContent }) => {
   const t = TRANSLATIONS[language];
   const [reservations, setReservations] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -1264,7 +1226,8 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
     fileType: 'pdf' as 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text',
     accessLevel: 'member' as 'public' | 'member' | 'premium',
     author: '',
-    tags: ''
+    tags: '',
+    color: '#F27D26'
   });
 
   useEffect(() => {
@@ -1374,7 +1337,8 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
         fileType: 'pdf',
         accessLevel: 'member',
         author: '',
-        tags: ''
+        tags: '',
+        color: '#F27D26'
       });
       alert(language === 'ko' ? '처리가 완료되었습니다.' : 'Operation completed.');
     } catch (error) {
@@ -1432,7 +1396,8 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
       fileType: res.fileType,
       accessLevel: res.accessLevel,
       author: res.author || '',
-      tags: Array.isArray(res.tags) ? res.tags.join(', ') : ''
+      tags: Array.isArray(res.tags) ? res.tags.join(', ') : '',
+      color: res.color || '#F27D26'
     });
     // Scroll to form
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1575,7 +1540,7 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
       {/* Quick Actions Bar */}
       <div className="flex flex-wrap gap-4 p-6 bg-gold/5 border border-gold/10 rounded-3xl">
         <button 
-          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', textContent: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '' }); }}
+          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', textContent: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '', color: '#F27D26' }); }}
           className="flex items-center gap-2 px-6 py-3 bg-ink text-paper rounded-xl text-[10px] uppercase tracking-widest font-bold hover:bg-gold transition-all"
         >
           <Upload size={14} />
@@ -1595,6 +1560,46 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
           <Calendar size={14} />
           {language === 'ko' ? '예약 현황 수정' : 'Edit Reservations'}
         </button>
+        <div className="flex-grow" />
+        <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-ink/5">
+          <span className="text-[10px] uppercase tracking-widest font-bold opacity-50">Event Discount</span>
+          <div className="flex items-center gap-2">
+            <input 
+              type="number" 
+              min="0" 
+              max="100"
+              value={(siteContent['event-discount']?.discountRate ?? 0.20) * 100}
+              onChange={async (e) => {
+                const path = 'siteContent';
+                const rate = parseFloat(e.target.value) / 100;
+                await setDoc(doc(db, path, 'event-discount'), { ...siteContent['event-discount'], discountRate: rate }, { merge: true });
+              }}
+              className="w-12 text-[10px] p-1 border rounded text-center"
+            />
+            <span className="text-[10px] font-bold">%</span>
+          </div>
+          <div className="h-4 w-px bg-ink/10 mx-2" />
+          <span className="text-[10px] uppercase tracking-widest font-bold opacity-50">Period</span>
+          <input 
+            type="date" 
+            value={siteContent['event-discount']?.startDate || ''}
+            onChange={async (e) => {
+              const path = 'siteContent';
+              await setDoc(doc(db, path, 'event-discount'), { ...siteContent['event-discount'], startDate: e.target.value }, { merge: true });
+            }}
+            className="text-[10px] p-1 border rounded"
+          />
+          <span className="text-[10px] opacity-30">to</span>
+          <input 
+            type="date" 
+            value={siteContent['event-discount']?.endDate || ''}
+            onChange={async (e) => {
+              const path = 'siteContent';
+              await setDoc(doc(db, path, 'event-discount'), { ...siteContent['event-discount'], endDate: e.target.value }, { merge: true });
+            }}
+            className="text-[10px] p-1 border rounded"
+          />
+        </div>
       </div>
 
       {activeTab === 'reservations' && (
@@ -1733,7 +1738,7 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
           {/* Upload Form */}
           <div className="md:col-span-1 space-y-8">
-            <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6 sticky top-32">
+            <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6 sticky top-32 max-h-[80vh] overflow-y-auto pr-2">
               <div className="flex justify-between items-center">
               <h3 className="text-xl font-serif">{editingResource ? (language === 'ko' ? '자료 수정' : 'Edit Resource') : t.admin.upload}</h3>
               {editingResource && (
@@ -1750,7 +1755,8 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                       fileType: 'pdf',
                       accessLevel: 'member',
                       author: '',
-                      tags: ''
+                      tags: '',
+                      color: '#F27D26'
                     });
                   }}
                   className="text-xs text-gold underline"
@@ -1841,15 +1847,32 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
                     />
                   </div>
                   <div className="space-y-2">
-                    <label className="text-[10px] uppercase tracking-widest opacity-50">Tags (comma-separated)</label>
-                    <input 
-                      type="text"
-                      value={newResource.tags}
-                      onChange={(e) => setNewResource(prev => ({ ...prev, tags: e.target.value }))}
-                      className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-sm"
-                      placeholder="HSK, Vocabulary, PDF"
-                    />
+                    <label className="text-[10px] uppercase tracking-widest opacity-50">Card Color</label>
+                    <div className="flex gap-2">
+                      <input 
+                        type="color"
+                        value={newResource.color}
+                        onChange={(e) => setNewResource(prev => ({ ...prev, color: e.target.value }))}
+                        className="w-10 h-10 p-0 border-none bg-transparent cursor-pointer"
+                      />
+                      <input 
+                        type="text"
+                        value={newResource.color}
+                        onChange={(e) => setNewResource(prev => ({ ...prev, color: e.target.value }))}
+                        className="flex-grow p-3 bg-ink/5 border border-ink/10 rounded-xl text-xs font-mono"
+                      />
+                    </div>
                   </div>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50">Tags (comma-separated)</label>
+                  <input 
+                    type="text"
+                    value={newResource.tags}
+                    onChange={(e) => setNewResource(prev => ({ ...prev, tags: e.target.value }))}
+                    className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-sm"
+                    placeholder="HSK, Vocabulary, PDF"
+                  />
                 </div>
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest opacity-50">Text Content (Optional for Text type)</label>
@@ -1914,13 +1937,16 @@ const AdminView: FC<{ language: LanguageCode }> = ({ language }) => {
             {resources.map(res => (
               <div key={res.id} className="p-6 border border-ink/10 rounded-3xl bg-white flex items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-xl bg-ink/5 flex items-center justify-center text-ink/40">
+                  <div 
+                    className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg"
+                    style={{ backgroundColor: res.color || '#F27D26' }}
+                  >
                     {res.fileType === 'pdf' && <FileText size={20} />}
                     {res.fileType === 'mp3' && <Music size={20} />}
                     {res.fileType === 'image' && <ImageIcon size={20} />}
-                    {res.fileType === 'ppt' && <FileText size={20} className="text-orange-500" />}
-                    {res.fileType === 'word' && <FileText size={20} className="text-blue-500" />}
-                    {res.fileType === 'text' && <FileText size={20} className="text-gray-500" />}
+                    {res.fileType === 'ppt' && <FileText size={20} />}
+                    {res.fileType === 'word' && <FileText size={20} />}
+                    {res.fileType === 'text' && <FileText size={20} />}
                   </div>
                   <div>
                     <h4 className="font-bold">{res.title}</h4>
@@ -2380,7 +2406,8 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     fileType: 'pdf' as 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text',
     accessLevel: 'member' as 'public' | 'member' | 'premium',
     author: '',
-    tags: ''
+    tags: '',
+    color: '#F27D26'
   });
 
   useEffect(() => {
@@ -2478,7 +2505,8 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
         fileType: 'pdf',
         accessLevel: 'member',
         author: '',
-        tags: ''
+        tags: '',
+        color: '#F27D26'
       });
       setIsManaging(false);
       alert(language === 'ko' ? '처리가 완료되었습니다.' : 'Operation completed.');
@@ -2535,7 +2563,8 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
       fileType: res.fileType,
       accessLevel: res.accessLevel,
       author: res.author || '',
-      tags: Array.isArray(res.tags) ? res.tags.join(', ') : ''
+      tags: Array.isArray(res.tags) ? res.tags.join(', ') : '',
+      color: res.color || '#F27D26'
     });
     setIsManaging(true);
   };
@@ -2705,13 +2734,16 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
               className="p-6 border border-ink/10 rounded-2xl bg-white space-y-4 flex flex-col hover:shadow-xl hover:shadow-ink/5 transition-all group cursor-pointer"
             >
               <div className="flex justify-between items-start">
-                <div className="w-10 h-10 rounded-xl bg-ink/5 flex items-center justify-center text-ink/40 group-hover:bg-gold group-hover:text-ink transition-colors">
+                <div 
+                  className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg"
+                  style={{ backgroundColor: res.color || '#F27D26' }}
+                >
                   {res.fileType === 'pdf' && <FileText size={20} />}
                   {res.fileType === 'mp3' && <Music size={20} />}
                   {res.fileType === 'image' && <ImageIcon size={20} />}
-                  {res.fileType === 'ppt' && <FileText size={20} className="text-orange-500" />}
-                  {res.fileType === 'word' && <FileText size={20} className="text-blue-500" />}
-                  {res.fileType === 'text' && <FileText size={20} className="text-gray-500" />}
+                  {res.fileType === 'ppt' && <FileText size={20} />}
+                  {res.fileType === 'word' && <FileText size={20} />}
+                  {res.fileType === 'text' && <FileText size={20} />}
                 </div>
                 <div className="flex items-center gap-2">
                   {isAdmin && (
@@ -2896,6 +2928,23 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                           <option value="member">Member</option>
                           <option value="premium">Premium</option>
                         </select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <label className="text-[10px] uppercase tracking-widest opacity-50">Color Theme</label>
+                      <div className="flex gap-2">
+                        <input 
+                          type="color"
+                          value={newResource.color}
+                          onChange={(e) => setNewResource(prev => ({ ...prev, color: e.target.value }))}
+                          className="w-12 h-12 p-1 bg-ink/5 border border-ink/10 rounded-xl cursor-pointer"
+                        />
+                        <input 
+                          type="text"
+                          value={newResource.color}
+                          onChange={(e) => setNewResource(prev => ({ ...prev, color: e.target.value }))}
+                          className="flex-grow p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm font-mono focus:outline-none focus:border-gold transition-all"
+                        />
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -3121,7 +3170,170 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
   );
 };
 
-const InquiryView: FC<{ language: LanguageCode, onComplete: () => void }> = ({ language, onComplete }) => {
+const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void, isEditMode: boolean, siteContent: any }> = ({ language, onBook, isEditMode, siteContent }) => {
+  const t = TRANSLATIONS[language];
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      exit={{ opacity: 0, y: -20 }}
+      className="max-w-7xl mx-auto px-6 py-32"
+    >
+      <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
+        <div className="space-y-4">
+          <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+            <EditableText contentKey="curriculum.badge" defaultValue={t.curriculum.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </span>
+          <h2 className="text-5xl font-serif font-light">
+            <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </h2>
+        </div>
+        <div className="max-w-xs text-sm opacity-60 font-serif italic">
+          <EditableText contentKey="curriculum.subtitle" defaultValue={t.curriculum.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-px bg-ink/10 border border-ink/10">
+        {COURSES.map((course, idx) => (
+          <motion.div 
+            key={course.id}
+            whileHover={{ backgroundColor: 'rgba(26, 26, 26, 0.02)' }}
+            className="bg-paper p-8 space-y-8 flex flex-col h-full"
+          >
+            <div className="space-y-4 flex-grow">
+              <div className="w-12 h-12 rounded-full border border-ink/10 flex items-center justify-center">
+                {idx === 0 && <MessageSquare size={20} />}
+                {idx === 1 && <GraduationCap size={20} />}
+                {idx === 2 && <Star size={20} />}
+                {idx === 3 && <Briefcase size={20} />}
+                {idx === 4 && <Globe size={20} />}
+              </div>
+              <h3 className="text-2xl font-serif">{course.title}</h3>
+              <p className="text-xs opacity-60 leading-relaxed">{course.description}</p>
+              <div className="flex flex-wrap gap-2">
+                {course.levels.map(level => (
+                  <span key={level} className="text-[9px] uppercase tracking-widest px-2 py-1 bg-ink/5 rounded-sm">{level}</span>
+                ))}
+              </div>
+            </div>
+            <button 
+              onClick={() => onBook(course)}
+              className="group flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold hover:text-gold transition-colors"
+            >
+              {language === 'ko' ? '수강 신청' : t.curriculum.bookNow} <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+            </button>
+          </motion.div>
+        ))}
+      </div>
+    </motion.div>
+  );
+};
+
+const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEditMode: boolean, siteContent: any, isEventPeriod: boolean }> = ({ language, setView, isEditMode, siteContent, isEventPeriod }) => {
+  const t = TRANSLATIONS[language];
+  const event = siteContent['event-discount'];
+  const customRate = event?.discountRate;
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }} 
+      animate={{ opacity: 1, y: 0 }} 
+      exit={{ opacity: 0, y: -20 }}
+      className="bg-ink text-paper py-32 px-6 min-h-screen flex items-center"
+    >
+      <div className="max-w-7xl mx-auto w-full">
+        <div className="text-center space-y-6 mb-20">
+          <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+            <EditableText contentKey="pricing.badge" defaultValue={t.pricing.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </span>
+          <h2 className="text-5xl font-serif font-light">
+            <EditableText contentKey="pricing.title" defaultValue={t.pricing.title} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </h2>
+          <div className="max-w-xl mx-auto opacity-60 font-serif italic">
+            <EditableText contentKey="pricing.subtitle" defaultValue={t.pricing.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </div>
+          
+          {isEventPeriod && event?.startDate && event?.endDate && (
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="inline-block mt-8 px-6 py-3 border border-gold/30 rounded-2xl bg-gold/5"
+            >
+              <p className="text-[10px] uppercase tracking-widest text-gold font-bold mb-1">
+                {language === 'ko' ? '특별 할인 이벤트 기간' : 'Special Discount Event Period'}
+              </p>
+              <p className="text-sm font-serif italic opacity-80">
+                {event.startDate} ~ {event.endDate}
+              </p>
+            </motion.div>
+          )}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          {[4, 8, 12].map((weeks) => {
+            const priceInfo = calculatePrice('초급', weeks, 1, 1, isEventPeriod, customRate);
+            return (
+              <div 
+                key={weeks}
+                className={cn(
+                  "p-12 border border-paper/10 rounded-3xl flex flex-col items-center text-center space-y-8 relative overflow-hidden transition-all duration-500",
+                  weeks === 12 && "border-gold/50 bg-paper/5"
+                )}
+              >
+                {weeks === 12 && (
+                  <div className="absolute top-0 right-0 bg-gold text-ink text-[10px] font-bold uppercase tracking-widest px-6 py-2 rounded-bl-2xl">
+                    {t.pricing.bestValue}
+                  </div>
+                )}
+                <span className="text-xs uppercase tracking-widest opacity-50">{weeks} {t.pricing.weeks}</span>
+                
+                <div className="space-y-2">
+                  {priceInfo.isEventDiscount || priceInfo.weeksDiscountRate > 0 ? (
+                    <>
+                      <p className="text-sm opacity-30 line-through">₩{priceInfo.originalPrice.toLocaleString()}</p>
+                      <p className="text-4xl font-serif text-gold">₩{priceInfo.discountedPrice.toLocaleString()}</p>
+                      <p className="text-[10px] uppercase tracking-widest font-bold text-gold/60">
+                        {Math.round((1 - priceInfo.discountedPrice / priceInfo.originalPrice) * 100)}% OFF
+                      </p>
+                    </>
+                  ) : (
+                    <p className="text-4xl font-serif">₩{priceInfo.originalPrice.toLocaleString()}</p>
+                  )}
+                  <p className="text-[10px] uppercase tracking-widest opacity-30 mt-2">
+                    {language === 'ko' ? '주 1회 1시간 기준' : 'Based on 1 session/week (1hr)'}
+                  </p>
+                </div>
+
+                <ul className="space-y-4 w-full text-sm opacity-70">
+                  {t.pricing.features.map((feature: string, i: number) => (
+                    <li key={i} className="flex items-center justify-center gap-2">
+                      <CheckCircle2 size={14} className="text-gold" /> {feature}
+                    </li>
+                  ))}
+                </ul>
+                <button 
+                  onClick={() => setView('inquiry')}
+                  className={cn(
+                    "w-full py-4 rounded-full text-xs uppercase tracking-widest transition-all",
+                    weeks === 12 ? "bg-gold text-ink font-bold" : "bg-paper text-ink"
+                  )}
+                >
+                  {language === 'ko' ? '수강 신청하기' : t.pricing.selectPlan}
+                </button>
+              </div>
+            );
+          })}
+        </div>
+        
+        <p className="text-center mt-12 text-[10px] uppercase tracking-widest opacity-30">
+          {language === 'ko' ? '* 레벨 및 수업 횟수에 따라 금액이 변동될 수 있습니다.' : '* Prices may vary depending on level and number of sessions.'}
+        </p>
+      </div>
+    </motion.div>
+  );
+};
+
+const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventPeriod: boolean, siteContent: any }> = ({ language, onComplete, isEventPeriod, siteContent }) => {
   const t = TRANSLATIONS[language];
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -3133,8 +3345,14 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void }> = ({ l
     levelConcerns: [] as string[],
     otherLevelConcern: '',
     desiredClass: [] as string[],
-    otherDesiredClass: ''
+    otherDesiredClass: '',
+    desiredWeeks: 12
   });
+
+  const priceResult = useMemo(() => {
+    const customRate = siteContent['event-discount']?.discountRate;
+    return calculatePrice('입문', formData.desiredWeeks, 1, 1, isEventPeriod, customRate);
+  }, [formData.desiredWeeks, isEventPeriod, siteContent]);
 
   const toggleSelection = (field: 'levelConcerns' | 'desiredClass', value: string) => {
     setFormData(prev => ({
@@ -3171,6 +3389,8 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void }> = ({ l
         history: formData.history,
         levelConcerns: finalLevelConcerns,
         desiredClass: finalDesiredClass,
+        desiredWeeks: formData.desiredWeeks,
+        priceInfo: priceResult,
         createdAt: serverTimestamp()
       });
       setIsSuccess(true);
@@ -3207,8 +3427,8 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void }> = ({ l
       className="max-w-3xl mx-auto px-6 py-20"
     >
       <div className="text-center space-y-4 mb-16">
-        <span className="text-gold text-[10px] uppercase tracking-[0.4em]">{t.inquiry.badge}</span>
-        <h2 className="text-5xl font-serif font-light">{t.inquiry.title}</h2>
+        <span className="text-gold text-[10px] uppercase tracking-[0.4em]">{language === 'ko' ? 'COURSE APPLICATION' : t.inquiry.badge}</span>
+        <h2 className="text-5xl font-serif font-light">{language === 'ko' ? '수강 신청 및 레벨 진단' : t.inquiry.title}</h2>
         <p className="text-lg opacity-60 font-serif italic">{t.inquiry.subtitle}</p>
       </div>
 
@@ -3302,10 +3522,76 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void }> = ({ l
           </div>
         </div>
 
-        {/* 5. Desired Class */}
+        {/* 5. Desired Duration */}
         <div className="space-y-6">
           <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">5</span>
+            {language === 'ko' ? '희망 수강 기간' : 'Desired Duration'}
+          </label>
+          <div className="grid grid-cols-3 gap-4">
+            {[4, 8, 12].map(w => (
+              <button 
+                key={w}
+                type="button"
+                onClick={() => setFormData(prev => ({ ...prev, desiredWeeks: w }))}
+                className={cn(
+                  "py-4 border rounded-2xl text-sm transition-all",
+                  formData.desiredWeeks === w ? "border-gold bg-gold/10 text-gold font-bold" : "border-ink/10 hover:border-gold/50"
+                )}
+              >
+                {w}{t.pricing.weeks}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Price Preview */}
+        <div className="p-8 bg-gold/5 border border-gold/20 rounded-[32px] space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xl font-serif">{language === 'ko' ? '예상 수강료' : 'Estimated Tuition'}</h3>
+            {isEventPeriod && (
+              <span className="text-[10px] bg-gold text-ink px-3 py-1 rounded-full font-bold uppercase tracking-widest">
+                {language === 'ko' ? '이벤트 할인 적용됨' : 'Event Discount Applied'}
+              </span>
+            )}
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex justify-between items-center opacity-60">
+              <span className="text-sm">{language === 'ko' ? '기본 수강료' : 'Base Tuition'}</span>
+              <span className="line-through">₩{priceResult.originalPrice.toLocaleString()}</span>
+            </div>
+            
+            {priceResult.weeksDiscountRate > 0 && (
+              <div className="flex justify-between items-center text-green-600">
+                <span className="text-sm">{formData.desiredWeeks}{t.pricing.weeks} {language === 'ko' ? '장기 할인' : 'Duration Discount'}</span>
+                <span>-{priceResult.weeksDiscountRate}%</span>
+              </div>
+            )}
+
+            {priceResult.isEventDiscount && (
+              <div className="flex justify-between items-center text-gold">
+                <span className="text-sm">{language === 'ko' ? '이벤트 추가 할인' : 'Event Extra Discount'}</span>
+                <span>-{priceResult.eventDiscountRate}%</span>
+              </div>
+            )}
+
+            <div className="pt-4 border-t border-gold/10 flex justify-between items-center">
+              <span className="text-lg font-serif">{language === 'ko' ? '최종 혜택가' : 'Final Price'}</span>
+              <div className="text-right">
+                <span className="text-3xl font-serif text-gold">₩{priceResult.discountedPrice.toLocaleString()}</span>
+                <p className="text-[10px] opacity-40 mt-1 italic">
+                  {language === 'ko' ? '* 주 1회, 1시간 기준 예상 금액입니다.' : '* Estimated for 1 session/week, 1 hour.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 6. Desired Class */}
+        <div className="space-y-6">
+          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">6</span>
             {t.inquiry.classLabel}
           </label>
           <div className="grid grid-cols-1 gap-3">
@@ -3351,7 +3637,7 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void }> = ({ l
             disabled={isSubmitting}
             className="w-full py-6 bg-ink text-paper rounded-full text-sm uppercase tracking-[0.2em] font-bold hover:bg-gold hover:text-ink transition-all shadow-2xl disabled:opacity-50"
           >
-            {isSubmitting ? 'Submitting...' : t.inquiry.submit}
+            {isSubmitting ? 'Submitting...' : (language === 'ko' ? '수강 신청 및 진단 완료하기' : t.inquiry.submit)}
           </button>
         </div>
       </form>

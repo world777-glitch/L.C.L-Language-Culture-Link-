@@ -59,6 +59,7 @@
         "accessLevel": { "type": "string", "enum": ["public", "member", "premium"] },
         "author": { "type": "string" },
         "tags": { "type": "array", "items": { "type": "string" } },
+        "color": { "type": "string", "description": "Hex color code for the resource card" },
         "downloadCount": { "type": "integer" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
@@ -118,6 +119,20 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["key", "language", "value"]
+    },
+    "inquiries": {
+      "title": "Course Inquiry",
+      "description": "Stores student inquiries and level diagnosis requests.",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "contact": { "type": "string" },
+        "history": { "type": "string" },
+        "levelConcerns": { "type": "array", "items": { "type": "string" } },
+        "desiredClass": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "contact", "createdAt"]
     }
   },
   "firestore": {
@@ -128,6 +143,7 @@
     "/downloads/{downloadId}": { "schema": "downloads", "description": "Download tracking" },
     "/comments/{commentId}": { "schema": "comments", "description": "Resource comments" },
     "/community/{postId}": { "schema": "community", "description": "Community posts" },
-    "/siteContent/{contentId}": { "schema": "siteContent", "description": "Landing page content overrides" }
+    "/siteContent/{contentId}": { "schema": "siteContent", "description": "Landing page content overrides" },
+    "/inquiries/{inquiryId}": { "schema": "inquiries", "description": "Student inquiries" }
   }
 }

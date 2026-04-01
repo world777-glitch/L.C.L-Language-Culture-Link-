@@ -106,14 +106,40 @@ export const LEVEL_PRICES: Record<string, number> = {
   'Special Session': 129000,
 };
 
-export function calculatePrice(level: string, weeks: number, sessionsPerWeek: number, hours: number) {
+export interface PriceResult {
+  originalPrice: number;
+  discountedPrice: number;
+  isEventDiscount: boolean;
+  eventDiscountRate: number;
+  weeksDiscountRate: number;
+}
+
+export function calculatePrice(
+  level: string, 
+  weeks: number, 
+  sessionsPerWeek: number, 
+  hours: number,
+  isEventPeriod: boolean = false,
+  customEventDiscountRate?: number
+): PriceResult {
   const basePrice = LEVEL_PRICES[level] || 99000;
   const sessionPrice = basePrice * sessionsPerWeek * (hours / 1);
+  const baseTotalPrice = sessionPrice * (weeks / 4);
   
-  let discount = 0;
-  if (weeks === 8) discount = 0.05;
-  if (weeks === 12) discount = 0.15;
+  let eventDiscountRate = isEventPeriod ? (customEventDiscountRate ?? 0.20) : 0;
+  let weeksDiscountRate = 0;
   
-  const totalPrice = sessionPrice * (weeks / 4);
-  return Math.floor(totalPrice * (1 - discount));
+  if (weeks === 8) weeksDiscountRate = 0.10;
+  if (weeks === 12) weeksDiscountRate = 0.15;
+  
+  const originalPrice = Math.floor(baseTotalPrice);
+  const discountedPrice = Math.floor(baseTotalPrice * (1 - eventDiscountRate) * (1 - weeksDiscountRate));
+  
+  return {
+    originalPrice,
+    discountedPrice,
+    isEventDiscount: isEventPeriod,
+    eventDiscountRate,
+    weeksDiscountRate
+  };
 }
