@@ -586,8 +586,10 @@ const EditableImage: FC<{
   language: string,
   siteContent: Record<string, any>,
   className?: string,
-  alt?: string
-}> = ({ contentKey, defaultUrl, isEditMode, language, siteContent, className, alt }) => {
+  alt?: string,
+  rounded?: string,
+  children?: React.ReactNode
+}> = ({ contentKey, defaultUrl, isEditMode, language, siteContent, className, alt, rounded = "rounded-lg", children }) => {
   const [isUploading, setIsUploading] = useState(false);
   const content = siteContent[contentKey] || {};
   const url = content.value || defaultUrl;
@@ -617,20 +619,34 @@ const EditableImage: FC<{
     }
   };
 
+  // Filter out image-specific classes from the container
+  const containerClasses = className?.split(' ').filter(c => !['object-cover', 'object-contain', 'opacity-80', 'opacity-70'].includes(c)).join(' ');
+  const imgClasses = className?.split(' ').filter(c => ['object-cover', 'object-contain', 'opacity-80', 'opacity-70'].includes(c)).join(' ');
+
   if (isEditMode) {
     return (
-      <div className={cn("relative group", className)}>
+      <div className={cn("relative group cursor-pointer", containerClasses, rounded)}>
         <div 
-          className="relative cursor-pointer group/item"
+          className="relative w-full h-full"
           onClick={() => fileInputRef.current?.click()}
         >
-          <div className="absolute inset-0 bg-gold/20 opacity-0 group-hover/item:opacity-100 transition-opacity flex items-center justify-center z-10 rounded-lg border-2 border-dashed border-gold">
-            <div className="bg-paper text-ink px-4 py-2 rounded-full text-[10px] uppercase tracking-widest font-bold shadow-xl flex items-center gap-2">
-              {isUploading ? <Clock size={12} className="animate-spin" /> : <Upload size={12} />}
+          <img src={url} alt={alt} className={cn("w-full h-full", imgClasses)} referrerPolicy="no-referrer" />
+          {children}
+          
+          {/* Dashed border - always visible in edit mode */}
+          <div className={cn("absolute inset-0 border-2 border-dashed border-gold/60 pointer-events-none z-30", rounded)} />
+          
+          {/* Hover overlay with button */}
+          <div className={cn(
+            "absolute inset-0 bg-ink/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center z-50 backdrop-blur-[1px]",
+            rounded
+          )}>
+            <div className="bg-white text-ink px-6 py-3 rounded-full text-[10px] uppercase tracking-widest font-bold shadow-2xl flex items-center gap-3 transform scale-90 group-hover:scale-100 transition-transform duration-300">
+              {isUploading ? <Clock size={14} className="animate-spin text-gold" /> : <Upload size={14} className="text-gold" />}
               {isUploading ? 'Uploading...' : 'Change Image'}
             </div>
           </div>
-          <img src={url} alt={alt} className={cn("w-full h-full object-cover", className)} referrerPolicy="no-referrer" />
+          
           <input 
             type="file" 
             ref={fileInputRef} 
@@ -643,7 +659,12 @@ const EditableImage: FC<{
     );
   }
 
-  return <img src={url} alt={alt} className={className} referrerPolicy="no-referrer" />;
+  return (
+    <div className={cn("relative overflow-hidden", containerClasses, rounded)}>
+      <img src={url} alt={alt} className={cn("w-full h-full", imgClasses)} referrerPolicy="no-referrer" />
+      {children}
+    </div>
+  );
 };
 
 const EditableLink: FC<{ 
@@ -746,7 +767,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
     >
       {/* Hero Section */}
       <section className="relative h-[90vh] flex items-center overflow-hidden px-6">
-        <div className="absolute right-0 top-0 w-1/2 h-full bg-ink/5 -z-10 flex items-center justify-center">
+        <div className="absolute right-0 top-0 w-1/2 h-full bg-ink/5 z-0 flex items-center justify-center">
           <div className="w-[80%] aspect-[3/4] bg-ink/10 rounded-[200px] overflow-hidden relative">
             <EditableImage 
               contentKey="hero.image"
@@ -756,16 +777,18 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               isEditMode={isEditMode}
               language={language}
               siteContent={siteContent}
-            />
-            <div className="absolute inset-0 bg-gradient-to-t from-paper/40 to-transparent" />
+              rounded="rounded-[200px]"
+            >
+              <div className="absolute inset-0 bg-gradient-to-t from-paper/40 to-transparent pointer-events-none" />
+            </EditableImage>
           </div>
           <div className="absolute top-1/2 left-0 -translate-x-1/2 vertical-text opacity-20 text-4xl font-serif">
             Language & Culture Link
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-2">
-          <div className="space-y-8">
+        <div className="max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 relative z-10 pointer-events-none">
+          <div className="space-y-8 pointer-events-auto">
             <motion.div 
               initial={{ x: -50, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -819,13 +842,24 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               </button>
               <div className="flex items-center gap-3">
                 <div className="flex -space-x-2">
-                  {[1,2,3].map(i => (
-                    <div key={i} className="w-8 h-8 rounded-full border-2 border-paper bg-ink/20 overflow-hidden">
-                      <img src={`https://i.pravatar.cc/100?img=${i+10}`} alt="Student" referrerPolicy="no-referrer" />
+                  {[1, 2, 3].map(i => (
+                    <div key={i} className="w-8 h-8 rounded-full border-2 border-paper bg-ink/20 overflow-hidden relative group/avatar">
+                      <EditableImage 
+                        contentKey={`hero.avatar_${i}`}
+                        defaultUrl={`https://i.pravatar.cc/100?img=${i + 10}`}
+                        alt="Student"
+                        className="w-full h-full object-cover"
+                        isEditMode={isEditMode}
+                        language={language}
+                        siteContent={siteContent}
+                        rounded="rounded-full"
+                      />
                     </div>
                   ))}
                 </div>
-            <span className="text-[10px] uppercase tracking-widest opacity-60">{language === 'ko' ? '500+ 수강생 참여' : '500+ Students Joined'}</span>
+                <span className="text-[10px] uppercase tracking-widest opacity-60">
+                  <EditableText contentKey="hero.students_count" defaultValue={language === 'ko' ? '500+ 수강생 참여' : '500+ Students Joined'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                </span>
               </div>
             </motion.div>
           </div>
@@ -923,6 +957,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                   isEditMode={isEditMode}
                   language={language}
                   siteContent={siteContent}
+                  rounded="rounded-[40px]"
                 />
               </div>
             </div>
