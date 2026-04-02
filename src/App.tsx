@@ -1310,6 +1310,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
   const [editingPost, setEditingPost] = useState<any>(null);
   const [editPostData, setEditPostData] = useState({ title: '', content: '' });
   const [isDragging, setIsDragging] = useState(false);
+  const editorRef = useRef<HTMLDivElement>(null);
   
   // Resource Form State
   const [newResource, setNewResource] = useState({
@@ -1483,98 +1484,96 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement> | React.DragEvent) => {
+  const handleFileUpload = async (input: React.ChangeEvent<HTMLInputElement> | React.DragEvent | File) => {
     let file: File | null = null;
-    if ('files' in e.target && (e.target as HTMLInputElement).files) {
-      file = (e.target as HTMLInputElement).files![0];
-    } else if ('dataTransfer' in e) {
+    if (input instanceof File) {
+      file = input;
+    } else if ('dataTransfer' in (input as any)) {
+      const e = input as React.DragEvent;
       e.preventDefault();
       setIsDragging(false);
-      file = (e as React.DragEvent).dataTransfer.files[0];
+      file = e.dataTransfer.files[0];
+    } else if ('target' in (input as any)) {
+      const e = input as React.ChangeEvent<HTMLInputElement>;
+      if (e.target.files) {
+        file = e.target.files[0];
+      }
     }
 
     if (!file) return;
 
-    // Basic validation
-    const maxSize = 50 * 1024 * 1024; // 50MB limit
+    if (!auth.currentUser) {
+      alert(language === 'ko' ? '로그인이 필요합니다.' : 'Login required.');
+      return;
+    }
+
+    // Validation
+    const maxSize = 100 * 1024 * 1024; // 100MB limit
     if (file.size > maxSize) {
-      alert(language === 'ko' ? '파일 크기가 너무 큽니다 (최대 50MB).' : 'File is too large (max 50MB).');
+      alert(language === 'ko' ? '파일 크기가 너무 큽니다 (최대 100MB).' : 'File is too large (max 100MB).');
       return;
     }
 
     setUploading(true);
     setUploadProgress(0);
     
-    console.log('Starting upload for file:', file.name, 'Size:', file.size);
-    
     try {
       if (!storage) {
-        console.error('Firebase Storage is not initialized!');
-        throw new Error('Storage not initialized');
+        throw new Error('Firebase Storage is not initialized');
       }
 
       const storageRef = ref(storage, `resources/${Date.now()}_${file.name}`);
-      console.log('Storage reference created:', storageRef.fullPath);
+      console.log('Starting upload for:', file.name, 'Size:', file.size, 'Type:', file.type);
       
-      // Use uploadBytesResumable for progress tracking
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      // Use uploadBytes for better compatibility in some environments
+      setUploadProgress(10); // Initial progress
+      const uploadResult = await uploadBytes(storageRef, file);
+      console.log('Upload successful:', uploadResult.metadata.fullPath);
+      setUploadProgress(100);
 
-      uploadTask.on('state_changed', 
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-          console.log(`Upload progress: ${Math.round(progress)}% (${snapshot.bytesTransferred}/${snapshot.totalBytes})`);
-        }, 
-        (error: any) => {
-          console.error('Upload error details:', error);
-          let message = language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.';
-          if (error.code === 'storage/unauthorized') {
-            message = language === 'ko' ? '업로드 권한이 없습니다. (관리자 권한 확인 필요)' : 'No permission to upload. (Check admin role)';
-          } else if (error.code === 'storage/canceled') {
-            message = language === 'ko' ? '업로드가 취소되었습니다.' : 'Upload canceled.';
-          } else if (error.code === 'storage/unknown') {
-            message = language === 'ko' ? '알 수 없는 오류가 발생했습니다.' : 'Unknown storage error.';
-          }
-          alert(`${message}\nCode: ${error.code}\nMessage: ${error.message}`);
-          setUploading(false);
-        }, 
-        async () => {
-          try {
-            console.log('Upload completed successfully. Getting download URL...');
-            const url = await getDownloadURL(storageRef);
-            console.log('Download URL obtained:', url);
-            
-            const extension = file.name.split('.').pop()?.toLowerCase();
-            let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
-            if (extension === 'mp3') fileType = 'mp3';
-            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
-            if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
-            if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
-            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
-            
-            let textContent = '';
-            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
-              textContent = await file.text();
-            }
-            
-            setNewResource(prev => ({ 
-              ...prev, 
-              fileUrl: url, 
-              fileType,
-              textContent: textContent || prev.textContent
-            }));
-            alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
-          } catch (err: any) {
-            console.error('Error getting download URL:', err);
-            alert(`${language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.'} (${err.message})`);
-          } finally {
-            setUploading(false);
-          }
+      try {
+        const url = await getDownloadURL(storageRef);
+        console.log('Download URL obtained:', url);
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
+        if (extension === 'mp3') fileType = 'mp3';
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
+        if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
+        if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
+        if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
+        
+        let textContent = '';
+        if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
+          textContent = await file.text();
         }
-      );
+        
+        setNewResource(prev => ({ 
+          ...prev, 
+          fileUrl: url, 
+          fileType,
+          textContent: textContent || prev.textContent
+        }));
+
+        if (textContent && editorRef.current) {
+          editorRef.current.innerHTML = textContent;
+        }
+
+        alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+      } catch (err: any) {
+        console.error('Error getting download URL:', err);
+        alert(`${language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.'} (${err.message})`);
+      } finally {
+        setUploading(false);
+      }
     } catch (error: any) {
       console.error('Upload catch error:', error);
-      alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${error.message})`);
+      let errorMsg = error.message;
+      if (error.code === 'storage/quota-exceeded') {
+        errorMsg = language === 'ko' ? '저장 공간 할당량이 초과되었습니다. 내일 다시 시도해 주세요.' : 'Storage quota exceeded. Please try again tomorrow.';
+      } else if (error.code === 'storage/unauthorized') {
+        errorMsg = language === 'ko' ? '파일 업로드 권한이 없습니다.' : 'Unauthorized to upload file.';
+      }
+      alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${errorMsg})`);
       setUploading(false);
     }
   };
@@ -1691,6 +1690,17 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
 
   const [isFullScreen, setIsFullScreen] = useState(false);
 
+  const COLOR_PALETTE = [
+    '#000000', '#444444', '#666666', '#999999', '#cccccc', '#eeeeee', '#f3f3f3', '#ffffff',
+    '#ff0000', '#ff9900', '#ffff00', '#00ff00', '#00ffff', '#0000ff', '#9900ff', '#ff00ff',
+    '#f4cccc', '#fce5cd', '#fff2cc', '#d9ead3', '#d0e0e3', '#cfe2f3', '#d9d2e9', '#ead1dc',
+    '#ea9999', '#f9cb9c', '#ffe599', '#b6d7a8', '#a2c4c9', '#9fc5e8', '#b4a7d6', '#d5a6bd',
+    '#e06666', '#f6b26b', '#ffd966', '#93c47d', '#76a5af', '#6fa8dc', '#8e7cc3', '#c27ba0',
+    '#cc0000', '#e69138', '#f1c232', '#6aa84f', '#45818e', '#3d85c6', '#674ea7', '#a64d79',
+    '#990000', '#b45f06', '#bf9000', '#38761d', '#134f5c', '#0b5394', '#351c75', '#741b47',
+    '#660000', '#783f04', '#7f6000', '#274e13', '#0c343d', '#073763', '#20124d', '#4c1130'
+  ];
+
   const applyStyle = (command: string, value?: string) => {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
@@ -1698,29 +1708,47 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
     if (command === 'fontName') {
       document.execCommand('fontName', false, value);
     } else if (command === 'fontSize') {
-      // execCommand fontSize is 1-7, which is limited. 
-      // Better to wrap in span with style.
-      const range = selection.getRangeAt(0);
-      const span = document.createElement('span');
-      span.style.fontSize = value + 'px';
-      range.surroundContents(span);
+      const selectedText = selection.toString();
+      if (selectedText) {
+        document.execCommand('insertHTML', false, `<span style="font-size: ${value}px">${selectedText}</span>`);
+      }
     } else if (command === 'foreColor') {
       document.execCommand('foreColor', false, value);
     } else if (command === 'bold') {
       document.execCommand('bold', false);
     } else if (command === 'fontWeight') {
-      const range = selection.getRangeAt(0);
-      const span = document.createElement('span');
-      span.style.fontWeight = value || 'normal';
-      range.surroundContents(span);
+      const selectedText = selection.toString();
+      if (selectedText) {
+        document.execCommand('insertHTML', false, `<span style="font-weight: ${value || 'normal'}">${selectedText}</span>`);
+      }
     }
     
     // Update state from contentEditable
-    const editor = document.getElementById('rich-text-editor');
-    if (editor) {
-      setNewResource(prev => ({ ...prev, textContent: editor.innerHTML }));
+    if (editorRef.current) {
+      const html = editorRef.current.innerHTML;
+      setNewResource(prev => ({ ...prev, textContent: html }));
     }
   };
+
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleFileUpload(file as any);
+        }
+      }
+    }
+  };
+
+  // Sync editor content when editing starts
+  useEffect(() => {
+    if (activeTab === 'resources' && editorRef.current) {
+      editorRef.current.innerHTML = newResource.textContent;
+    }
+  }, [activeTab, editingResource]);
 
   const handleEditPost = async (postId: string) => {
     const path = 'community';
@@ -2141,13 +2169,91 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase tracking-widest opacity-50">Text Content (Optional for Text type)</label>
-                  <textarea 
-                    value={newResource.textContent}
-                    onChange={(e) => setNewResource(prev => ({ ...prev, textContent: e.target.value }))}
-                    className="w-full p-3 bg-ink/5 border border-ink/10 rounded-xl text-sm min-h-[100px]"
-                    placeholder="Attach text content here..."
-                  />
+                  <label className="text-[10px] uppercase tracking-widest opacity-50">Text Content (Rich Editor)</label>
+                  <div className="bg-white border border-ink/10 rounded-2xl overflow-hidden">
+                    <div className="flex flex-wrap gap-1 p-2 bg-ink/5 border-b border-ink/10">
+                      <select 
+                        onChange={(e) => applyStyle('fontName', e.target.value)}
+                        className="p-1 text-[10px] bg-white border border-ink/10 rounded"
+                      >
+                        <option value="">Font</option>
+                        <option value="serif">Serif</option>
+                        <option value="sans-serif">Sans Serif</option>
+                        <option value="monospace">Monospace</option>
+                        <option value="Batang">Batang</option>
+                        <option value="SimHei">SimHei</option>
+                        <option value="SimSun">SimSun</option>
+                      </select>
+                      <select 
+                        onChange={(e) => applyStyle('fontSize', e.target.value)}
+                        className="p-1 text-[10px] bg-white border border-ink/10 rounded"
+                      >
+                        <option value="">Size</option>
+                        {[10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72, 96].map(s => (
+                          <option key={s} value={s}>{s}px</option>
+                        ))}
+                      </select>
+                      <div className="relative group">
+                        <button 
+                          type="button"
+                          className="p-1 text-[10px] bg-white border border-ink/10 rounded hover:bg-gold/10 flex items-center gap-1"
+                        >
+                          <div className="w-3 h-3 rounded-full border border-ink/10" style={{ backgroundColor: newResource.color || '#000000' }} />
+                          Color
+                        </button>
+                        <div className="absolute top-full left-0 mt-1 p-2 bg-white border border-ink/10 rounded-xl shadow-2xl z-50 hidden group-hover:grid grid-cols-8 gap-1 w-48">
+                          {COLOR_PALETTE.map(color => (
+                            <button
+                              key={color}
+                              type="button"
+                              onClick={() => applyStyle('foreColor', color)}
+                              className="w-4 h-4 rounded-sm border border-ink/5 hover:scale-110 transition-transform"
+                              style={{ backgroundColor: color }}
+                              title={color}
+                            />
+                          ))}
+                          <input 
+                            type="color" 
+                            onChange={(e) => applyStyle('foreColor', e.target.value)}
+                            className="col-span-8 w-full h-4 p-0 border-none bg-transparent cursor-pointer mt-1"
+                          />
+                        </div>
+                      </div>
+                      <button 
+                        type="button"
+                        onClick={() => applyStyle('bold')}
+                        className="px-2 py-1 text-[10px] font-bold bg-white border border-ink/10 rounded hover:bg-gold/10"
+                      >
+                        B
+                      </button>
+                      <select 
+                        onChange={(e) => applyStyle('fontWeight', e.target.value)}
+                        className="p-1 text-[10px] bg-white border border-ink/10 rounded"
+                      >
+                        <option value="">Weight</option>
+                        <option value="100">100</option>
+                        <option value="200">200</option>
+                        <option value="300">300</option>
+                        <option value="400">400</option>
+                        <option value="500">500</option>
+                        <option value="600">600</option>
+                        <option value="700">700</option>
+                        <option value="800">800</option>
+                        <option value="900">900</option>
+                      </select>
+                    </div>
+                    <div 
+                      ref={editorRef}
+                      contentEditable
+                      suppressContentEditableWarning
+                      onInput={(e) => {
+                        const html = e.currentTarget.innerHTML;
+                        setNewResource(prev => ({ ...prev, textContent: html }));
+                      }}
+                      onPaste={handlePaste}
+                      className="w-full p-4 text-sm min-h-[200px] focus:outline-none bg-white"
+                    />
+                  </div>
                 </div>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
@@ -2866,6 +2972,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [isDragging, setIsDragging] = useState(false);
+  const editorRef = useRef<HTMLDivElement>(null);
   const [newResource, setNewResource] = useState({
     title: '',
     description: '',
@@ -2886,6 +2993,17 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
 
   const [isFullScreen, setIsFullScreen] = useState(false);
 
+  const COLOR_PALETTE = [
+    '#000000', '#444444', '#666666', '#999999', '#cccccc', '#eeeeee', '#f3f3f3', '#ffffff',
+    '#ff0000', '#ff9900', '#ffff00', '#00ff00', '#00ffff', '#0000ff', '#9900ff', '#ff00ff',
+    '#f4cccc', '#fce5cd', '#fff2cc', '#d9ead3', '#d0e0e3', '#cfe2f3', '#d9d2e9', '#ead1dc',
+    '#ea9999', '#f9cb9c', '#ffe599', '#b6d7a8', '#a2c4c9', '#9fc5e8', '#b4a7d6', '#d5a6bd',
+    '#e06666', '#f6b26b', '#ffd966', '#93c47d', '#76a5af', '#6fa8dc', '#8e7cc3', '#c27ba0',
+    '#cc0000', '#e69138', '#f1c232', '#6aa84f', '#45818e', '#3d85c6', '#674ea7', '#a64d79',
+    '#990000', '#b45f06', '#bf9000', '#38761d', '#134f5c', '#0b5394', '#351c75', '#741b47',
+    '#660000', '#783f04', '#7f6000', '#274e13', '#0c343d', '#073763', '#20124d', '#4c1130'
+  ];
+
   const applyStyle = (command: string, value?: string) => {
     const selection = window.getSelection();
     if (!selection || selection.rangeCount === 0) return;
@@ -2893,27 +3011,48 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     if (command === 'fontName') {
       document.execCommand('fontName', false, value);
     } else if (command === 'fontSize') {
-      const range = selection.getRangeAt(0);
-      const span = document.createElement('span');
-      span.style.fontSize = value + 'px';
-      range.surroundContents(span);
+      // Use insertHTML for more robust font size wrapping
+      const selectedText = selection.toString();
+      if (selectedText) {
+        document.execCommand('insertHTML', false, `<span style="font-size: ${value}px">${selectedText}</span>`);
+      }
     } else if (command === 'foreColor') {
       document.execCommand('foreColor', false, value);
     } else if (command === 'bold') {
       document.execCommand('bold', false);
     } else if (command === 'fontWeight') {
-      const range = selection.getRangeAt(0);
-      const span = document.createElement('span');
-      span.style.fontWeight = value || 'normal';
-      range.surroundContents(span);
+      const selectedText = selection.toString();
+      if (selectedText) {
+        document.execCommand('insertHTML', false, `<span style="font-weight: ${value || 'normal'}">${selectedText}</span>`);
+      }
     }
     
     // Update state from contentEditable
-    const editor = document.getElementById('rich-text-editor');
-    if (editor) {
-      setNewResource(prev => ({ ...prev, textContent: editor.innerHTML }));
+    if (editorRef.current) {
+      const html = editorRef.current.innerHTML;
+      setNewResource(prev => ({ ...prev, textContent: html }));
     }
   };
+
+  const handlePaste = async (e: React.ClipboardEvent) => {
+    const items = e.clipboardData.items;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].type.indexOf('image') !== -1) {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          handleFileUpload(file as any);
+        }
+      }
+    }
+  };
+
+  // Sync editor content when editing starts
+  useEffect(() => {
+    if (isManaging && editorRef.current) {
+      editorRef.current.innerHTML = newResource.textContent;
+    }
+  }, [isManaging, editingResource]);
 
   useEffect(() => {
     if (initialFilter) {
@@ -3077,17 +3216,35 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement> | React.DragEvent) => {
+  const handleFileUpload = async (input: React.ChangeEvent<HTMLInputElement> | React.DragEvent | File) => {
     let file: File | null = null;
-    if ('files' in e.target && (e.target as HTMLInputElement).files) {
-      file = (e.target as HTMLInputElement).files![0];
-    } else if ('dataTransfer' in e) {
+    if (input instanceof File) {
+      file = input;
+    } else if ('dataTransfer' in (input as any)) {
+      const e = input as React.DragEvent;
       e.preventDefault();
       setIsDragging(false);
-      file = (e as React.DragEvent).dataTransfer.files[0];
+      file = e.dataTransfer.files[0];
+    } else if ('target' in (input as any)) {
+      const e = input as React.ChangeEvent<HTMLInputElement>;
+      if (e.target.files) {
+        file = e.target.files[0];
+      }
     }
 
     if (!file) return;
+
+    if (!auth.currentUser) {
+      alert(language === 'ko' ? '로그인이 필요합니다.' : 'Login required.');
+      return;
+    }
+
+    // Validation
+    const maxSize = 100 * 1024 * 1024; // 100MB limit
+    if (file.size > maxSize) {
+      alert(language === 'ko' ? '파일 크기가 너무 큽니다 (최대 100MB).' : 'File is too large (max 100MB).');
+      return;
+    }
 
     setUploading(true);
     setUploadProgress(0);
@@ -3095,67 +3252,62 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     
     try {
       if (!storage) {
-        console.error('Firebase Storage is not initialized!');
-        throw new Error('Storage not initialized');
+        throw new Error('Firebase Storage is not initialized');
       }
 
       const storageRef = ref(storage, `resources/${Date.now()}_${file.name}`);
-      console.log('Storage reference created (Archive):', storageRef.fullPath);
+      console.log('Starting upload (Archive) for:', file.name, 'Size:', file.size, 'Type:', file.type);
       
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      // Use uploadBytes for better compatibility in some environments
+      setUploadProgress(10); // Initial progress
+      const uploadResult = await uploadBytes(storageRef, file);
+      console.log('Archive Upload successful:', uploadResult.metadata.fullPath);
+      setUploadProgress(100);
 
-      uploadTask.on('state_changed', 
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-          console.log(`Upload progress (Archive): ${Math.round(progress)}%`);
-        }, 
-        (error: any) => {
-          console.error('Upload error details (Archive):', error);
-          let message = language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.';
-          if (error.code === 'storage/unauthorized') {
-            message = language === 'ko' ? '업로드 권한이 없습니다. (관리자 권한 확인 필요)' : 'No permission to upload. (Check admin role)';
-          }
-          alert(`${message}\nCode: ${error.code}\nMessage: ${error.message}`);
-          setUploading(false);
-        }, 
-        async () => {
-          try {
-            console.log('Upload completed (Archive). Getting download URL...');
-            const url = await getDownloadURL(storageRef);
-            console.log('Download URL obtained (Archive):', url);
-            
-            const extension = file.name.split('.').pop()?.toLowerCase();
-            let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
-            if (extension === 'mp3') fileType = 'mp3';
-            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
-            if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
-            if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
-            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
-            
-            let textContent = '';
-            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
-              textContent = await file.text();
-            }
-            
-            setNewResource(prev => ({ 
-              ...prev, 
-              fileUrl: url, 
-              fileType,
-              textContent: textContent || prev.textContent 
-            }));
-            alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
-          } catch (err: any) {
-            console.error('Error getting download URL (Archive):', err);
-            alert(`${language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.'} (${err.message})`);
-          } finally {
-            setUploading(false);
-          }
+      try {
+        const url = await getDownloadURL(storageRef);
+        console.log('Archive Download URL obtained:', url);
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
+        if (extension === 'mp3') fileType = 'mp3';
+        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
+        if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
+        if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
+        if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
+        
+        let textContent = '';
+        if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
+          textContent = await file.text();
         }
-      );
+        
+        setNewResource(prev => ({ 
+          ...prev, 
+          fileUrl: url, 
+          fileType,
+          textContent: textContent || prev.textContent 
+        }));
+        
+        // If it's a text file, also update the editor if it's open
+        if (textContent && editorRef.current) {
+          editorRef.current.innerHTML = textContent;
+        }
+
+        alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+      } catch (err: any) {
+        console.error('Error getting download URL (Archive):', err);
+        alert(`${language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.'} (${err.message})`);
+      } finally {
+        setUploading(false);
+      }
     } catch (error: any) {
       console.error('Upload catch error (Archive):', error);
-      alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${error.message})`);
+      let errorMsg = error.message;
+      if (error.code === 'storage/quota-exceeded') {
+        errorMsg = language === 'ko' ? '저장 공간 할당량이 초과되었습니다. 내일 다시 시도해 주세요.' : 'Storage quota exceeded. Please try again tomorrow.';
+      } else if (error.code === 'storage/unauthorized') {
+        errorMsg = language === 'ko' ? '파일 업로드 권한이 없습니다.' : 'Unauthorized to upload file.';
+      }
+      alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${errorMsg})`);
       setUploading(false);
     }
   };
@@ -3585,12 +3737,32 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                               <option key={s} value={s}>{s}px</option>
                             ))}
                           </select>
-                          <input 
-                            type="color" 
-                            onChange={(e) => applyStyle('foreColor', e.target.value)}
-                            className="w-6 h-6 p-0 border-none bg-transparent cursor-pointer"
-                            title="Text Color"
-                          />
+                          <div className="relative group">
+                            <button 
+                              type="button"
+                              className="p-1 text-[10px] bg-white border border-ink/10 rounded hover:bg-gold/10 flex items-center gap-1"
+                            >
+                              <div className="w-3 h-3 rounded-full border border-ink/10" style={{ backgroundColor: newResource.color || '#000000' }} />
+                              Color
+                            </button>
+                            <div className="absolute top-full left-0 mt-1 p-2 bg-white border border-ink/10 rounded-xl shadow-2xl z-50 hidden group-hover:grid grid-cols-8 gap-1 w-48">
+                              {COLOR_PALETTE.map(color => (
+                                <button
+                                  key={color}
+                                  type="button"
+                                  onClick={() => applyStyle('foreColor', color)}
+                                  className="w-4 h-4 rounded-sm border border-ink/5 hover:scale-110 transition-transform"
+                                  style={{ backgroundColor: color }}
+                                  title={color}
+                                />
+                              ))}
+                              <input 
+                                type="color" 
+                                onChange={(e) => applyStyle('foreColor', e.target.value)}
+                                className="col-span-8 w-full h-4 p-0 border-none bg-transparent cursor-pointer mt-1"
+                              />
+                            </div>
+                          </div>
                           <button 
                             type="button"
                             onClick={() => applyStyle('bold')}
@@ -3610,11 +3782,15 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                           </select>
                         </div>
                         <div 
-                          id="rich-text-editor"
+                          ref={editorRef}
                           contentEditable
-                          onInput={(e) => setNewResource(prev => ({ ...prev, textContent: e.currentTarget.innerHTML }))}
+                          suppressContentEditableWarning
+                          onInput={(e) => {
+                            const html = e.currentTarget.innerHTML;
+                            setNewResource(prev => ({ ...prev, textContent: html }));
+                          }}
+                          onPaste={handlePaste}
                           className="w-full p-4 text-sm min-h-[200px] focus:outline-none bg-white"
-                          dangerouslySetInnerHTML={{ __html: newResource.textContent }}
                         />
                       </div>
                     </div>

@@ -3,10 +3,7 @@ service firebase.storage {
   match /b/{bucket}/o {
     match /{allPaths=**} {
       allow read: if true;
-      allow write: if request.auth != null && (
-        request.auth.token.email == "lhbin777@gmail.com" ||
-        firestore.get(/databases/ai-studio-787f972d-47cb-443b-872a-2ce3c399931c/documents/users/$(request.auth.uid)).data.role == "admin"
-      );
+      allow write: if request.auth != null;
     }
   }
 }
