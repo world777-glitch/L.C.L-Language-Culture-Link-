@@ -178,14 +178,21 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
         '비즈니스/전문 분야(IT, 기술 등) 중국어가 필요하다.',
         '기타 (직접 입력)'
       ],
-      classLabel: '5. 희망 수업 과정 (Desired Class)',
+      goalsLabel: '5. 구체적인 학습 목표 (Specific Goals)',
+      goalsPlaceholder: '예: 3개월 내 HSK 5급 취득, 비즈니스 미팅 가능 수준 등',
+      classLabel: '6. 희망 수업 과정 (Desired Course)',
       classOptions: [
-        '[입문/기초] 성조부터 탄탄하게 시작하는 첫걸음',
-        '[HSK 집중] 4~6급 단기 합격 및 고득점 전략',
-        '[실전 회화] 상황별 바로 쓰는 생생한 중국어',
-        '[비즈니스/시사] 전문 분야 통번역 및 심화 토론',
-        '[1:1 맞춤] 개인별 목표에 맞춘 집중 케어'
+        '회화 (Conversation)',
+        'HSK (Chinese Proficiency Test)',
+        '토론 (Discussion)',
+        '비즈니스 (Business)',
+        '문화 (Culture)',
+        '소수 그룹반',
+        '기타 (직접 입력)'
       ],
+      scheduleLabel: '7. 희망 수업 시간대 (Preferred Schedule)',
+      requestsLabel: '8. 기타 요청 사항 (Additional Requests)',
+      requestsPlaceholder: '수업 방식, 교재, 특별히 집중하고 싶은 부분 등',
       submit: '신청 완료 (Confirm)',
       successTitle: '신청 완료!',
       successMessage: '신청이 완료되었습니다. 박사님께서 직접 분석 후 곧 연락드릴 예정입니다.'
@@ -222,14 +229,21 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
         'I need Chinese for business/professional fields (IT, technology, etc.).',
         'Other (Enter directly)'
       ],
-      classLabel: '5. Desired Class',
+      goalsLabel: '5. Specific Learning Goals',
+      goalsPlaceholder: 'e.g., Obtain HSK 5 within 3 months, reach business meeting level, etc.',
+      classLabel: '6. Desired Course',
       classOptions: [
-        '[Intro/Basic] First step starting from tones',
-        '[HSK Intensive] Short-term HSK 4-6 passing & high score strategy',
-        '[Practical Conversation] Vivid Chinese for situational use',
-        '[Business/Current Affairs] Professional translation & in-depth discussion',
-        '[1:1 Custom] Intensive care tailored to individual goals'
+        'Conversation',
+        'HSK (Chinese Proficiency Test)',
+        'Discussion',
+        'Business',
+        'Culture',
+        'Small Group Class',
+        'Other (Enter directly)'
       ],
+      scheduleLabel: '7. Preferred Schedule',
+      requestsLabel: '8. Additional Requests',
+      requestsPlaceholder: 'Teaching style, materials, specific areas to focus on, etc.',
       submit: 'Apply for Diagnosis',
       successTitle: 'Application Complete!',
       successMessage: 'Your application has been submitted. Dr. Lee will contact you soon after analysis.'
@@ -374,11 +388,13 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       ],
       classLabel: '5. 希望参加的课程',
       classOptions: [
-        '[入门/基础] 从声调开始的坚实第一步',
-        '[HSK 强化] HSK 4-6级短期合格及高分策略',
-        '[实战会话] 不同场景下即学即用的生动汉语',
-        '[商务/时事] 专业领域笔译口译及深度讨论',
-        '[1:1 定制] 针对个人目标的集中护理'
+        '会话 (Conversation)',
+        'HSK (Chinese Proficiency Test)',
+        '讨论 (Discussion)',
+        '商务 (Business)',
+        '文化 (Culture)',
+        '小班课 (Small Group)',
+        '其他 (直接输入)'
       ],
       submit: '申请诊断',
       successTitle: '申请完成！',

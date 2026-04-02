@@ -38,13 +38,19 @@ import {
   Edit,
   X,
   ExternalLink,
-  Copy
+  Copy,
+  Minimize2,
+  Maximize2
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { COURSES, calculatePrice, RESOURCE_GROUPS, LEVEL_PRICES } from './constants';
 import { cn } from './lib/utils';
 import { LANGUAGES, TRANSLATIONS, LanguageCode } from './translations';
+import { jsPDF } from 'jspdf';
+import html2canvas from 'html2canvas';
+import { Document, Packer, Paragraph, TextRun } from 'docx';
+import { saveAs } from 'file-saver';
 
 import { auth, loginWithGoogle, logout as firebaseLogout, db, storage, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -1214,7 +1220,13 @@ const BookingView: FC<{ course: any, onComplete: () => void, isEventPeriod: bool
                 {priceResult.isEventDiscount && (
                   <div className="flex justify-between items-center border-b border-ink/10 pb-4 text-gold">
                     <span className="text-sm">Event Discount</span>
-                    <span>-{priceResult.eventDiscountRate}%</span>
+                    <span>-{Math.round(priceResult.eventDiscountRate * 100)}%</span>
+                  </div>
+                )}
+                {priceResult.weeksDiscountRate > 0 && (
+                  <div className="flex justify-between items-center border-b border-ink/10 pb-4 text-green-600">
+                    <span className="text-sm">Duration Discount</span>
+                    <span>-{Math.round(priceResult.weeksDiscountRate * 100)}%</span>
                   </div>
                 )}
                 <div className="flex justify-between items-start border-b border-ink/10 pb-4">
@@ -1295,6 +1307,8 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
   const [editingResource, setEditingResource] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [editingPost, setEditingPost] = useState<any>(null);
+  const [editPostData, setEditPostData] = useState({ title: '', content: '' });
   
   // Resource Form State
   const [newResource, setNewResource] = useState({
@@ -1654,8 +1668,38 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
     }
   };
 
-  const [editingPost, setEditingPost] = useState<any>(null);
-  const [editPostData, setEditPostData] = useState({ title: '', content: '' });
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  const applyStyle = (command: string, value?: string) => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    if (command === 'fontName') {
+      document.execCommand('fontName', false, value);
+    } else if (command === 'fontSize') {
+      // execCommand fontSize is 1-7, which is limited. 
+      // Better to wrap in span with style.
+      const range = selection.getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.fontSize = value + 'px';
+      range.surroundContents(span);
+    } else if (command === 'foreColor') {
+      document.execCommand('foreColor', false, value);
+    } else if (command === 'bold') {
+      document.execCommand('bold', false);
+    } else if (command === 'fontWeight') {
+      const range = selection.getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.fontWeight = value || 'normal';
+      range.surroundContents(span);
+    }
+    
+    // Update state from contentEditable
+    const editor = document.getElementById('rich-text-editor');
+    if (editor) {
+      setNewResource(prev => ({ ...prev, textContent: editor.innerHTML }));
+    }
+  };
 
   const handleEditPost = async (postId: string) => {
     const path = 'community';
@@ -1783,134 +1827,151 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
       </div>
 
       {activeTab === 'reservations' && (
-        <div className="grid grid-cols-1 gap-8">
-          {reservations.map(res => {
-            const student = users.find(u => u.uid === res.studentUid);
+        <div className="space-y-12">
+          {COURSES.map(course => {
+            const courseReservations = reservations.filter(r => r.courseId === course.id);
+            if (courseReservations.length === 0) return null;
             return (
-              <div key={res.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
-                <div className="flex flex-col md:flex-row justify-between gap-6">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full overflow-hidden bg-ink/5">
-                      <img src={student?.photoURL || "https://i.pravatar.cc/100"} alt="Profile" referrerPolicy="no-referrer" />
-                    </div>
-                    <div>
-                      <p className="font-bold">{student?.displayName || student?.email || 'Unknown Student'}</p>
-                      <p className="text-[10px] uppercase tracking-widest opacity-50">{student?.email}</p>
-                    </div>
+              <div key={course.id} className="space-y-6">
+                <div className="flex items-center gap-4 border-b border-ink/10 pb-4">
+                  <div className="w-10 h-10 bg-gold text-ink rounded-xl flex items-center justify-center font-serif font-bold">
+                    {course.id.toUpperCase()}
                   </div>
-                  <div className="flex items-center gap-4">
-                    <select 
-                      value={res.courseId}
-                      onChange={async (e) => {
-                        const path = 'reservations';
-                        try {
-                          await updateDoc(doc(db, path, res.id), { courseId: e.target.value });
-                        } catch (error) {
-                          handleFirestoreError(error, OperationType.UPDATE, path);
-                        }
-                      }}
-                      className="px-4 py-2 border border-ink/10 rounded-xl text-[10px] uppercase tracking-widest bg-paper font-bold"
-                    >
-                      {COURSES.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
-                    </select>
-                    <select 
-                      value={res.level}
-                      onChange={async (e) => {
-                        const path = 'reservations';
-                        try {
-                          await updateDoc(doc(db, path, res.id), { level: e.target.value });
-                        } catch (error) {
-                          handleFirestoreError(error, OperationType.UPDATE, path);
-                        }
-                      }}
-                      className="px-4 py-2 border border-ink/10 rounded-xl text-[10px] uppercase tracking-widest bg-paper font-bold"
-                    >
-                      {['intro', 'beginner', 'intermediate', 'advanced', 'expert'].map(l => <option key={l} value={l}>{l}</option>)}
-                    </select>
-                    <select 
-                      value={res.status}
-                      onChange={(e) => updateStatus(res.id, e.target.value)}
-                      className="px-4 py-2 border border-ink/10 rounded-xl text-xs uppercase tracking-widest bg-paper"
-                    >
-                      <option value="pending">Pending</option>
-                      <option value="confirmed">Confirmed</option>
-                      <option value="completed">Completed</option>
-                    </select>
-                    <button 
-                      onClick={async () => {
-                        if (!confirm(language === 'ko' ? '정말 삭제하시겠습니까?' : 'Are you sure you want to delete this reservation?')) return;
-                        const path = 'reservations';
-                        try {
-                          await deleteDoc(doc(db, path, res.id));
-                        } catch (error) {
-                          handleFirestoreError(error, OperationType.DELETE, path);
-                        }
-                      }}
-                      className="p-2 text-ink/20 hover:text-red-500 transition-colors"
-                    >
-                      <Trash2 size={18} />
-                    </button>
-                    <div className={cn(
-                      "px-3 py-1 text-[10px] uppercase tracking-widest rounded-full font-bold",
-                      res.status === 'confirmed' ? "bg-green-100 text-green-700" : 
-                      res.status === 'completed' ? "bg-blue-100 text-blue-700" : "bg-gold/20 text-gold"
-                    )}>
-                      {res.status}
-                    </div>
-                  </div>
+                  <h3 className="text-2xl font-serif">{course.title}</h3>
+                  <span className="text-[10px] bg-ink/5 px-3 py-1 rounded-full opacity-50">{courseReservations.length} Reservations</span>
                 </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {courseReservations.map(res => {
+                    const student = users.find(u => u.uid === res.studentUid);
+                    return (
+                      <div key={res.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6 hover:shadow-lg transition-all">
+                        <div className="flex justify-between items-start">
+                          <div className="flex items-center gap-4">
+                            <div className="w-12 h-12 rounded-full overflow-hidden bg-ink/5">
+                              <img src={student?.photoURL || "https://i.pravatar.cc/100"} alt="Profile" referrerPolicy="no-referrer" />
+                            </div>
+                            <div>
+                              <p className="font-bold">{student?.displayName || student?.email || 'Unknown Student'}</p>
+                              <p className="text-[10px] uppercase tracking-widest opacity-50">{student?.email}</p>
+                            </div>
+                          </div>
+                          <div className={cn(
+                            "px-3 py-1 text-[8px] uppercase tracking-widest rounded-full font-bold",
+                            res.status === 'confirmed' ? "bg-green-100 text-green-700" : 
+                            res.status === 'completed' ? "bg-blue-100 text-blue-700" : "bg-gold/20 text-gold"
+                          )}>
+                            {res.status}
+                          </div>
+                        </div>
+                        
+                        <div className="flex flex-wrap gap-4 items-center">
+                          <select 
+                            value={res.courseId}
+                            onChange={async (e) => {
+                              const path = 'reservations';
+                              try {
+                                await updateDoc(doc(db, path, res.id), { courseId: e.target.value });
+                              } catch (error) {
+                                handleFirestoreError(error, OperationType.UPDATE, path);
+                              }
+                            }}
+                            className="px-4 py-2 border border-ink/10 rounded-xl text-[10px] uppercase tracking-widest bg-paper font-bold"
+                          >
+                            {COURSES.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+                          </select>
+                          <select 
+                            value={res.level}
+                            onChange={async (e) => {
+                              const path = 'reservations';
+                              try {
+                                await updateDoc(doc(db, path, res.id), { level: e.target.value });
+                              } catch (error) {
+                                handleFirestoreError(error, OperationType.UPDATE, path);
+                              }
+                            }}
+                            className="px-4 py-2 border border-ink/10 rounded-xl text-[10px] uppercase tracking-widest bg-paper font-bold"
+                          >
+                            {['intro', 'beginner', 'intermediate', 'advanced', 'expert'].map(l => <option key={l} value={l}>{l}</option>)}
+                          </select>
+                          <select 
+                            value={res.status}
+                            onChange={(e) => updateStatus(res.id, e.target.value)}
+                            className="px-4 py-2 border border-ink/10 rounded-xl text-xs uppercase tracking-widest bg-paper"
+                          >
+                            <option value="pending">Pending</option>
+                            <option value="confirmed">Confirmed</option>
+                            <option value="completed">Completed</option>
+                          </select>
+                          <button 
+                            onClick={async () => {
+                              if (!confirm(language === 'ko' ? '정말 삭제하시겠습니까?' : 'Are you sure you want to delete this reservation?')) return;
+                              const path = 'reservations';
+                              try {
+                                await deleteDoc(doc(db, path, res.id));
+                              } catch (error) {
+                                handleFirestoreError(error, OperationType.DELETE, path);
+                              }
+                            }}
+                            className="p-2 text-ink/20 hover:text-red-500 transition-colors"
+                          >
+                            <Trash2 size={18} />
+                          </button>
+                        </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-6 py-6 border-y border-ink/5">
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Course</p>
-                    <p className="text-sm font-bold">{COURSES.find(c => c.id === res.courseId)?.title} ({res.level})</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Schedule</p>
-                    <p className="text-sm">{res.durationWeeks}주 / 주 {res.sessionsPerWeek}회 / {res.sessionDuration}시간</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Price</p>
-                    <p className="text-sm font-bold text-gold">₩{res.totalPrice.toLocaleString()}</p>
-                  </div>
-                  <div>
-                    <p className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Preferred Times</p>
-                    <div className="flex flex-wrap gap-1">
-                      {res.preferredSlots?.map((s: string) => (
-                        <span key={s} className="text-[8px] bg-ink/5 px-1.5 py-0.5 rounded-full">{s}</span>
-                      )) || <span className="text-xs opacity-30 italic">None</span>}
-                    </div>
-                  </div>
-                </div>
+                        <div className="grid grid-cols-2 gap-4 py-4 border-t border-ink/5">
+                          <div>
+                            <p className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Schedule</p>
+                            <p className="text-sm">{res.durationWeeks}주 / 주 {res.sessionsPerWeek}회 / {res.sessionDuration}시간</p>
+                          </div>
+                          <div>
+                            <p className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Price</p>
+                            <p className="text-sm font-bold text-gold">₩{res.totalPrice.toLocaleString()}</p>
+                          </div>
+                          <div className="col-span-2">
+                            <p className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Preferred Times</p>
+                            <div className="flex flex-wrap gap-1">
+                              {res.preferredSlots?.map((s: string) => (
+                                <span key={s} className="text-[8px] bg-ink/5 px-1.5 py-0.5 rounded-full">{s}</span>
+                              )) || <span className="text-xs opacity-30 italic">None</span>}
+                            </div>
+                          </div>
+                        </div>
 
-                <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <label className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.feedback}</label>
-                    {feedbacks.find(f => f.reservationId === res.id) && (
-                      <span className="text-[8px] uppercase tracking-widest text-gold font-bold">
-                        {language === 'ko' ? '기존 피드백 있음' : 'Existing Feedback'}
-                      </span>
-                    )}
-                  </div>
-                  <div className="flex gap-4">
-                    <textarea 
-                      value={feedbackText[res.id] !== undefined ? feedbackText[res.id] : (feedbacks.find(f => f.reservationId === res.id)?.content || '')}
-                      onChange={(e) => setFeedbackText(prev => ({ ...prev, [res.id]: e.target.value }))}
-                      placeholder={language === 'ko' ? "수강생에게 전달할 피드백을 입력하세요..." : "Enter feedback for the student..."}
-                      className="flex-grow p-4 border border-ink/10 rounded-2xl text-sm bg-paper/50 focus:border-gold outline-none transition-colors"
-                      rows={2}
-                    />
-                    <button 
-                      onClick={() => submitFeedback(res.id, res.studentUid)}
-                      className="px-6 py-4 bg-ink text-paper rounded-2xl text-[10px] uppercase tracking-widest hover:bg-gold transition-colors self-end"
-                    >
-                      {feedbacks.find(f => f.reservationId === res.id) ? (language === 'ko' ? '수정' : 'Update') : t.community.submit}
-                    </button>
-                  </div>
+                        <div className="space-y-4 pt-4 border-t border-ink/5">
+                          <div className="flex justify-between items-center">
+                            <label className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.feedback}</label>
+                            {feedbacks.find(f => f.reservationId === res.id) && (
+                              <span className="text-[8px] uppercase tracking-widest text-gold font-bold">
+                                {language === 'ko' ? '기존 피드백 있음' : 'Existing Feedback'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex gap-4">
+                            <textarea 
+                              value={feedbackText[res.id] !== undefined ? feedbackText[res.id] : (feedbacks.find(f => f.reservationId === res.id)?.content || '')}
+                              onChange={(e) => setFeedbackText(prev => ({ ...prev, [res.id]: e.target.value }))}
+                              placeholder={language === 'ko' ? "수강생에게 전달할 피드백을 입력하세요..." : "Enter feedback for the student..."}
+                              className="flex-grow p-4 border border-ink/10 rounded-2xl text-sm bg-paper/50 focus:border-gold outline-none transition-colors"
+                              rows={2}
+                            />
+                            <button 
+                              onClick={() => submitFeedback(res.id, res.studentUid)}
+                              className="px-6 py-4 bg-ink text-paper rounded-2xl text-[10px] uppercase tracking-widest hover:bg-gold transition-colors self-end"
+                            >
+                              {feedbacks.find(f => f.reservationId === res.id) ? (language === 'ko' ? '수정' : 'Update') : t.community.submit}
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
             );
           })}
+          {reservations.length === 0 && (
+            <div className="py-20 text-center opacity-30 italic">No reservations found.</div>
+          )}
         </div>
       )}
 
@@ -2308,7 +2369,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
       )}
 
       {activeTab === 'inquiries' && (
-        <div className="grid grid-cols-1 gap-8">
+        <div className="space-y-12">
           {editingInquiry ? (
             <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
               <div className="flex justify-between items-center">
@@ -2385,66 +2446,155 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
               </form>
             </div>
           ) : (
-            inquiries.length === 0 ? (
-              <div className="py-20 text-center opacity-30 italic">No inquiries found.</div>
-            ) : (
-              inquiries.map(inq => (
-                <div key={inq.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
-                  <div className="flex justify-between items-start">
-                    <div className="space-y-1">
-                      <h4 className="text-xl font-bold">{inq.name}</h4>
-                      <p className="text-sm text-gold font-bold">{inq.contact}</p>
-                      <p className="text-[10px] opacity-40 uppercase tracking-widest">
-                        {inq.createdAt?.toDate ? inq.createdAt.toDate().toLocaleString() : 'Just now'}
-                      </p>
+            <div className="space-y-12">
+              {COURSES.concat([{ id: 'custom', title: '1:1 Custom / Other', category: 'Conversation', description: '', levels: [] }]).map(course => {
+                const courseInquiries = inquiries.filter(inq => {
+                  const desired = Array.isArray(inq.desiredClass) ? inq.desiredClass : [inq.desiredClass];
+                  return desired.some((d: string) => d.toLowerCase().includes(course.id.toLowerCase()) || d.toLowerCase().includes(course.title.toLowerCase()));
+                });
+                if (courseInquiries.length === 0) return null;
+                return (
+                  <div key={course.id} className="space-y-6">
+                    <div className="flex items-center gap-4 border-b border-ink/10 pb-4">
+                      <h3 className="text-2xl font-serif">{course.title}</h3>
+                      <span className="text-[10px] bg-ink/5 px-3 py-1 rounded-full opacity-50">{courseInquiries.length} Inquiries</span>
                     </div>
-                    <div className="flex gap-2">
-                      <div className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold uppercase tracking-widest">
-                        {inq.desiredWeeks}{t.pricing.weeks} / {inq.desiredHours || 1}{language === 'ko' ? '시간' : 'h'}
-                      </div>
-                      <div className="px-3 py-1 bg-ink/5 text-ink/40 rounded-full text-[10px] font-bold uppercase tracking-widest">
-                        ₩{inq.priceInfo?.discountedPrice?.toLocaleString()}
-                      </div>
-                      <button 
-                        onClick={() => handleEditInquiry(inq)}
-                        className="p-2 text-ink/20 hover:text-gold transition-colors"
-                      >
-                        <Edit size={18} />
-                      </button>
-                      <button 
-                        onClick={() => handleDeleteInquiry(inq.id)}
-                        className="p-2 text-ink/20 hover:text-red-500 transition-colors"
-                      >
-                        <Trash2 size={18} />
-                      </button>
+                    <div className="grid grid-cols-1 gap-6">
+                      {courseInquiries.map(inq => (
+                        <div key={inq.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                              <h4 className="text-xl font-bold">{inq.name}</h4>
+                              <p className="text-sm text-gold font-bold">{inq.contact}</p>
+                              <p className="text-[10px] opacity-40 uppercase tracking-widest">
+                                {inq.createdAt?.toDate ? inq.createdAt.toDate().toLocaleString() : 'Just now'}
+                              </p>
+                            </div>
+                            <div className="flex gap-2">
+                              <div className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold uppercase tracking-widest">
+                                {inq.desiredWeeks}{t.pricing.weeks} / {inq.desiredHours || 1}{language === 'ko' ? '시간' : 'h'}
+                              </div>
+                              <div className="px-3 py-1 bg-ink/5 text-ink/40 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                                ₩{inq.priceInfo?.discountedPrice?.toLocaleString()}
+                              </div>
+                              <button 
+                                onClick={() => handleEditInquiry(inq)}
+                                className="p-2 text-ink/20 hover:text-gold transition-colors"
+                              >
+                                <Edit size={18} />
+                              </button>
+                              <button 
+                                onClick={() => handleDeleteInquiry(inq.id)}
+                                className="p-2 text-ink/20 hover:text-red-500 transition-colors"
+                              >
+                                <Trash2 size={18} />
+                              </button>
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t border-ink/5">
+                            <div className="space-y-2">
+                              <p className="text-[10px] uppercase tracking-widest opacity-50">Learning History</p>
+                              <p className="text-sm leading-relaxed whitespace-pre-wrap">{inq.history}</p>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-[10px] uppercase tracking-widest opacity-50">Level & Concerns</p>
+                              <div className="flex flex-wrap gap-2">
+                                {Array.isArray(inq.levelConcerns) ? inq.levelConcerns.map((item: string, idx: number) => (
+                                  <span key={idx} className="px-3 py-1 bg-ink/5 rounded-full text-[10px]">{item}</span>
+                                )) : <span className="px-3 py-1 bg-ink/5 rounded-full text-[10px]">{inq.concerns}</span>}
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <p className="text-[10px] uppercase tracking-widest opacity-50">Desired Class</p>
+                              <div className="flex flex-wrap gap-2">
+                                {Array.isArray(inq.desiredClass) ? inq.desiredClass.map((item: string, idx: number) => (
+                                  <span key={idx} className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold">{item}</span>
+                                )) : <span className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold">{inq.desiredClass}</span>}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
+                );
+              })}
+              {inquiries.filter(inq => {
+                const desired = Array.isArray(inq.desiredClass) ? inq.desiredClass : [inq.desiredClass];
+                return !desired.some((d: string) => COURSES.some(c => d.toLowerCase().includes(c.id.toLowerCase()) || d.toLowerCase().includes(c.title.toLowerCase())) || d.toLowerCase().includes('custom'));
+              }).length > 0 && (
+                <div className="space-y-6">
+                  <div className="flex items-center gap-4 border-b border-ink/10 pb-4">
+                    <h3 className="text-2xl font-serif">Uncategorized Inquiries</h3>
+                  </div>
+                  <div className="grid grid-cols-1 gap-6">
+                    {inquiries.filter(inq => {
+                      const desired = Array.isArray(inq.desiredClass) ? inq.desiredClass : [inq.desiredClass];
+                      return !desired.some((d: string) => COURSES.some(c => d.toLowerCase().includes(c.id.toLowerCase()) || d.toLowerCase().includes(c.title.toLowerCase())) || d.toLowerCase().includes('custom'));
+                    }).map(inq => (
+                      <div key={inq.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
+                        <div className="flex justify-between items-start">
+                          <div className="space-y-1">
+                            <h4 className="text-xl font-bold">{inq.name}</h4>
+                            <p className="text-sm text-gold font-bold">{inq.contact}</p>
+                            <p className="text-[10px] opacity-40 uppercase tracking-widest">
+                              {inq.createdAt?.toDate ? inq.createdAt.toDate().toLocaleString() : 'Just now'}
+                            </p>
+                          </div>
+                          <div className="flex gap-2">
+                            <div className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold uppercase tracking-widest">
+                              {inq.desiredWeeks}{t.pricing.weeks} / {inq.desiredHours || 1}{language === 'ko' ? '시간' : 'h'}
+                            </div>
+                            <div className="px-3 py-1 bg-ink/5 text-ink/40 rounded-full text-[10px] font-bold uppercase tracking-widest">
+                              ₩{inq.priceInfo?.discountedPrice?.toLocaleString()}
+                            </div>
+                            <button 
+                              onClick={() => handleEditInquiry(inq)}
+                              className="p-2 text-ink/20 hover:text-gold transition-colors"
+                            >
+                              <Edit size={18} />
+                            </button>
+                            <button 
+                              onClick={() => handleDeleteInquiry(inq.id)}
+                              className="p-2 text-ink/20 hover:text-red-500 transition-colors"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t border-ink/5">
-                    <div className="space-y-2">
-                      <p className="text-[10px] uppercase tracking-widest opacity-50">Learning History</p>
-                      <p className="text-sm leading-relaxed whitespace-pre-wrap">{inq.history}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-[10px] uppercase tracking-widest opacity-50">Level & Concerns</p>
-                      <div className="flex flex-wrap gap-2">
-                        {Array.isArray(inq.levelConcerns) ? inq.levelConcerns.map((item: string, idx: number) => (
-                          <span key={idx} className="px-3 py-1 bg-ink/5 rounded-full text-[10px]">{item}</span>
-                        )) : <span className="px-3 py-1 bg-ink/5 rounded-full text-[10px]">{inq.concerns}</span>}
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t border-ink/5">
+                          <div className="space-y-2">
+                            <p className="text-[10px] uppercase tracking-widest opacity-50">Learning History</p>
+                            <p className="text-sm leading-relaxed whitespace-pre-wrap">{inq.history}</p>
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-[10px] uppercase tracking-widest opacity-50">Level & Concerns</p>
+                            <div className="flex flex-wrap gap-2">
+                              {Array.isArray(inq.levelConcerns) ? inq.levelConcerns.map((item: string, idx: number) => (
+                                <span key={idx} className="px-3 py-1 bg-ink/5 rounded-full text-[10px]">{item}</span>
+                              )) : <span className="px-3 py-1 bg-ink/5 rounded-full text-[10px]">{inq.concerns}</span>}
+                            </div>
+                          </div>
+                          <div className="space-y-2">
+                            <p className="text-[10px] uppercase tracking-widest opacity-50">Desired Class</p>
+                            <div className="flex flex-wrap gap-2">
+                              {Array.isArray(inq.desiredClass) ? inq.desiredClass.map((item: string, idx: number) => (
+                                <span key={idx} className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold">{item}</span>
+                              )) : <span className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold">{inq.desiredClass}</span>}
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-[10px] uppercase tracking-widest opacity-50">Desired Class</p>
-                      <div className="flex flex-wrap gap-2">
-                        {Array.isArray(inq.desiredClass) ? inq.desiredClass.map((item: string, idx: number) => (
-                          <span key={idx} className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold">{item}</span>
-                        )) : <span className="px-3 py-1 bg-gold/10 text-gold rounded-full text-[10px] font-bold">{inq.desiredClass}</span>}
-                      </div>
-                    </div>
+                    ))}
                   </div>
                 </div>
-              ))
-            )
+              )}
+              {inquiries.length === 0 && (
+                <div className="py-20 text-center opacity-30 italic">No inquiries found.</div>
+              )}
+            </div>
           )}
         </div>
       )}
@@ -2682,6 +2832,37 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     color: '#F27D26'
   });
 
+  const [isFullScreen, setIsFullScreen] = useState(false);
+
+  const applyStyle = (command: string, value?: string) => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    if (command === 'fontName') {
+      document.execCommand('fontName', false, value);
+    } else if (command === 'fontSize') {
+      const range = selection.getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.fontSize = value + 'px';
+      range.surroundContents(span);
+    } else if (command === 'foreColor') {
+      document.execCommand('foreColor', false, value);
+    } else if (command === 'bold') {
+      document.execCommand('bold', false);
+    } else if (command === 'fontWeight') {
+      const range = selection.getRangeAt(0);
+      const span = document.createElement('span');
+      span.style.fontWeight = value || 'normal';
+      range.surroundContents(span);
+    }
+    
+    // Update state from contentEditable
+    const editor = document.getElementById('rich-text-editor');
+    if (editor) {
+      setNewResource(prev => ({ ...prev, textContent: editor.innerHTML }));
+    }
+  };
+
   useEffect(() => {
     if (initialFilter) {
       setSelectedGroup(initialFilter.groupId);
@@ -2707,6 +2888,59 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     const matchesSearch = !searchQuery || res.title.toLowerCase().includes(searchQuery.toLowerCase()) || res.description.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesGroup && matchesCategory && matchesSearch;
   });
+
+  const handleDownloadFormat = async (resource: any, format: 'pdf' | 'docx' | 'png' | 'txt') => {
+    if (!auth.currentUser) {
+      alert(language === 'ko' ? '로그인이 필요한 서비스입니다.' : 'Login is required.');
+      loginWithGoogle().catch(console.error);
+      return;
+    }
+
+    const title = resource.title.replace(/\s+/g, '_');
+    const content = resource.textContent || resource.description;
+
+    try {
+      if (format === 'txt') {
+        const blob = new Blob([content], { type: 'text/plain' });
+        saveAs(blob, `${title}.txt`);
+      } else if (format === 'pdf') {
+        const doc = new jsPDF();
+        const splitText = doc.splitTextToSize(content, 180);
+        doc.text(splitText, 10, 10);
+        doc.save(`${title}.pdf`);
+      } else if (format === 'docx') {
+        const doc = new Document({
+          sections: [{
+            properties: {},
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun(content),
+                ],
+              }),
+            ],
+          }],
+        });
+        const blob = await Packer.toBlob(doc);
+        saveAs(blob, `${title}.docx`);
+      } else if (format === 'png') {
+        const element = document.getElementById('resource-text-preview');
+        if (element) {
+          const canvas = await html2canvas(element);
+          canvas.toBlob((blob) => {
+            if (blob) saveAs(blob, `${title}.png`);
+          });
+        }
+      }
+
+      await updateDoc(doc(db, 'resources', resource.id), {
+        downloadCount: (resource.downloadCount || 0) + 1
+      });
+    } catch (error) {
+      console.error('Download error:', error);
+      alert('Download failed.');
+    }
+  };
 
   const handleDownload = async (resource: any) => {
     if (!auth.currentUser) {
@@ -2778,7 +3012,11 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
         accessLevel: 'member',
         author: '',
         tags: '',
-        color: '#F27D26'
+        color: '#F27D26',
+        fontFamily: 'serif',
+        fontSize: 16,
+        fontColor: '#000000',
+        fontWeight: '400'
       });
       setIsManaging(false);
       alert(language === 'ko' ? '처리가 완료되었습니다.' : 'Operation completed.');
@@ -3259,13 +3497,62 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] uppercase tracking-widest opacity-50">Text Content (Optional for Text type)</label>
-                      <textarea 
-                        value={newResource.textContent}
-                        onChange={(e) => setNewResource(prev => ({ ...prev, textContent: e.target.value }))}
-                        className="w-full p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm min-h-[150px] focus:outline-none focus:border-gold transition-all"
-                        placeholder="Attach text content here..."
-                      />
+                      <label className="text-[10px] uppercase tracking-widest opacity-50">Text Content (Rich Editor)</label>
+                      <div className="bg-white border border-ink/10 rounded-2xl overflow-hidden">
+                        <div className="flex flex-wrap gap-1 p-2 bg-ink/5 border-b border-ink/10">
+                          <select 
+                            onChange={(e) => applyStyle('fontName', e.target.value)}
+                            className="p-1 text-[10px] bg-white border border-ink/10 rounded"
+                          >
+                            <option value="">Font</option>
+                            <option value="serif">Serif</option>
+                            <option value="sans-serif">Sans Serif</option>
+                            <option value="monospace">Monospace</option>
+                            <option value="Batang">Batang</option>
+                            <option value="SimHei">SimHei</option>
+                            <option value="SimSun">SimSun</option>
+                          </select>
+                          <select 
+                            onChange={(e) => applyStyle('fontSize', e.target.value)}
+                            className="p-1 text-[10px] bg-white border border-ink/10 rounded"
+                          >
+                            <option value="">Size</option>
+                            {[10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 48, 64, 72, 96].map(s => (
+                              <option key={s} value={s}>{s}px</option>
+                            ))}
+                          </select>
+                          <input 
+                            type="color" 
+                            onChange={(e) => applyStyle('foreColor', e.target.value)}
+                            className="w-6 h-6 p-0 border-none bg-transparent cursor-pointer"
+                            title="Text Color"
+                          />
+                          <button 
+                            type="button"
+                            onClick={() => applyStyle('bold')}
+                            className="px-2 py-1 text-[10px] font-bold bg-white border border-ink/10 rounded hover:bg-gold/10"
+                          >
+                            B
+                          </button>
+                          <select 
+                            onChange={(e) => applyStyle('fontWeight', e.target.value)}
+                            className="p-1 text-[10px] bg-white border border-ink/10 rounded"
+                          >
+                            <option value="">Weight</option>
+                            <option value="100">100</option>
+                            <option value="400">400</option>
+                            <option value="700">700</option>
+                            <option value="900">900</option>
+                          </select>
+                        </div>
+                        <div 
+                          id="rich-text-editor"
+                          contentEditable
+                          onInput={(e) => setNewResource(prev => ({ ...prev, textContent: e.currentTarget.innerHTML }))}
+                          className="w-full p-4 text-sm min-h-[200px] focus:outline-none bg-white"
+                          dangerouslySetInnerHTML={{ __html: newResource.textContent }}
+                        />
+                      </div>
                     </div>
                     <div className="space-y-2">
                       <label className="text-[10px] uppercase tracking-widest opacity-50">File URL / Upload</label>
@@ -3327,11 +3614,30 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
           >
             <motion.div 
               initial={{ scale: 0.9, opacity: 0, y: 20 }}
-              animate={{ scale: 1, opacity: 1, y: 0 }}
+              animate={{ 
+                scale: 1, 
+                opacity: 1, 
+                y: 0,
+                width: isFullScreen ? '100vw' : '100%',
+                maxWidth: isFullScreen ? '100vw' : '56rem',
+                height: isFullScreen ? '100vh' : 'auto',
+                maxHeight: isFullScreen ? '100vh' : '90vh',
+                borderRadius: isFullScreen ? '0px' : '40px'
+              }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-paper w-full max-w-4xl max-h-[90vh] rounded-[40px] shadow-2xl overflow-hidden flex flex-col md:flex-row"
+              className="bg-paper shadow-2xl overflow-hidden flex flex-col md:flex-row relative"
               onClick={e => e.stopPropagation()}
             >
+              {/* Full Screen Toggle */}
+              <div className="absolute top-6 right-20 z-10 flex gap-2">
+                <button 
+                  onClick={() => setIsFullScreen(!isFullScreen)}
+                  className="p-3 bg-white/80 backdrop-blur-sm border border-ink/10 rounded-full hover:border-gold transition-all shadow-sm"
+                  title={isFullScreen ? "Minimize" : "Maximize"}
+                >
+                  {isFullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
+                </button>
+              </div>
               {/* Left: Preview/Info */}
               <div className="flex-grow p-8 md:p-12 space-y-8 overflow-y-auto">
                 <div className="flex justify-between items-start">
@@ -3401,9 +3707,17 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                         <Copy size={12} />
                       </button>
                     </div>
-                    <div className="text-sm font-serif whitespace-pre-wrap leading-relaxed max-h-[400px] overflow-y-auto custom-scrollbar pr-2">
-                      {selectedResource.textContent}
-                    </div>
+                    <div 
+                      id="resource-text-preview"
+                      className="text-sm whitespace-pre-wrap leading-relaxed max-h-[400px] overflow-y-auto custom-scrollbar pr-2 p-4 bg-white rounded-xl"
+                      style={{ 
+                        fontFamily: selectedResource.fontFamily || 'serif', 
+                        fontSize: `${selectedResource.fontSize || 16}px`, 
+                        color: selectedResource.fontColor || '#000000',
+                        fontWeight: selectedResource.fontWeight || 'normal'
+                      }}
+                      dangerouslySetInnerHTML={{ __html: selectedResource.textContent }}
+                    />
                   </div>
                 )}
 
@@ -3427,12 +3741,36 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                 </div>
 
                 <div className="flex flex-wrap gap-4 pt-4">
-                  <button 
-                    onClick={() => handleDownload(selectedResource)}
-                    className="flex-grow md:flex-none px-10 py-4 bg-ink text-paper rounded-full text-xs uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all flex items-center justify-center gap-3 shadow-lg hover:shadow-gold/20"
-                  >
-                    <Download size={16} /> {t.archive.download}
-                  </button>
+                  <div className="w-full flex flex-wrap gap-2">
+                    <button 
+                      onClick={() => handleDownload(selectedResource)}
+                      className="flex-grow md:flex-none px-6 py-4 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all flex items-center justify-center gap-2 shadow-lg"
+                    >
+                      <Download size={14} /> {t.archive.download}
+                    </button>
+                    {selectedResource.textContent && (
+                      <>
+                        <button 
+                          onClick={() => handleDownloadFormat(selectedResource, 'pdf')}
+                          className="px-4 py-4 border border-ink/10 rounded-full text-[10px] uppercase tracking-widest font-bold hover:border-gold hover:text-gold transition-all"
+                        >
+                          PDF
+                        </button>
+                        <button 
+                          onClick={() => handleDownloadFormat(selectedResource, 'docx')}
+                          className="px-4 py-4 border border-ink/10 rounded-full text-[10px] uppercase tracking-widest font-bold hover:border-gold hover:text-gold transition-all"
+                        >
+                          Word / WPS
+                        </button>
+                        <button 
+                          onClick={() => handleDownloadFormat(selectedResource, 'png')}
+                          className="px-4 py-4 border border-ink/10 rounded-full text-[10px] uppercase tracking-widest font-bold hover:border-gold hover:text-gold transition-all"
+                        >
+                          PNG / Image
+                        </button>
+                      </>
+                    )}
+                  </div>
                   {selectedResource.fileUrl && (selectedResource.fileType === 'pdf' || selectedResource.fileType === 'ppt' || selectedResource.fileType === 'word') && (
                     <button 
                       onClick={() => {
@@ -3923,24 +4261,41 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
     history: '',
     levelConcerns: [] as string[],
     otherLevelConcern: '',
+    goals: '',
     desiredClass: [] as string[],
     otherDesiredClass: '',
+    desiredLevel: '입문',
     desiredWeeks: 12,
-    desiredHours: 1
+    desiredHours: 1,
+    preferredSlots: [] as string[],
+    requests: ''
   });
 
   const priceResult = useMemo(() => {
     const customRate = siteContent['event-discount']?.discountRate;
-    return calculatePrice('입문', formData.desiredWeeks, 1, formData.desiredHours, isEventPeriod, customRate, weeksDiscounts, levelPrices);
-  }, [formData.desiredWeeks, formData.desiredHours, isEventPeriod, siteContent, weeksDiscounts, levelPrices]);
+    return calculatePrice(formData.desiredLevel, formData.desiredWeeks, 1, formData.desiredHours, isEventPeriod, customRate, weeksDiscounts, levelPrices);
+  }, [formData.desiredLevel, formData.desiredWeeks, formData.desiredHours, isEventPeriod, siteContent, weeksDiscounts, levelPrices]);
 
-  const toggleSelection = (field: 'levelConcerns' | 'desiredClass', value: string) => {
-    setFormData(prev => ({
-      ...prev,
-      [field]: prev[field].includes(value) 
-        ? prev[field].filter(v => v !== value)
-        : [...prev[field], value]
-    }));
+  const toggleSelection = (field: 'levelConcerns' | 'desiredClass' | 'preferredSlots', value: string) => {
+    setFormData(prev => {
+      const current = prev[field] as string[];
+      if (field === 'desiredClass') {
+        if (current.includes(value)) {
+          return { ...prev, [field]: current.filter(v => v !== value) };
+        }
+        if (current.length >= 2) {
+          alert(language === 'ko' ? '최대 2개까지 선택 가능합니다.' : 'You can select up to 2 options.');
+          return prev;
+        }
+        return { ...prev, [field]: [...current, value] };
+      }
+      return {
+        ...prev,
+        [field]: current.includes(value) 
+          ? current.filter(v => v !== value)
+          : [...current, value]
+      };
+    });
   };
 
   const handleSubmit = async (e: FormEvent) => {
@@ -3959,18 +4314,24 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
       }
 
       const finalDesiredClass = [...formData.desiredClass];
-      if (formData.otherDesiredClass) {
+      if (formData.otherDesiredClass && formData.desiredClass.includes('소수 그룹반')) {
         finalDesiredClass.push(`Other: ${formData.otherDesiredClass}`);
       }
+      const finalDesiredLevel = formData.desiredLevel;
 
       await addDoc(collection(db, 'inquiries'), {
         name: formData.name,
         contact: formData.contact,
         history: formData.history,
         levelConcerns: finalLevelConcerns,
+        goals: formData.goals,
         desiredClass: finalDesiredClass,
+        otherDesiredClass: formData.otherDesiredClass,
+        desiredLevel: finalDesiredLevel,
         desiredWeeks: formData.desiredWeeks,
         desiredHours: formData.desiredHours,
+        preferredSlots: formData.preferredSlots,
+        requests: formData.requests,
         priceInfo: priceResult,
         createdAt: serverTimestamp()
       });
@@ -4109,6 +4470,20 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
           </div>
         </div>
 
+        {/* 5. Goals */}
+        <div className="space-y-4">
+          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">5</span>
+            <EditableText contentKey="inquiry.goalsLabel" defaultValue={t.inquiry.goalsLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </label>
+          <textarea 
+            placeholder={t.inquiry.goalsPlaceholder}
+            value={formData.goals || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, goals: e.target.value }))}
+            className="w-full p-6 bg-ink/5 border border-ink/10 rounded-3xl focus:border-gold outline-none transition-colors text-lg min-h-[100px]"
+          />
+        </div>
+
         {/* 5. Desired Duration & Hours */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
           <div className="space-y-6">
@@ -4179,14 +4554,14 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
             {priceResult.weeksDiscountRate > 0 && (
               <div className="flex justify-between items-center text-green-600">
                 <span className="text-sm">{formData.desiredWeeks}{t.pricing.weeks} {language === 'ko' ? '장기 할인' : 'Duration Discount'}</span>
-                <span>-{priceResult.weeksDiscountRate}%</span>
+                <span>-{Math.round(priceResult.weeksDiscountRate * 100)}%</span>
               </div>
             )}
 
             {priceResult.isEventDiscount && (
               <div className="flex justify-between items-center text-gold">
                 <span className="text-sm">{language === 'ko' ? '이벤트 추가 할인' : 'Event Extra Discount'}</span>
-                <span>-{priceResult.eventDiscountRate}%</span>
+                <span>-{Math.round(priceResult.eventDiscountRate * 100)}%</span>
               </div>
             )}
 
@@ -4202,13 +4577,13 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
           </div>
         </div>
 
-        {/* 6. Desired Class */}
+        {/* 6. Desired Course */}
         <div className="space-y-6">
           <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">6</span>
             <EditableText contentKey="inquiry.classLabel" defaultValue={t.inquiry.classLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </label>
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {t.inquiry.classOptions.map((option: string) => (
               <div key={option} className="space-y-3">
                 <button
@@ -4217,7 +4592,7 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
                   className={cn(
                     "w-full p-5 rounded-2xl border text-left transition-all flex items-center justify-between group",
                     formData.desiredClass.includes(option) 
-                      ? "bg-ink text-paper border-ink font-bold" 
+                      ? "bg-gold/10 border-gold text-gold font-bold" 
                       : "bg-paper border-ink/10 hover:border-gold/50"
                   )}
                 >
@@ -4229,20 +4604,84 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
                     {formData.desiredClass.includes(option) && <Check size={12} />}
                   </div>
                 </button>
-                {option.includes('(') && formData.desiredClass.includes(option) && (
-                  <motion.input
-                    initial={{ opacity: 0, height: 0 }}
-                    animate={{ opacity: 1, height: 'auto' }}
-                    type="text"
-                    placeholder={language === 'ko' ? '직접 입력해 주세요.' : 'Please enter directly.'}
-                    value={formData.otherDesiredClass}
-                    onChange={(e) => setFormData(prev => ({ ...prev, otherDesiredClass: e.target.value }))}
-                    className="w-full p-4 bg-white border border-gold/30 rounded-xl outline-none focus:border-gold text-sm"
-                  />
-                )}
               </div>
             ))}
           </div>
+
+          {/* Level Selection (New) */}
+          {formData.desiredClass.length > 0 && (
+            <motion.div 
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              className="space-y-4 pt-4"
+            >
+              <p className="text-[10px] uppercase tracking-widest opacity-50">{language === 'ko' ? '희망 레벨 선택' : 'Select Desired Level'}</p>
+              <div className="flex flex-wrap gap-2">
+                {(COURSES.find(c => formData.desiredClass.some(dc => dc.includes(c.title)))?.levels || ['입문', '초급', '중급', '고급', '초고급']).map(level => (
+                  <button
+                    key={level}
+                    type="button"
+                    onClick={() => setFormData(prev => ({ ...prev, desiredLevel: level }))}
+                    className={cn(
+                      "px-4 py-2 rounded-full border text-[10px] uppercase tracking-widest transition-all",
+                      formData.desiredLevel === level ? "bg-gold text-ink border-gold font-bold" : "border-ink/10 hover:border-gold/50"
+                    )}
+                  >
+                    {level}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+
+          {formData.desiredClass.some(c => c.includes('소수 그룹반')) && (
+            <motion.input
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              type="text"
+              placeholder={language === 'ko' ? '직접 입력해 주세요.' : 'Please enter directly.'}
+              value={formData.otherDesiredClass}
+              onChange={(e) => setFormData(prev => ({ ...prev, otherDesiredClass: e.target.value }))}
+              className="w-full p-4 bg-white border border-gold/30 rounded-xl outline-none focus:border-gold text-sm"
+            />
+          )}
+        </div>
+
+        {/* 7. Preferred Schedule */}
+        <div className="space-y-6">
+          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">7</span>
+            <EditableText contentKey="inquiry.scheduleLabel" defaultValue={t.inquiry.scheduleLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </label>
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {['평일 오전', '평일 오후', '평일 저녁', '주말 오전', '주말 오후', '주말 저녁'].map(slot => (
+              <button
+                key={slot}
+                type="button"
+                onClick={() => toggleSelection('preferredSlots', slot)}
+                className={cn(
+                  "p-4 border rounded-2xl text-[10px] uppercase tracking-widest transition-all",
+                  formData.preferredSlots.includes(slot) ? "border-gold bg-gold/10 text-gold font-bold" : "border-ink/10 hover:border-gold/50"
+                )}
+              >
+                {slot}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* 8. Additional Requests */}
+        <div className="space-y-4">
+          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">8</span>
+            <EditableText contentKey="inquiry.requestsLabel" defaultValue={t.inquiry.requestsLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </label>
+          <textarea 
+            placeholder={t.inquiry.requestsPlaceholder}
+            value={formData.requests || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, requests: e.target.value }))}
+            className="w-full p-6 bg-ink/5 border border-ink/10 rounded-3xl focus:border-gold outline-none transition-colors text-lg min-h-[100px]"
+          />
         </div>
 
         <div className="pt-12">
