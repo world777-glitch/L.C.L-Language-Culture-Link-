@@ -1309,6 +1309,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
   const [uploadProgress, setUploadProgress] = useState(0);
   const [editingPost, setEditingPost] = useState<any>(null);
   const [editPostData, setEditPostData] = useState({ title: '', content: '' });
+  const [isDragging, setIsDragging] = useState(false);
   
   // Resource Form State
   const [newResource, setNewResource] = useState({
@@ -1322,7 +1323,11 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
     accessLevel: 'member' as 'public' | 'member' | 'premium',
     author: '',
     tags: '',
-    color: '#F27D26'
+    color: '#F27D26',
+    fontFamily: 'serif',
+    fontSize: 16,
+    fontColor: '#000000',
+    fontWeight: '400'
   });
 
   useEffect(() => {
@@ -1466,7 +1471,11 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
         accessLevel: 'member',
         author: '',
         tags: '',
-        color: '#F27D26'
+        color: '#F27D26',
+        fontFamily: 'serif',
+        fontSize: 16,
+        fontColor: '#000000',
+        fontWeight: '400'
       });
       alert(language === 'ko' ? '처리가 완료되었습니다.' : 'Operation completed.');
     } catch (error) {
@@ -1474,8 +1483,16 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement> | React.DragEvent) => {
+    let file: File | null = null;
+    if ('files' in e.target && (e.target as HTMLInputElement).files) {
+      file = (e.target as HTMLInputElement).files![0];
+    } else if ('dataTransfer' in e) {
+      e.preventDefault();
+      setIsDragging(false);
+      file = (e as React.DragEvent).dataTransfer.files[0];
+    }
+
     if (!file) return;
 
     // Basic validation
@@ -1575,7 +1592,11 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
       accessLevel: res.accessLevel,
       author: res.author || '',
       tags: Array.isArray(res.tags) ? res.tags.join(', ') : '',
-      color: res.color || '#F27D26'
+      color: res.color || '#F27D26',
+      fontFamily: res.fontFamily || 'serif',
+      fontSize: res.fontSize || 16,
+      fontColor: res.fontColor || '#000000',
+      fontWeight: res.fontWeight || '400'
     });
     // Scroll to form
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -1748,7 +1769,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
       {/* Quick Actions Bar */}
       <div className="flex flex-wrap gap-4 p-6 bg-gold/5 border border-gold/10 rounded-3xl">
         <button 
-          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', textContent: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '', color: '#F27D26' }); }}
+          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', textContent: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '', color: '#F27D26', fontFamily: 'serif', fontSize: 16, fontColor: '#000000', fontWeight: '400' }); }}
           className="flex items-center gap-2 px-6 py-3 bg-ink text-paper rounded-xl text-[10px] uppercase tracking-widest font-bold hover:bg-gold transition-all"
         >
           <Upload size={14} />
@@ -1997,7 +2018,11 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
                       accessLevel: 'member',
                       author: '',
                       tags: '',
-                      color: '#F27D26'
+                      color: '#F27D26',
+                      fontFamily: 'serif',
+                      fontSize: 16,
+                      fontColor: '#000000',
+                      fontWeight: '400'
                     });
                   }}
                   className="text-xs text-gold underline"
@@ -2137,7 +2162,12 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
                   </div>
                   <div className="space-y-2">
                     <label className="text-[10px] uppercase tracking-widest opacity-50">{language === 'ko' ? '파일 직접 업로드' : 'Upload File Directly'}</label>
-                    <div className="relative">
+                    <div 
+                      className="relative"
+                      onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                      onDragLeave={() => setIsDragging(false)}
+                      onDrop={handleFileUpload}
+                    >
                       <input 
                         type="file" 
                         onChange={handleFileUpload}
@@ -2147,19 +2177,36 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
                       />
                       <label 
                         htmlFor="file-upload"
-                        className={`flex flex-col items-center justify-center gap-1 w-full p-3 bg-ink/5 border border-dashed border-ink/20 rounded-xl cursor-pointer hover:border-gold transition-all ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+                        className={`flex flex-col items-center justify-center gap-2 w-full p-6 bg-ink/5 border-2 border-dashed rounded-2xl cursor-pointer transition-all ${isDragging ? 'border-gold bg-gold/5 scale-[1.02]' : 'border-ink/10 hover:border-gold/50'} ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
                       >
-                        <div className="flex items-center gap-2">
-                          <Upload size={14} />
-                          <span className="text-[10px] uppercase tracking-widest font-bold">
-                            {uploading ? (language === 'ko' ? '업로드 중...' : 'Uploading...') : (language === 'ko' ? '파일 선택' : 'Select File')}
-                          </span>
-                        </div>
-                        {uploading && (
-                          <span className="text-[8px] font-bold text-gold">{Math.round(uploadProgress)}%</span>
+                        {uploading ? (
+                          <div className="flex flex-col items-center gap-2">
+                            <div className="w-6 h-6 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+                            <span className="text-[10px] font-bold text-gold">{Math.round(uploadProgress)}%</span>
+                          </div>
+                        ) : (
+                          <>
+                            <Upload size={24} className={isDragging ? 'text-gold' : 'opacity-40'} />
+                            <div className="text-center">
+                              <p className="text-xs font-medium">{language === 'ko' ? '클릭하거나 파일을 여기로 끌어다 놓으세요' : 'Click or drag file here'}</p>
+                              <p className="text-[10px] opacity-40 mt-1">PDF, MP3, Image, PPT, Word</p>
+                            </div>
+                          </>
                         )}
                       </label>
                     </div>
+                    {newResource.fileUrl && newResource.fileType === 'image' && (
+                      <div className="mt-4 relative group">
+                        <img src={newResource.fileUrl} alt="Preview" className="w-full h-32 object-cover rounded-xl border border-ink/10" referrerPolicy="no-referrer" />
+                        <button 
+                          type="button"
+                          onClick={() => setNewResource(prev => ({ ...prev, fileUrl: '' }))}
+                          className="absolute top-2 right-2 p-1.5 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-lg"
+                        >
+                          <X size={12} />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
                 <button type="submit" className="w-full py-4 bg-ink text-paper rounded-xl text-xs uppercase tracking-widest hover:bg-gold transition-colors">
@@ -2818,6 +2865,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
   const [editingResource, setEditingResource] = useState<any>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
+  const [isDragging, setIsDragging] = useState(false);
   const [newResource, setNewResource] = useState({
     title: '',
     description: '',
@@ -2829,7 +2877,11 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     accessLevel: 'member' as 'public' | 'member' | 'premium',
     author: '',
     tags: '',
-    color: '#F27D26'
+    color: '#F27D26',
+    fontFamily: 'serif',
+    fontSize: 16,
+    fontColor: '#000000',
+    fontWeight: '400'
   });
 
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -3025,8 +3077,16 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     }
   };
 
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement> | React.DragEvent) => {
+    let file: File | null = null;
+    if ('files' in e.target && (e.target as HTMLInputElement).files) {
+      file = (e.target as HTMLInputElement).files![0];
+    } else if ('dataTransfer' in e) {
+      e.preventDefault();
+      setIsDragging(false);
+      file = (e as React.DragEvent).dataTransfer.files[0];
+    }
+
     if (!file) return;
 
     setUploading(true);
@@ -3113,7 +3173,11 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
       accessLevel: res.accessLevel,
       author: res.author || '',
       tags: Array.isArray(res.tags) ? res.tags.join(', ') : '',
-      color: res.color || '#F27D26'
+      color: res.color || '#F27D26',
+      fontFamily: res.fontFamily || 'serif',
+      fontSize: res.fontSize || 16,
+      fontColor: res.fontColor || '#000000',
+      fontWeight: res.fontWeight || '400'
     });
     setIsManaging(true);
   };
@@ -3555,36 +3619,66 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                       </div>
                     </div>
                     <div className="space-y-2">
-                      <label className="text-[10px] uppercase tracking-widest opacity-50">File URL / Upload</label>
-                      <div className="flex gap-2">
+                      <label className="text-[10px] uppercase tracking-widest opacity-50">File URL / Drag & Drop Upload</label>
+                      <div className="flex flex-col gap-3">
                         <input 
                           type="url"
                           value={newResource.fileUrl}
                           onChange={(e) => setNewResource(prev => ({ ...prev, fileUrl: e.target.value }))}
-                          className="flex-grow p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm focus:outline-none focus:border-gold transition-all"
+                          className="w-full p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm focus:outline-none focus:border-gold transition-all"
                           placeholder="https://..."
                         />
-                        <input 
-                          type="file" 
-                          onChange={handleFileUpload}
-                          disabled={uploading}
-                          className="hidden"
-                          id="archive-file-upload"
-                        />
-                        <label 
-                          htmlFor="archive-file-upload"
-                          className={cn(
-                            "px-6 py-4 rounded-2xl flex items-center justify-center cursor-pointer transition-all min-w-[120px]",
-                            uploading ? "bg-ink/10 text-ink/30" : "bg-gold text-ink hover:bg-gold/90"
-                          )}
+                        <div 
+                          className="relative"
+                          onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+                          onDragLeave={() => setIsDragging(false)}
+                          onDrop={handleFileUpload}
                         >
-                          {uploading ? (
-                            <div className="flex flex-col items-center gap-1">
-                              <div className="w-4 h-4 border-2 border-ink/30 border-t-ink rounded-full animate-spin" />
-                              <span className="text-[8px] font-bold">{Math.round(uploadProgress)}%</span>
-                            </div>
-                          ) : <Upload size={20} />}
-                        </label>
+                          <input 
+                            type="file" 
+                            onChange={handleFileUpload}
+                            disabled={uploading}
+                            className="hidden"
+                            id="archive-file-upload"
+                          />
+                          <label 
+                            htmlFor="archive-file-upload"
+                            className={cn(
+                              "w-full p-8 border-2 border-dashed rounded-2xl flex flex-col items-center justify-center gap-3 transition-all cursor-pointer",
+                              isDragging ? "border-gold bg-gold/5 scale-[1.01]" : "border-ink/10 bg-ink/5 hover:border-gold/50",
+                              uploading && "opacity-50 cursor-not-allowed"
+                            )}
+                          >
+                            {uploading ? (
+                              <div className="flex flex-col items-center gap-2">
+                                <div className="w-8 h-8 border-2 border-gold border-t-transparent rounded-full animate-spin" />
+                                <span className="text-xs font-bold text-gold">{Math.round(uploadProgress)}%</span>
+                              </div>
+                            ) : (
+                              <>
+                                <div className="w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center text-gold">
+                                  <Upload size={24} />
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-sm font-medium">{language === 'ko' ? '파일을 여기로 끌어다 놓거나 클릭하세요' : 'Drag & drop file here or click'}</p>
+                                  <p className="text-[10px] opacity-40 mt-1">PDF, MP3, Image, PPT, Word</p>
+                                </div>
+                              </>
+                            )}
+                          </label>
+                        </div>
+                        {newResource.fileUrl && newResource.fileType === 'image' && (
+                          <div className="mt-4 relative group">
+                            <img src={newResource.fileUrl} alt="Preview" className="w-full h-40 object-cover rounded-2xl border border-ink/10" referrerPolicy="no-referrer" />
+                            <button 
+                              type="button"
+                              onClick={() => setNewResource(prev => ({ ...prev, fileUrl: '' }))}
+                              className="absolute top-3 right-3 p-2 bg-red-500 text-white rounded-full opacity-0 group-hover:opacity-100 transition-opacity shadow-xl"
+                            >
+                              <X size={14} />
+                            </button>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -3618,21 +3712,33 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                 scale: 1, 
                 opacity: 1, 
                 y: 0,
-                width: isFullScreen ? '100vw' : '100%',
-                maxWidth: isFullScreen ? '100vw' : '56rem',
+                width: isFullScreen ? '100vw' : '95%',
+                maxWidth: isFullScreen ? '100vw' : '64rem',
                 height: isFullScreen ? '100vh' : 'auto',
-                maxHeight: isFullScreen ? '100vh' : '90vh',
-                borderRadius: isFullScreen ? '0px' : '40px'
+                maxHeight: isFullScreen ? '100vh' : '85vh',
+                borderRadius: isFullScreen ? '0px' : '32px'
               }}
               exit={{ scale: 0.9, opacity: 0, y: 20 }}
-              className="bg-paper shadow-2xl overflow-hidden flex flex-col md:flex-row relative"
+              className={cn(
+                "bg-paper shadow-2xl overflow-hidden flex flex-col md:flex-row relative transition-all duration-500",
+                isFullScreen ? "fixed inset-0 z-[110]" : ""
+              )}
               onClick={e => e.stopPropagation()}
             >
-              {/* Full Screen Toggle */}
-              <div className="absolute top-6 right-20 z-10 flex gap-2">
+              {/* Full Screen Toggle & External Link */}
+              <div className="absolute top-6 right-20 z-20 flex gap-3">
+                {selectedResource.fileUrl && (
+                  <button 
+                    onClick={() => window.open(selectedResource.fileUrl, '_blank')}
+                    className="p-3 bg-white/90 backdrop-blur-sm border border-ink/10 rounded-full hover:border-gold hover:text-gold transition-all shadow-lg"
+                    title={language === 'ko' ? '새 창에서 열기' : 'Open in New Window'}
+                  >
+                    <ExternalLink size={18} />
+                  </button>
+                )}
                 <button 
                   onClick={() => setIsFullScreen(!isFullScreen)}
-                  className="p-3 bg-white/80 backdrop-blur-sm border border-ink/10 rounded-full hover:border-gold transition-all shadow-sm"
+                  className="p-3 bg-white/90 backdrop-blur-sm border border-ink/10 rounded-full hover:border-gold hover:text-gold transition-all shadow-lg"
                   title={isFullScreen ? "Minimize" : "Maximize"}
                 >
                   {isFullScreen ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
@@ -3709,7 +3815,10 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                     </div>
                     <div 
                       id="resource-text-preview"
-                      className="text-sm whitespace-pre-wrap leading-relaxed max-h-[400px] overflow-y-auto custom-scrollbar pr-2 p-4 bg-white rounded-xl"
+                      className={cn(
+                        "text-sm whitespace-pre-wrap leading-relaxed overflow-y-auto custom-scrollbar pr-2 p-8 bg-white rounded-3xl shadow-inner transition-all duration-500",
+                        isFullScreen ? "max-h-none min-h-[70vh]" : "max-h-[400px]"
+                      )}
                       style={{ 
                         fontFamily: selectedResource.fontFamily || 'serif', 
                         fontSize: `${selectedResource.fontSize || 16}px`, 
@@ -3790,32 +3899,34 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
               </div>
 
               {/* Right: Related Content */}
-              <div className="w-full md:w-80 bg-ink/5 p-8 md:p-12 space-y-8 border-l border-ink/5">
-                <h4 className="text-[10px] uppercase tracking-widest font-bold opacity-40">
-                  {language === 'ko' ? '관련 자료' : 'Related Content'}
-                </h4>
-                <div className="space-y-6">
-                  {relatedResources.length > 0 ? relatedResources.map(res => (
-                    <button 
-                      key={res.id}
-                      onClick={() => setSelectedResource(res)}
-                      className="w-full text-left space-y-2 group"
-                    >
-                      <div className="flex items-center gap-2 text-[8px] uppercase tracking-widest opacity-40 group-hover:text-gold transition-colors">
-                        {res.fileType === 'pdf' && <FileText size={10} />}
-                        {res.fileType === 'mp3' && <Music size={10} />}
-                        {res.fileType === 'image' && <ImageIcon size={10} />}
-                        {res.fileType}
-                      </div>
-                      <h5 className="font-bold text-sm leading-tight group-hover:text-gold transition-colors line-clamp-2">{res.title}</h5>
-                    </button>
-                  )) : (
-                    <p className="text-xs opacity-40 italic">
-                      {language === 'ko' ? '관련 자료가 없습니다.' : 'No related content found.'}
-                    </p>
-                  )}
+              {!isFullScreen && (
+                <div className="w-full md:w-80 bg-ink/5 p-8 md:p-12 space-y-8 border-l border-ink/5">
+                  <h4 className="text-[10px] uppercase tracking-widest font-bold opacity-40">
+                    {language === 'ko' ? '관련 자료' : 'Related Content'}
+                  </h4>
+                  <div className="space-y-6">
+                    {relatedResources.length > 0 ? relatedResources.map(res => (
+                      <button 
+                        key={res.id}
+                        onClick={() => setSelectedResource(res)}
+                        className="w-full text-left space-y-2 group"
+                      >
+                        <div className="flex items-center gap-2 text-[8px] uppercase tracking-widest opacity-40 group-hover:text-gold transition-colors">
+                          {res.fileType === 'pdf' && <FileText size={10} />}
+                          {res.fileType === 'mp3' && <Music size={10} />}
+                          {res.fileType === 'image' && <ImageIcon size={10} />}
+                          {res.fileType}
+                        </div>
+                        <h5 className="font-bold text-sm leading-tight group-hover:text-gold transition-colors line-clamp-2">{res.title}</h5>
+                      </button>
+                    )) : (
+                      <p className="text-xs opacity-40 italic">
+                        {language === 'ko' ? '관련 자료가 없습니다.' : 'No related content found.'}
+                      </p>
+                    )}
+                  </div>
                 </div>
-              </div>
+              )}
             </motion.div>
           </motion.div>
         )}
