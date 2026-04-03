@@ -21,6 +21,7 @@ import {
   Image as ImageIcon,
   AlertCircle,
   Plus,
+  PlusCircle,
   Check,
   ShieldCheck,
   FileText,
@@ -90,10 +91,12 @@ export default function App() {
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
+  const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [view, setView] = useState<'landing' | 'booking' | 'mypage' | 'admin' | 'image-gen' | 'archive' | 'community' | 'inquiry' | 'curriculum' | 'pricing'>('landing');
   const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
   const [initialArchiveFilter, setInitialArchiveFilter] = useState<{ groupId: string | null, categoryId: string | null }>({ groupId: null, categoryId: null });
   const [language, setLanguage] = useState<LanguageCode>('ko');
+  const [adminTab, setAdminTab] = useState<'reservations' | 'resources' | 'community' | 'users' | 'stats' | 'inquiries'>('reservations');
   const t = TRANSLATIONS[language];
 
   const [isEditMode, setIsEditMode] = useState(false);
@@ -283,6 +286,12 @@ export default function App() {
             >
               {t.nav.inquiry}
             </button>
+            <button 
+              onClick={() => setIsPostModalOpen(true)}
+              className="flex items-center gap-1.5 px-4 py-1.5 bg-gold text-ink rounded-full text-[10px] lg:text-xs uppercase tracking-widest font-bold hover:scale-105 transition-transform shadow-lg shadow-gold/20 whitespace-nowrap"
+            >
+              <PlusCircle size={14} /> {t.nav.post}
+            </button>
             {(isAdmin || siteContent['ai-studio-access']?.access === 'all' || (siteContent['ai-studio-access']?.access === 'premium' && userProfile?.role === 'premium') || (siteContent['ai-studio-access']?.access === 'member' && userProfile)) && (
               <button 
                 onClick={() => setView('image-gen')} 
@@ -346,7 +355,7 @@ export default function App() {
           {view === 'pricing' && <PricingView key="pricing" language={language} setView={setView} isEditMode={isEditMode} siteContent={siteContent} isEventPeriod={isEventPeriod} />}
           {view === 'booking' && <BookingView key="booking" course={selectedCourse} onComplete={() => setView('mypage')} isEventPeriod={isEventPeriod} siteContent={siteContent} />}
           {view === 'mypage' && <MyPageView key="mypage" />}
-          {view === 'admin' && <AdminView key="admin" language={language} siteContent={siteContent} />}
+          {view === 'admin' && <AdminView key="admin" language={language} siteContent={siteContent} initialTab={adminTab} />}
           {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} siteContent={siteContent} />}
           {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} />}
           {view === 'community' && <CommunityView key="community" language={language} />}
@@ -379,6 +388,22 @@ export default function App() {
           )}
         </AnimatePresence>
       </main>
+
+      <AnimatePresence>
+        {isPostModalOpen && (
+          <QuickPostModal 
+            isOpen={isPostModalOpen}
+            onClose={() => setIsPostModalOpen(false)}
+            language={language}
+            isAdmin={isAdmin}
+            user={user}
+            setView={setView}
+            setIsEditMode={setIsEditMode}
+            setAdminTab={setAdminTab}
+            t={t}
+          />
+        )}
+      </AnimatePresence>
 
       <footer className="bg-ink text-paper py-20 px-6">
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
@@ -583,6 +608,330 @@ const EditableText: FC<{
   }
 
   return <Component className={className} style={currentStyles}>{renderContent()}</Component>;
+};
+
+const Repeater: FC<{
+  contentKey: string,
+  isEditMode: boolean,
+  language: string,
+  siteContent: Record<string, any>,
+  renderItem: (index: number) => React.ReactNode,
+  className?: string,
+  containerClassName?: string,
+  addButtonLabel?: string,
+  defaultCount?: number
+}> = ({ contentKey, isEditMode, language, siteContent, renderItem, className, containerClassName, addButtonLabel, defaultCount = 0 }) => {
+  const countKey = `${contentKey}.count`;
+  const count = siteContent[countKey]?.value !== undefined ? Number(siteContent[countKey].value) : defaultCount;
+
+  const handleAdd = async () => {
+    const docId = `${language}_${countKey.replace(/\./g, '_')}`;
+    try {
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: countKey,
+        language,
+        value: count + 1,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
+  const handleRemove = async () => {
+    if (count <= 0) return;
+    const docId = `${language}_${countKey.replace(/\./g, '_')}`;
+    try {
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: countKey,
+        language,
+        value: count - 1,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
+  return (
+    <div className={containerClassName}>
+      <div className={className}>
+        {Array.from({ length: count }).map((_, i) => (
+          <div key={i} className="relative group/repeater-item">
+            {renderItem(i)}
+            {isEditMode && i === count - 1 && (
+              <button 
+                onClick={handleRemove}
+                className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/repeater-item:opacity-100 transition-opacity z-20 shadow-lg hover:scale-110"
+                title="Remove last item"
+              >
+                <X size={12} />
+              </button>
+            )}
+          </div>
+        ))}
+      </div>
+      {isEditMode && (
+        <button 
+          onClick={handleAdd}
+          className="mt-6 flex items-center gap-2 px-6 py-3 bg-gold/10 text-gold border border-gold/20 rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all mx-auto group"
+        >
+          <Plus size={16} className="group-hover:rotate-90 transition-transform" /> {addButtonLabel || 'Add Item'}
+        </button>
+      )}
+    </div>
+  );
+};
+
+const QuickPostModal: FC<{
+  isOpen: boolean,
+  onClose: () => void,
+  language: string,
+  isAdmin: boolean,
+  user: any,
+  setView: (view: any) => void,
+  setIsEditMode: (mode: boolean) => void,
+  setAdminTab: (tab: any) => void,
+  t: any
+}> = ({ isOpen, onClose, language, isAdmin, user, setView, setIsEditMode, setAdminTab, t }) => {
+  if (!isOpen) return null;
+
+  const options = [
+    {
+      id: 'community',
+      title: language === 'ko' ? '커뮤니티 게시글' : 'Community Post',
+      desc: language === 'ko' ? '질문이나 자료 요청을 남겨보세요.' : 'Leave questions or resource requests.',
+      icon: <MessageSquare size={24} />,
+      action: () => { setView('community'); onClose(); },
+      show: !!user
+    },
+    {
+      id: 'resource',
+      title: language === 'ko' ? '자료실 업로드' : 'Upload Resource',
+      desc: language === 'ko' ? '새로운 학습 자료를 등록합니다.' : 'Register new learning materials.',
+      icon: <Upload size={24} />,
+      action: () => { 
+        setAdminTab('resources');
+        setView('admin'); 
+        onClose(); 
+      },
+      show: isAdmin
+    },
+    {
+      id: 'landing',
+      title: language === 'ko' ? '홈페이지 섹션 추가' : 'Add Landing Section',
+      desc: language === 'ko' ? '홈페이지에 새로운 콘텐츠 블록을 추가합니다.' : 'Add a new content block to the homepage.',
+      icon: <PlusCircle size={24} />,
+      action: () => { 
+        setView('landing'); 
+        setIsEditMode(true); 
+        onClose();
+        setTimeout(() => {
+          const element = document.getElementById('landing-dynamic-area');
+          if (element) element.scrollIntoView({ behavior: 'smooth' });
+        }, 300);
+      },
+      show: isAdmin
+    }
+  ].filter(opt => opt.show);
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-6">
+      <motion.div 
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        onClick={onClose}
+        className="absolute inset-0 bg-ink/60 backdrop-blur-sm"
+      />
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.9, y: 20 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        exit={{ opacity: 0, scale: 0.9, y: 20 }}
+        className="relative w-full max-w-lg bg-paper rounded-[40px] shadow-2xl overflow-hidden p-10 space-y-8"
+      >
+        <div className="flex items-center justify-between">
+          <div className="space-y-1">
+            <h2 className="text-3xl font-serif">{language === 'ko' ? '무엇을 추가할까요?' : 'What would you like to add?'}</h2>
+            <p className="text-xs opacity-50 uppercase tracking-widest">{language === 'ko' ? '원하는 게시 유형을 선택하세요' : 'Select the type of content to post'}</p>
+          </div>
+          <button onClick={onClose} className="w-10 h-10 rounded-full bg-ink/5 flex items-center justify-center hover:bg-ink/10 transition-colors">
+            <X size={20} />
+          </button>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4">
+          {options.length > 0 ? options.map(opt => (
+            <button 
+              key={opt.id}
+              onClick={opt.action}
+              className="flex items-center gap-6 p-6 rounded-[32px] border border-ink/5 hover:border-gold hover:bg-gold/5 transition-all group text-left"
+            >
+              <div className="w-14 h-14 rounded-2xl bg-ink/5 flex items-center justify-center group-hover:bg-gold group-hover:text-ink transition-colors">
+                {opt.icon}
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-xl font-serif">{opt.title}</h3>
+                <p className="text-xs opacity-60 leading-relaxed">{opt.desc}</p>
+              </div>
+              <ChevronRight size={20} className="ml-auto opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
+            </button>
+          )) : (
+            <div className="p-12 text-center space-y-4 bg-ink/5 rounded-[32px]">
+              <AlertCircle size={40} className="mx-auto opacity-20" />
+              <p className="text-sm opacity-60">{language === 'ko' ? '게시 권한이 없거나 로그인이 필요합니다.' : 'No posting permissions or login required.'}</p>
+              {!user && (
+                <button onClick={() => { onClose(); }} className="px-8 py-3 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold">
+                  {t.nav.login}
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      </motion.div>
+    </div>
+  );
+};
+
+const DynamicContentArea: FC<{
+  contentKey: string,
+  isEditMode: boolean,
+  language: string,
+  siteContent: Record<string, any>
+}> = ({ contentKey, isEditMode, language, siteContent }) => {
+  const countKey = `${contentKey}.count`;
+  const count = siteContent[countKey]?.value !== undefined ? Number(siteContent[countKey].value) : 0;
+
+  const handleAdd = async (type: string) => {
+    const countDocId = `${language}_${countKey.replace(/\./g, '_')}`;
+    const typeKey = `${contentKey}.item_${count}.type`;
+    const typeDocId = `${language}_${typeKey.replace(/\./g, '_')}`;
+    
+    try {
+      await setDoc(doc(db, 'siteContent', typeDocId), {
+        key: typeKey,
+        language,
+        value: type,
+        updatedAt: serverTimestamp()
+      });
+      
+      await setDoc(doc(db, 'siteContent', countDocId), {
+        key: countKey,
+        language,
+        value: count + 1,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
+  const handleRemove = async () => {
+    if (count <= 0) return;
+    const countDocId = `${language}_${countKey.replace(/\./g, '_')}`;
+    try {
+      await setDoc(doc(db, 'siteContent', countDocId), {
+        key: countKey,
+        language,
+        value: count - 1,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
+  return (
+    <div className="space-y-32">
+      {Array.from({ length: count }).map((_, i) => {
+        const typeKey = `${contentKey}.item_${i}.type`;
+        const type = siteContent[typeKey]?.value || 'text';
+        
+        return (
+          <div key={i} className="relative group/dynamic-block">
+            {type === 'text' && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                className="max-w-3xl mx-auto text-center space-y-8"
+              >
+                <h3 className="text-4xl md:text-5xl font-serif font-light">
+                  <EditableText contentKey={`${contentKey}.item_${i}.title`} defaultValue="New Section Title" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                </h3>
+                <div className="text-lg opacity-70 font-serif leading-relaxed">
+                  <EditableText contentKey={`${contentKey}.item_${i}.content`} defaultValue="Add your content here. This is a dynamic text section that you can edit directly." isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
+                </div>
+              </motion.div>
+            )}
+            {type === 'image' && (
+              <motion.div 
+                initial={{ opacity: 0, scale: 0.95 }}
+                whileInView={{ opacity: 1, scale: 1 }}
+                viewport={{ once: true }}
+                className="max-w-5xl mx-auto aspect-video rounded-[40px] overflow-hidden shadow-2xl"
+              >
+                <EditableImage 
+                  contentKey={`${contentKey}.item_${i}.image`}
+                  defaultUrl={`https://picsum.photos/seed/dynamic-${i}/1200/800`}
+                  alt="Dynamic Image"
+                  isEditMode={isEditMode}
+                  language={language}
+                  siteContent={siteContent}
+                  rounded="rounded-[40px]"
+                />
+              </motion.div>
+            )}
+            {type === 'quote' && (
+              <motion.div 
+                initial={{ opacity: 0, x: -20 }}
+                whileInView={{ opacity: 1, x: 0 }}
+                viewport={{ once: true }}
+                className="max-w-4xl mx-auto p-12 bg-gold/5 border-l-4 border-gold rounded-r-[40px] space-y-6"
+              >
+                <div className="text-3xl font-serif italic opacity-80">
+                  <EditableText contentKey={`${contentKey}.item_${i}.quote`} defaultValue="A meaningful quote or highlight that stands out." isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                </div>
+                <div className="text-xs uppercase tracking-widest font-bold text-gold">
+                  <EditableText contentKey={`${contentKey}.item_${i}.author`} defaultValue="Author Name" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                </div>
+              </motion.div>
+            )}
+            
+            {isEditMode && i === count - 1 && (
+              <button 
+                onClick={handleRemove}
+                className="absolute -top-4 -right-4 w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/dynamic-block:opacity-100 transition-opacity z-20 shadow-2xl hover:scale-110"
+                title="Remove this section"
+              >
+                <X size={20} />
+              </button>
+            )}
+          </div>
+        );
+      })}
+      
+      {isEditMode && (
+        <div className="max-w-4xl mx-auto py-20 border-2 border-dashed border-gold/20 rounded-[40px] bg-gold/5 flex flex-col items-center gap-8">
+          <div className="text-center space-y-2">
+            <h4 className="text-xs uppercase tracking-[0.4em] font-bold text-gold">Add New Section</h4>
+            <p className="text-[10px] opacity-50 uppercase tracking-widest">Choose a block type to add to the page</p>
+          </div>
+          <div className="flex flex-wrap justify-center gap-4">
+            <button onClick={() => handleAdd('text')} className="px-8 py-4 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all flex items-center gap-2 shadow-lg">
+              <FileText size={14} /> Text Block
+            </button>
+            <button onClick={() => handleAdd('image')} className="px-8 py-4 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all flex items-center gap-2 shadow-lg">
+              <ImageIcon size={14} /> Image Block
+            </button>
+            <button onClick={() => handleAdd('quote')} className="px-8 py-4 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all flex items-center gap-2 shadow-lg">
+              <MessageSquare size={14} /> Quote Block
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
 };
 
 const EditableImage: FC<{ 
@@ -847,9 +1196,16 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                 {t.inquiry.title}
               </button>
               <div className="flex items-center gap-3">
-                <div className="flex -space-x-2">
-                  {[1, 2, 3].map(i => (
-                    <div key={i} className="w-8 h-8 rounded-full border-2 border-paper bg-ink/20 overflow-hidden relative group/avatar">
+                <Repeater 
+                  contentKey="hero.avatars"
+                  isEditMode={isEditMode}
+                  language={language}
+                  siteContent={siteContent}
+                  defaultCount={3}
+                  className="flex -space-x-2"
+                  addButtonLabel={language === 'ko' ? '아바타 추가' : 'Add Avatar'}
+                  renderItem={(i) => (
+                    <div className="w-8 h-8 rounded-full border-2 border-paper bg-ink/20 overflow-hidden relative group/avatar">
                       <EditableImage 
                         contentKey={`hero.avatar_${i}`}
                         defaultUrl={`https://i.pravatar.cc/100?img=${i + 10}`}
@@ -861,8 +1217,8 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                         rounded="rounded-full"
                       />
                     </div>
-                  ))}
-                </div>
+                  )}
+                />
                 <span className="text-[10px] uppercase tracking-widest opacity-60">
                   <EditableText contentKey="hero.students_count" defaultValue={language === 'ko' ? '500+ 수강생 참여' : '500+ Students Joined'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
                 </span>
@@ -920,6 +1276,67 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
             </motion.div>
           ))}
         </div>
+      </section>
+
+      {/* Dynamic Gallery Section */}
+      <section className="max-w-7xl mx-auto px-6 py-20">
+        <div className="text-center space-y-4 mb-20">
+          <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+            <EditableText contentKey="gallery.badge" defaultValue="Gallery & Highlights" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </span>
+          <h2 className="text-5xl font-serif font-light">
+            <EditableText contentKey="gallery.title" defaultValue={language === 'ko' ? '우리의 특별한 순간들' : 'Our Special Moments'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </h2>
+        </div>
+
+        <Repeater 
+          contentKey="landing.gallery"
+          isEditMode={isEditMode}
+          language={language}
+          siteContent={siteContent}
+          defaultCount={3}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8"
+          addButtonLabel={language === 'ko' ? '갤러리 아이템 추가' : 'Add Gallery Item'}
+          renderItem={(i) => (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="space-y-6 group/gallery-item"
+            >
+              <div className="aspect-[4/5] bg-ink/5 rounded-[40px] overflow-hidden relative">
+                <EditableImage 
+                  contentKey={`gallery.item_${i}.image`}
+                  defaultUrl={`https://picsum.photos/seed/gallery-${i}/600/800`}
+                  alt="Gallery"
+                  className="w-full h-full object-cover group-hover/gallery-item:scale-105 transition-transform duration-700"
+                  isEditMode={isEditMode}
+                  language={language}
+                  siteContent={siteContent}
+                  rounded="rounded-[40px]"
+                />
+              </div>
+              <div className="space-y-2 px-4">
+                <h4 className="text-lg font-serif">
+                  <EditableText contentKey={`gallery.item_${i}.title`} defaultValue={language === 'ko' ? `하이라이트 ${i + 1}` : `Highlight ${i + 1}`} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                </h4>
+                <p className="text-xs opacity-60 leading-relaxed">
+                  <EditableText contentKey={`gallery.item_${i}.desc`} defaultValue={language === 'ko' ? '특별한 학습 경험과 문화적 통찰력을 공유합니다.' : 'Sharing special learning experiences and cultural insights.'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                </p>
+              </div>
+            </motion.div>
+          )}
+        />
+      </section>
+
+      {/* Dynamic Content Sections */}
+      <section id="landing-dynamic-area" className="max-w-7xl mx-auto px-6 py-20">
+        <DynamicContentArea 
+          contentKey="landing.dynamic"
+          isEditMode={isEditMode}
+          language={language}
+          siteContent={siteContent}
+        />
       </section>
 
       {/* Testimonials / Quote */}
@@ -1290,7 +1707,7 @@ const BookingView: FC<{ course: any, onComplete: () => void, isEventPeriod: bool
   );
 }
 
-const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language, siteContent }) => {
+const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 'reservations' | 'resources' | 'community' | 'users' | 'stats' | 'inquiries' }> = ({ language, siteContent, initialTab = 'reservations' }) => {
   const t = TRANSLATIONS[language];
   const [reservations, setReservations] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -1300,7 +1717,11 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
   const [communityPosts, setCommunityPosts] = useState<any[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'reservations' | 'resources' | 'community' | 'users' | 'stats' | 'inquiries'>('reservations');
+  const [activeTab, setActiveTab] = useState<'reservations' | 'resources' | 'community' | 'users' | 'stats' | 'inquiries'>(initialTab);
+  
+  useEffect(() => {
+    setActiveTab(initialTab);
+  }, [initialTab]);
   
   const [feedbackText, setFeedbackText] = useState<{ [key: string]: string }>({});
   const [replyText, setReplyText] = useState<{ [key: string]: string }>({});
@@ -1525,55 +1946,69 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any }> = ({ language,
       const storageRef = ref(storage, `resources/${Date.now()}_${file.name}`);
       console.log('Starting upload for:', file.name, 'Size:', file.size, 'Type:', file.type);
       
-      // Use uploadBytes for better compatibility in some environments
-      setUploadProgress(10); // Initial progress
-      const uploadResult = await uploadBytes(storageRef, file);
-      console.log('Upload successful:', uploadResult.metadata.fullPath);
-      setUploadProgress(100);
+      const uploadTask = uploadBytesResumable(storageRef, file);
 
-      try {
-        const url = await getDownloadURL(storageRef);
-        console.log('Download URL obtained:', url);
-        const extension = file.name.split('.').pop()?.toLowerCase();
-        let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
-        if (extension === 'mp3') fileType = 'mp3';
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
-        if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
-        if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
-        if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
-        
-        let textContent = '';
-        if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
-          textContent = await file.text();
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+          console.log('Upload progress:', progress + '%');
+        }, 
+        (error: any) => {
+          console.error('Upload task error:', error);
+          let errorMsg = error.message;
+          if (error.code === 'storage/quota-exceeded') {
+            errorMsg = language === 'ko' ? '저장 공간 할당량이 초과되었습니다. 내일 다시 시도해 주세요.' : 'Storage quota exceeded. Please try again tomorrow.';
+          } else if (error.code === 'storage/unauthorized') {
+            errorMsg = language === 'ko' ? '파일 업로드 권한이 없습니다.' : 'Unauthorized to upload file.';
+          } else if (error.code === 'storage/retry-limit-exceeded') {
+            errorMsg = language === 'ko' ? '업로드 시도 횟수가 초과되었습니다. 네트워크 연결을 확인해 주세요.' : 'Upload retry limit exceeded. Please check your network connection.';
+          }
+          alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${errorMsg})`);
+          setUploading(false);
+        }, 
+        async () => {
+          console.log('Upload successful');
+          setUploadProgress(100);
+          try {
+            const url = await getDownloadURL(storageRef);
+            console.log('Download URL obtained:', url);
+            const extension = file.name.split('.').pop()?.toLowerCase();
+            let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
+            if (extension === 'mp3') fileType = 'mp3';
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
+            if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
+            if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
+            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
+            
+            let textContent = '';
+            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
+              textContent = await file.text();
+            }
+            
+            setNewResource(prev => ({ 
+              ...prev, 
+              fileUrl: url, 
+              fileType,
+              textContent: textContent || prev.textContent
+            }));
+
+            if (textContent && editorRef.current) {
+              editorRef.current.innerHTML = textContent;
+            }
+
+            alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+          } catch (err: any) {
+            console.error('Error getting download URL:', err);
+            alert(`${language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.'} (${err.message})`);
+          } finally {
+            setUploading(false);
+          }
         }
-        
-        setNewResource(prev => ({ 
-          ...prev, 
-          fileUrl: url, 
-          fileType,
-          textContent: textContent || prev.textContent
-        }));
-
-        if (textContent && editorRef.current) {
-          editorRef.current.innerHTML = textContent;
-        }
-
-        alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
-      } catch (err: any) {
-        console.error('Error getting download URL:', err);
-        alert(`${language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.'} (${err.message})`);
-      } finally {
-        setUploading(false);
-      }
+      );
     } catch (error: any) {
       console.error('Upload catch error:', error);
-      let errorMsg = error.message;
-      if (error.code === 'storage/quota-exceeded') {
-        errorMsg = language === 'ko' ? '저장 공간 할당량이 초과되었습니다. 내일 다시 시도해 주세요.' : 'Storage quota exceeded. Please try again tomorrow.';
-      } else if (error.code === 'storage/unauthorized') {
-        errorMsg = language === 'ko' ? '파일 업로드 권한이 없습니다.' : 'Unauthorized to upload file.';
-      }
-      alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${errorMsg})`);
+      alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${error.message})`);
       setUploading(false);
     }
   };
@@ -3258,56 +3693,69 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
       const storageRef = ref(storage, `resources/${Date.now()}_${file.name}`);
       console.log('Starting upload (Archive) for:', file.name, 'Size:', file.size, 'Type:', file.type);
       
-      // Use uploadBytes for better compatibility in some environments
-      setUploadProgress(10); // Initial progress
-      const uploadResult = await uploadBytes(storageRef, file);
-      console.log('Archive Upload successful:', uploadResult.metadata.fullPath);
-      setUploadProgress(100);
+      const uploadTask = uploadBytesResumable(storageRef, file);
 
-      try {
-        const url = await getDownloadURL(storageRef);
-        console.log('Archive Download URL obtained:', url);
-        const extension = file.name.split('.').pop()?.toLowerCase();
-        let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
-        if (extension === 'mp3') fileType = 'mp3';
-        if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
-        if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
-        if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
-        if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
-        
-        let textContent = '';
-        if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
-          textContent = await file.text();
-        }
-        
-        setNewResource(prev => ({ 
-          ...prev, 
-          fileUrl: url, 
-          fileType,
-          textContent: textContent || prev.textContent 
-        }));
-        
-        // If it's a text file, also update the editor if it's open
-        if (textContent && editorRef.current) {
-          editorRef.current.innerHTML = textContent;
-        }
+      uploadTask.on('state_changed', 
+        (snapshot) => {
+          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+          setUploadProgress(progress);
+          console.log('Archive upload progress:', progress + '%');
+        }, 
+        (error: any) => {
+          console.error('Archive upload task error:', error);
+          let errorMsg = error.message;
+          if (error.code === 'storage/quota-exceeded') {
+            errorMsg = language === 'ko' ? '저장 공간 할당량이 초과되었습니다. 내일 다시 시도해 주세요.' : 'Storage quota exceeded. Please try again tomorrow.';
+          } else if (error.code === 'storage/unauthorized') {
+            errorMsg = language === 'ko' ? '파일 업로드 권한이 없습니다.' : 'Unauthorized to upload file.';
+          } else if (error.code === 'storage/retry-limit-exceeded') {
+            errorMsg = language === 'ko' ? '업로드 시도 횟수가 초과되었습니다. 네트워크 연결을 확인해 주세요.' : 'Upload retry limit exceeded. Please check your network connection.';
+          }
+          alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${errorMsg})`);
+          setUploading(false);
+        }, 
+        async () => {
+          console.log('Archive upload successful');
+          setUploadProgress(100);
+          try {
+            const url = await getDownloadURL(storageRef);
+            console.log('Archive Download URL obtained:', url);
+            const extension = file.name.split('.').pop()?.toLowerCase();
+            let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
+            if (extension === 'mp3') fileType = 'mp3';
+            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
+            if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
+            if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
+            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
+            
+            let textContent = '';
+            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
+              textContent = await file.text();
+            }
+            
+            setNewResource(prev => ({ 
+              ...prev, 
+              fileUrl: url, 
+              fileType,
+              textContent: textContent || prev.textContent 
+            }));
+            
+            if (textContent && editorRef.current) {
+              editorRef.current.innerHTML = textContent;
+            }
 
-        alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
-      } catch (err: any) {
-        console.error('Error getting download URL (Archive):', err);
-        alert(`${language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.'} (${err.message})`);
-      } finally {
-        setUploading(false);
-      }
+            alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+          } catch (err: any) {
+            console.error('Error getting download URL (Archive):', err);
+            alert(`${language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.'} (${err.message})`);
+          } finally {
+            setUploading(false);
+          }
+        }
+      );
     } catch (error: any) {
       console.error('Upload catch error (Archive):', error);
-      let errorMsg = error.message;
-      if (error.code === 'storage/quota-exceeded') {
-        errorMsg = language === 'ko' ? '저장 공간 할당량이 초과되었습니다. 내일 다시 시도해 주세요.' : 'Storage quota exceeded. Please try again tomorrow.';
-      } else if (error.code === 'storage/unauthorized') {
-        errorMsg = language === 'ko' ? '파일 업로드 권한이 없습니다.' : 'Unauthorized to upload file.';
-      }
-      alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${errorMsg})`);
+      alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${error.message})`);
       setUploading(false);
     }
   };
@@ -3367,7 +3815,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
 
       {/* Category Hub */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {RESOURCE_GROUPS.map((group) => (
+        {(t.resourceGroups || RESOURCE_GROUPS).map((group: any) => (
           <motion.div 
             key={group.id}
             className={cn(
@@ -3403,17 +3851,13 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                 </button>
               </div>
               <div>
-                <h3 className="text-2xl font-serif">{group.name.split(':')[1]?.trim() || group.name}</h3>
-                <p className={cn(
-                  "text-[10px] uppercase tracking-widest font-bold",
-                  selectedGroup === group.id ? "text-gold" : "text-gold/60"
-                )}>{group.name.split(':')[0]}</p>
+                <h3 className="text-2xl font-serif">{group.name}</h3>
               </div>
               <p className="text-sm opacity-60 leading-relaxed">{group.description}</p>
             </div>
 
             <div className="grid grid-cols-1 gap-2">
-              {group.categories.map((cat) => (
+              {group.categories.map((cat: any) => (
                 <button 
                   key={cat.id}
                   onClick={() => {
@@ -4135,7 +4579,7 @@ const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-px bg-ink/10 border border-ink/10">
-        {COURSES.map((course, idx) => (
+        {(t.courses || COURSES).map((course: any, idx: number) => (
           <motion.div 
             key={course.id}
             whileHover={{ backgroundColor: 'rgba(26, 26, 26, 0.02)' }}
@@ -4178,8 +4622,8 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
   const weeksDiscounts = siteContent['weeks-discounts']?.rates || {};
   const levelPrices = siteContent['level-prices']?.prices || {};
 
-  const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
-  const [selectedLevel, setSelectedLevel] = useState(COURSES[0].levels[0]);
+  const [selectedCourse, setSelectedCourse] = useState((t.courses || COURSES)[0]);
+  const [selectedLevel, setSelectedLevel] = useState((t.courses || COURSES)[0].levels[0]);
   const [selectedWeeks, setSelectedWeeks] = useState(12);
   const [sessionsPerWeek, setSessionsPerWeek] = useState(1);
   const [selectedHours, setSelectedHours] = useState(1);
@@ -4189,7 +4633,11 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
     setSelectedLevel(selectedCourse.levels[0]);
   }, [selectedCourse]);
 
-  const priceInfo = calculatePrice(selectedLevel, selectedWeeks, sessionsPerWeek, selectedHours, isEventPeriod, customRate, weeksDiscounts, levelPrices);
+  const originalCourse = COURSES.find(c => c.id === selectedCourse.id);
+  const levelIdx = selectedCourse.levels.indexOf(selectedLevel);
+  const originalLevel = originalCourse?.levels[levelIdx] || selectedLevel;
+
+  const priceInfo = calculatePrice(originalLevel, selectedWeeks, sessionsPerWeek, selectedHours, isEventPeriod, customRate, weeksDiscounts, levelPrices);
 
   const handleUpdateDiscount = async (weeks: number, rate: number) => {
     const newRates = { ...weeksDiscounts, [weeks]: rate };

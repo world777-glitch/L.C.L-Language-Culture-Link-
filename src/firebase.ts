@@ -41,8 +41,16 @@ export interface FirestoreErrorInfo {
 }
 
 export function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
+  const message = error instanceof Error ? error.message : String(error);
+  
+  // Provide a more user-friendly message for quota exceeded
+  let displayMessage = message;
+  if (message.includes('quota-exceeded') || message.includes('Quota exceeded')) {
+    displayMessage = 'Firebase daily free tier quota exceeded. The service will resume automatically at 00:00 UTC (09:00 KST). For higher limits, please upgrade your Firebase plan.';
+  }
+
   const errInfo: FirestoreErrorInfo = {
-    error: error instanceof Error ? error.message : String(error),
+    error: displayMessage,
     authInfo: {
       userId: auth.currentUser?.uid,
       email: auth.currentUser?.email,
@@ -60,7 +68,7 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     path
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  throw new Error(displayMessage);
 }
 
 export const loginWithGoogle = async () => {
