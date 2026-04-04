@@ -1388,10 +1388,10 @@ const DynamicContentArea: FC<{
               <FileText size={14} /> Text Block
             </button>
             <button onClick={() => handleAdd('image')} className="px-8 py-4 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all flex items-center gap-2 shadow-lg">
-              <ImageIcon size={14} /> Image Block
+              <ImageIcon size={14} /> Single Image Block
             </button>
             <button onClick={() => handleAdd('media')} className="px-8 py-4 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all flex items-center gap-2 shadow-lg">
-              <Upload size={14} /> Gallery Block
+              <Upload size={14} /> Multi-Media Gallery Block
             </button>
             <button onClick={() => handleAdd('quote')} className="px-8 py-4 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all flex items-center gap-2 shadow-lg">
               <MessageSquare size={14} /> Quote Block
@@ -1418,6 +1418,25 @@ const EditableMedia: FC<{
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
+  
+  const currentAspect = siteContent[`${contentKey}.aspect`]?.value || aspectRatio;
+  const currentFit = siteContent[`${contentKey}.fit`]?.value || 'object-cover';
+
+  const updateSetting = async (key: string, value: any) => {
+    const settingKey = `${contentKey}.${key}`;
+    const docId = `${language}_${settingKey.replace(/\./g, '_')}`;
+    try {
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: settingKey,
+        language,
+        value,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
   const content = siteContent[contentKey] || {};
   const mediaItems = content.value ? (Array.isArray(content.value) ? content.value : [content.value]) : defaultUrls;
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -1574,10 +1593,8 @@ const EditableMedia: FC<{
   const url = typeof currentMedia === 'string' ? currentMedia : currentMedia.url;
   const type = typeof currentMedia === 'string' ? 'image' : currentMedia.type;
 
-  const imgClasses = className?.split(' ').filter(c => ['object-cover', 'object-contain'].includes(c)).join(' ') || 'object-cover';
-
   return (
-    <div className={cn("relative group overflow-hidden", aspectRatio, rounded, className)}>
+    <div className={cn("relative group overflow-hidden", currentAspect, rounded, className)}>
       <AnimatePresence mode="wait">
         <motion.div
           key={currentIndex}
@@ -1593,10 +1610,10 @@ const EditableMedia: FC<{
               muted 
               loop 
               playsInline 
-              className={cn("w-full h-full", imgClasses)}
+              className={cn("w-full h-full", currentFit)}
             />
           ) : (
-            <img src={url} className={cn("w-full h-full", imgClasses)} referrerPolicy="no-referrer" />
+            <img src={url} className={cn("w-full h-full", currentFit)} referrerPolicy="no-referrer" />
           )}
         </motion.div>
       </AnimatePresence>
@@ -1632,42 +1649,91 @@ const EditableMedia: FC<{
       )}
 
       {showControls && (
-        <div className="absolute top-2 left-2 right-2 flex justify-between items-start z-30">
-          <div className="flex gap-1">
-            <button 
-              onClick={() => setIsAutoPlay(!isAutoPlay)}
-              className={cn(
-                "w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition-all",
-                isAutoPlay ? "bg-gold text-ink" : "bg-white/20 text-white backdrop-blur-md"
-              )}
-              title={language === 'ko' ? "자동 재생" : "Auto Play"}
-            >
-              <Clock size={14} />
-            </button>
-            <button 
-              onClick={() => fileInputRef.current?.click()}
-              className="w-8 h-8 bg-white text-ink rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform relative"
-              title={language === 'ko' ? "미디어 추가" : "Add Media"}
-            >
-              {isUploading ? (
-                <div className="relative flex items-center justify-center">
-                  <Clock size={14} className="animate-spin" />
-                  <span className="absolute -bottom-6 bg-ink text-white text-[8px] px-1 rounded whitespace-nowrap">
-                    {uploadProgress.current}/{uploadProgress.total}
-                  </span>
-                </div>
-              ) : <Plus size={14} />}
-            </button>
+        <div className="absolute top-2 left-2 right-2 flex flex-col gap-2 z-30 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="flex justify-between items-start">
+            <div className="flex gap-1">
+              <button 
+                onClick={() => setIsAutoPlay(!isAutoPlay)}
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition-all",
+                  isAutoPlay ? "bg-gold text-ink" : "bg-white/20 text-white backdrop-blur-md"
+                )}
+                title={language === 'ko' ? "자동 재생" : "Auto Play"}
+              >
+                <Clock size={14} />
+              </button>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-8 h-8 bg-white text-ink rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform relative"
+                title={language === 'ko' ? "미디어 추가" : "Add Media"}
+              >
+                {isUploading ? (
+                  <div className="relative flex items-center justify-center">
+                    <Clock size={14} className="animate-spin" />
+                    <span className="absolute -bottom-6 bg-ink text-white text-[8px] px-1 rounded whitespace-nowrap">
+                      {uploadProgress.current}/{uploadProgress.total}
+                    </span>
+                  </div>
+                ) : <Plus size={14} />}
+              </button>
+            </div>
+            {mediaItems.length > 0 && (
+              <button 
+                onClick={() => removeItem(currentIndex)}
+                className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                title={language === 'ko' ? "현재 항목 삭제" : "Remove Current"}
+              >
+                <Trash2 size={14} />
+              </button>
+            )}
           </div>
-          {mediaItems.length > 0 && (
-            <button 
-              onClick={() => removeItem(currentIndex)}
-              className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
-              title={language === 'ko' ? "현재 항목 삭제" : "Remove Current"}
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
+
+          <div className="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-2xl border border-gold/20 flex flex-col gap-3 self-start">
+            <div className="flex flex-col gap-1">
+              <span className="text-[8px] uppercase tracking-widest opacity-50 font-bold">Aspect Ratio</span>
+              <div className="flex gap-1">
+                {[
+                  { label: '16:9', val: 'aspect-video' },
+                  { label: '1:1', val: 'aspect-square' },
+                  { label: '4:3', val: 'aspect-[4/3]' },
+                  { label: '4:5', val: 'aspect-[4/5]' },
+                  { label: 'Auto', val: 'aspect-auto' }
+                ].map(opt => (
+                  <button 
+                    key={opt.val}
+                    onClick={() => updateSetting('aspect', opt.val)}
+                    className={cn(
+                      "px-2 py-1 text-[8px] rounded-md border transition-all",
+                      currentAspect === opt.val ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div className="flex flex-col gap-1">
+              <span className="text-[8px] uppercase tracking-widest opacity-50 font-bold">Fit</span>
+              <div className="flex gap-1">
+                {[
+                  { label: 'Cover', val: 'object-cover' },
+                  { label: 'Contain', val: 'object-contain' }
+                ].map(opt => (
+                  <button 
+                    key={opt.val}
+                    onClick={() => updateSetting('fit', opt.val)}
+                    className={cn(
+                      "px-2 py-1 text-[8px] rounded-md border transition-all",
+                      currentFit === opt.val ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+          
           <input 
             type="file" 
             ref={fileInputRef} 
