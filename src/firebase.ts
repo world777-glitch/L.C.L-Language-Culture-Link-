@@ -9,7 +9,10 @@ import firebaseConfig from '../firebase-applet-config.json';
 const app = initializeApp(firebaseConfig);
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
 export const auth = getAuth(app);
-export const storage = getStorage(app, firebaseConfig.storageBucket);
+
+// Explicitly set the bucket URL to ensure it matches the project
+const BUCKET_URL = "gs://gen-lang-client-0558382258.firebasestorage.app";
+export const storage = getStorage(app, BUCKET_URL);
 export const googleProvider = new GoogleAuthProvider();
 
 export enum OperationType {

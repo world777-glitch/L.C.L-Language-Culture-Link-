@@ -422,16 +422,16 @@ export default function App() {
 
       <main className="flex-grow">
         <AnimatePresence mode="wait">
-          {view === 'landing' && <LandingView key="landing" setView={setView} onBook={(course) => { setSelectedCourse(course); setView('inquiry'); }} setInitialArchiveFilter={setInitialArchiveFilter} language={language} isEditMode={isEditMode} siteContent={siteContent} isEventPeriod={isEventPeriod} />}
-          {view === 'curriculum' && <CurriculumView key="curriculum" language={language} onBook={(course) => { setSelectedCourse(course); setView('inquiry'); }} isEditMode={isEditMode} siteContent={siteContent} />}
-          {view === 'pricing' && <PricingView key="pricing" language={language} setView={setView} isEditMode={isEditMode} siteContent={siteContent} isEventPeriod={isEventPeriod} />}
+          {view === 'landing' && <LandingView key="landing" setView={setView} onBook={(course) => { setSelectedCourse(course); setView('inquiry'); }} setInitialArchiveFilter={setInitialArchiveFilter} language={language} isEditMode={isEditMode} isAdmin={isAdmin} siteContent={siteContent} isEventPeriod={isEventPeriod} />}
+          {view === 'curriculum' && <CurriculumView key="curriculum" language={language} onBook={(course) => { setSelectedCourse(course); setView('inquiry'); }} isEditMode={isEditMode} isAdmin={isAdmin} siteContent={siteContent} />}
+          {view === 'pricing' && <PricingView key="pricing" language={language} setView={setView} isEditMode={isEditMode} isAdmin={isAdmin} siteContent={siteContent} isEventPeriod={isEventPeriod} />}
           {view === 'booking' && <BookingView key="booking" course={selectedCourse} onComplete={() => setView('mypage')} isEventPeriod={isEventPeriod} siteContent={siteContent} />}
           {view === 'mypage' && <MyPageView key="mypage" />}
           {view === 'admin' && <AdminView key="admin" language={language} siteContent={siteContent} initialTab={adminTab} />}
           {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} siteContent={siteContent} />}
           {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} />}
           {view === 'community' && <CommunityView key="community" language={language} />}
-          {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} isEventPeriod={isEventPeriod} siteContent={siteContent} isEditMode={isEditMode} />}
+          {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} isEventPeriod={isEventPeriod} siteContent={siteContent} isEditMode={isEditMode} isAdmin={isAdmin} />}
         </AnimatePresence>
 
         {/* Edit Mode Instruction Bar */}
@@ -1045,10 +1045,11 @@ const QuickPostModal: FC<{
 const DynamicContentArea: FC<{
   contentKey: string,
   isEditMode: boolean,
+  isAdmin?: boolean,
   language: string,
   siteContent: Record<string, any>,
   itemsPerPage?: number
-}> = ({ contentKey, isEditMode, language, siteContent, itemsPerPage = 5 }) => {
+}> = ({ contentKey, isEditMode, isAdmin, language, siteContent, itemsPerPage = 5 }) => {
   const countKey = `${contentKey}.count`;
   const count = siteContent[countKey]?.value !== undefined ? Number(siteContent[countKey].value) : 0;
   const [currentPage, setCurrentPage] = useState(0);
@@ -1181,6 +1182,7 @@ const DynamicContentArea: FC<{
                     defaultUrl={`https://picsum.photos/seed/dynamic-${i}/1200/800`}
                     alt="Dynamic Image"
                     isEditMode={isEditMode}
+                    isAdmin={isAdmin}
                     language={language}
                     siteContent={siteContent}
                     rounded="rounded-[40px]"
@@ -1291,59 +1293,122 @@ const EditableMedia: FC<{
   contentKey: string, 
   defaultUrls: string[], 
   isEditMode: boolean, 
+  isAdmin?: boolean,
   language: string,
   siteContent: Record<string, any>,
   className?: string,
   aspectRatio?: string,
   rounded?: string
-}> = ({ contentKey, defaultUrls, isEditMode, language, siteContent, className, aspectRatio = "aspect-[3/4]", rounded = "rounded-2xl" }) => {
+}> = ({ contentKey, defaultUrls, isEditMode, isAdmin, language, siteContent, className, aspectRatio = "aspect-[3/4]", rounded = "rounded-2xl" }) => {
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
   const content = siteContent[contentKey] || {};
   const mediaItems = content.value ? (Array.isArray(content.value) ? content.value : [content.value]) : defaultUrls;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
+
+  const showControls = isEditMode || isAdmin;
+
+  const resetAutoPlay = () => {
+    if (autoPlayRef.current) clearInterval(autoPlayRef.current);
+    if (!isAutoPlay || isEditMode || mediaItems.length <= 1) return;
+    
+    autoPlayRef.current = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % mediaItems.length);
+    }, 5000); // Increased to 5s for better viewing
+  };
 
   useEffect(() => {
-    if (!isAutoPlay || isEditMode || mediaItems.length <= 1) return;
-    const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % mediaItems.length);
-    }, 4000);
-    return () => clearInterval(interval);
+    resetAutoPlay();
+    return () => {
+      if (autoPlayRef.current) clearInterval(autoPlayRef.current);
+    };
   }, [isAutoPlay, isEditMode, mediaItems.length]);
+
+  const handleManualChange = (newIndex: number) => {
+    setCurrentIndex(newIndex);
+    resetAutoPlay(); // Reset timer on manual interaction
+  };
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
 
-    // Limit to 20 files
-    const filesToUpload = files.slice(0, 20);
-    
+    // Limit to 20 files total
+    const currentCount = mediaItems.length;
+    const remainingSlots = 20 - currentCount;
+    if (remainingSlots <= 0) {
+      alert(language === 'ko' ? '최대 20개까지만 업로드 가능합니다.' : 'Maximum 20 items allowed.');
+      return;
+    }
+
+    const filesToUpload = files.slice(0, remainingSlots);
+    setUploadProgress({ current: 0, total: filesToUpload.length });
     setIsUploading(true);
+    
     try {
-      const newMediaItems = [...(Array.isArray(content.value) ? content.value : [])];
+      // Handle legacy string values or existing arrays
+      const existingValue = content.value;
+      const newMediaItems = [...(Array.isArray(existingValue) 
+        ? existingValue 
+        : (existingValue ? [{ url: existingValue, type: 'image' }] : []))];
       
-      for (const file of filesToUpload) {
+      for (let i = 0; i < filesToUpload.length; i++) {
+        const file = filesToUpload[i];
+        setUploadProgress(prev => ({ ...prev, current: i + 1 }));
+
+        // Size check (max 50MB for videos, 10MB for images)
+        const maxSize = file.type.startsWith('video/') ? 50 * 1024 * 1024 : 10 * 1024 * 1024;
+        if (file.size > maxSize) {
+          alert(language === 'ko' ? `${file.name}: 파일이 너무 큽니다 (최대 ${maxSize / (1024 * 1024)}MB).` : `${file.name}: File too large (max ${maxSize / (1024 * 1024)}MB).`);
+          continue;
+        }
+
         // Check video duration if it's a video
         if (file.type.startsWith('video/')) {
           const video = document.createElement('video');
           video.preload = 'metadata';
-          const duration = await new Promise<number>((resolve) => {
+          const duration = await new Promise<number>((resolve, reject) => {
+            const timeout = setTimeout(() => reject('Video metadata timeout'), 5000);
             video.onloadedmetadata = () => {
+              clearTimeout(timeout);
               window.URL.revokeObjectURL(video.src);
               resolve(video.duration);
+            };
+            video.onerror = () => {
+              clearTimeout(timeout);
+              reject('Video load error');
             };
             video.src = URL.createObjectURL(file);
           });
           
           if (duration > 16) { // 15s + 1s buffer
-            alert(language === 'ko' ? '동영상은 15초 이내여야 합니다.' : 'Videos must be under 15 seconds.');
+            alert(language === 'ko' ? `${file.name}: 동영상은 15초 이내여야 합니다.` : `${file.name}: Videos must be under 15 seconds.`);
             continue;
           }
         }
 
-        const storageRef = ref(storage, `siteContent/${language}/${contentKey}_${Date.now()}_${file.name}`);
-        await uploadBytes(storageRef, file);
+        // Sanitize filename for storage
+        const safeFileName = file.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+        const storageRef = ref(storage, `siteContent/${language}/${contentKey.replace(/\./g, '_')}_${Date.now()}_${i}_${safeFileName}`);
+        
+        // Use uploadBytesResumable for better reliability
+        const uploadTask = uploadBytesResumable(storageRef, file);
+        
+        await new Promise((resolve, reject) => {
+          uploadTask.on('state_changed', 
+            (snapshot) => {
+              // Optional: track individual file progress
+              const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+              console.log(`Upload is ${progress}% done`);
+            }, 
+            (error) => reject(error), 
+            () => resolve(null)
+          );
+        });
+
         const downloadUrl = await getDownloadURL(storageRef);
         newMediaItems.push({
           url: downloadUrl,
@@ -1358,10 +1423,17 @@ const EditableMedia: FC<{
         value: newMediaItems.slice(-20), // Keep last 20
         updatedAt: serverTimestamp()
       });
+      
+      // Move to the last uploaded item
+      setCurrentIndex(newMediaItems.length - 1);
     } catch (error) {
       console.error('Upload failed', error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      alert(language === 'ko' ? `업로드 실패: ${errorMessage}` : `Upload failed: ${errorMessage}`);
     } finally {
       setIsUploading(false);
+      setUploadProgress({ current: 0, total: 0 });
+      if (fileInputRef.current) fileInputRef.current.value = '';
     }
   };
 
@@ -1378,6 +1450,7 @@ const EditableMedia: FC<{
       if (currentIndex >= newMediaItems.length) {
         setCurrentIndex(Math.max(0, newMediaItems.length - 1));
       }
+      resetAutoPlay();
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
     }
@@ -1419,7 +1492,7 @@ const EditableMedia: FC<{
             {mediaItems.map((_: any, i: number) => (
               <button
                 key={i}
-                onClick={() => setCurrentIndex(i)}
+                onClick={() => handleManualChange(i)}
                 className={cn(
                   "w-1.5 h-1.5 rounded-full transition-all",
                   currentIndex === i ? "bg-gold w-4" : "bg-white/50 hover:bg-white"
@@ -1428,13 +1501,13 @@ const EditableMedia: FC<{
             ))}
           </div>
           <button 
-            onClick={() => setCurrentIndex((prev) => (prev - 1 + mediaItems.length) % mediaItems.length)}
+            onClick={() => handleManualChange((currentIndex - 1 + mediaItems.length) % mediaItems.length)}
             className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/20 backdrop-blur-md text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/40"
           >
             <ChevronLeft size={16} />
           </button>
           <button 
-            onClick={() => setCurrentIndex((prev) => (prev + 1) % mediaItems.length)}
+            onClick={() => handleManualChange((currentIndex + 1) % mediaItems.length)}
             className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/20 backdrop-blur-md text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/40"
           >
             <ChevronRight size={16} />
@@ -1442,7 +1515,7 @@ const EditableMedia: FC<{
         </>
       )}
 
-      {isEditMode && (
+      {showControls && (
         <div className="absolute top-2 left-2 right-2 flex justify-between items-start z-30">
           <div className="flex gap-1">
             <button 
@@ -1457,10 +1530,17 @@ const EditableMedia: FC<{
             </button>
             <button 
               onClick={() => fileInputRef.current?.click()}
-              className="w-8 h-8 bg-white text-ink rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+              className="w-8 h-8 bg-white text-ink rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform relative"
               title={language === 'ko' ? "미디어 추가" : "Add Media"}
             >
-              {isUploading ? <Plus size={14} className="animate-spin" /> : <Plus size={14} />}
+              {isUploading ? (
+                <div className="relative flex items-center justify-center">
+                  <Clock size={14} className="animate-spin" />
+                  <span className="absolute -bottom-6 bg-ink text-white text-[8px] px-1 rounded whitespace-nowrap">
+                    {uploadProgress.current}/{uploadProgress.total}
+                  </span>
+                </div>
+              ) : <Plus size={14} />}
             </button>
           </div>
           {mediaItems.length > 0 && (
@@ -1478,7 +1558,7 @@ const EditableMedia: FC<{
             onChange={handleUpload} 
             className="hidden" 
             multiple
-            accept="image/*,video/*"
+            accept="image/png,image/jpeg,image/webp,image/gif,video/*"
           />
         </div>
       )}
@@ -1490,17 +1570,20 @@ const EditableImage: FC<{
   contentKey: string, 
   defaultUrl: string, 
   isEditMode: boolean, 
+  isAdmin?: boolean,
   language: string,
   siteContent: Record<string, any>,
   className?: string,
   alt?: string,
   rounded?: string,
   children?: React.ReactNode
-}> = ({ contentKey, defaultUrl, isEditMode, language, siteContent, className, alt, rounded = "rounded-lg", children }) => {
+}> = ({ contentKey, defaultUrl, isEditMode, isAdmin, language, siteContent, className, alt, rounded = "rounded-lg", children }) => {
   const [isUploading, setIsUploading] = useState(false);
   const content = siteContent[contentKey] || {};
   const url = content.value || defaultUrl;
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const showControls = isEditMode || isAdmin;
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -1530,7 +1613,7 @@ const EditableImage: FC<{
   const containerClasses = className?.split(' ').filter(c => !['object-cover', 'object-contain', 'opacity-80', 'opacity-70'].includes(c)).join(' ');
   const imgClasses = className?.split(' ').filter(c => ['object-cover', 'object-contain', 'opacity-80', 'opacity-70'].includes(c)).join(' ');
 
-  if (isEditMode) {
+  if (showControls) {
     return (
       <div className={cn("relative group cursor-pointer", containerClasses, rounded)}>
         <div 
@@ -1559,7 +1642,7 @@ const EditableImage: FC<{
             ref={fileInputRef} 
             onChange={handleUpload} 
             className="hidden" 
-            accept="image/*"
+            accept="image/png,image/jpeg,image/webp,image/gif"
           />
         </div>
       </div>
@@ -1879,7 +1962,7 @@ const GlobalStyleEditor: FC<{
   );
 };
 
-const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode, isEditMode: boolean, siteContent: Record<string, any>, isEventPeriod: boolean }> = ({ setView, onBook, setInitialArchiveFilter, language, isEditMode, siteContent, isEventPeriod }) => {
+const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode, isEditMode: boolean, isAdmin?: boolean, siteContent: Record<string, any>, isEventPeriod: boolean }> = ({ setView, onBook, setInitialArchiveFilter, language, isEditMode, isAdmin, siteContent, isEventPeriod }) => {
   const t = TRANSLATIONS[language];
   
   return (
@@ -1889,7 +1972,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       exit={{ opacity: 0 }}
       className="space-y-32"
     >
-      <DynamicContentArea contentKey="landing.top" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+      <DynamicContentArea contentKey="landing.top" isEditMode={isEditMode} isAdmin={isAdmin} language={language} siteContent={siteContent} />
 
       {/* Hero Section */}
       <section className="relative h-[90vh] flex items-center overflow-hidden px-6 landing-hero-bg">
@@ -1902,6 +1985,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               alt="Chinese Culture" 
               className="w-full h-full object-cover opacity-80"
               isEditMode={isEditMode}
+              isAdmin={isAdmin}
               language={language}
               siteContent={siteContent}
               rounded="rounded-[200px]"
@@ -1984,6 +2068,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                         alt="Student"
                         className="w-full h-full object-cover"
                         isEditMode={isEditMode}
+                        isAdmin={isAdmin}
                         language={language}
                         siteContent={siteContent}
                         rounded="rounded-full"
@@ -2095,6 +2180,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                   contentKey={`gallery.item_${i}.media`}
                   defaultUrls={[`https://picsum.photos/seed/gallery-${i}/600/800`]}
                   isEditMode={isEditMode}
+                  isAdmin={isAdmin}
                   language={language}
                   siteContent={siteContent}
                   className="w-full h-full"
@@ -2120,6 +2206,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
         <DynamicContentArea 
           contentKey="landing.dynamic"
           isEditMode={isEditMode}
+          isAdmin={isAdmin}
           language={language}
           siteContent={siteContent}
         />
@@ -2164,6 +2251,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                   alt="Library" 
                   className="w-full h-full object-cover opacity-80"
                   isEditMode={isEditMode}
+                  isAdmin={isAdmin}
                   language={language}
                   siteContent={siteContent}
                   rounded="rounded-[40px]"
@@ -2224,7 +2312,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
           </div>
         </div>
       </section>
-      <DynamicContentArea contentKey="landing.bottom" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+      <DynamicContentArea contentKey="landing.bottom" isEditMode={isEditMode} isAdmin={isAdmin} language={language} siteContent={siteContent} />
     </motion.div>
   );
 };
@@ -2730,69 +2818,55 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
         throw new Error('Firebase Storage is not initialized');
       }
 
-      const storageRef = ref(storage, `resources/${Date.now()}_${file.name}`);
-      console.log('Starting upload for:', file.name, 'Size:', file.size, 'Type:', file.type);
+      const storagePath = `resources/${Date.now()}_${file.name}`;
+      const storageRef = ref(storage, storagePath);
+      console.warn('!!! UPLOAD ATTEMPT START (Admin) !!!');
+      console.log('Bucket:', storage.app.options.storageBucket);
+      console.log('Path:', storagePath, 'Size:', file.size, 'Type:', file.type);
       
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      if (!storage.app) {
+        console.error('Storage instance is not correctly initialized (missing app)');
+        throw new Error('Storage instance is not correctly initialized');
+      }
 
-      uploadTask.on('state_changed', 
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-          console.log('Upload progress:', progress + '%');
-        }, 
-        (error: any) => {
-          console.error('Upload task error:', error);
-          let errorMsg = error.message;
-          if (error.code === 'storage/quota-exceeded') {
-            errorMsg = language === 'ko' ? '저장 공간 할당량이 초과되었습니다. 내일 다시 시도해 주세요.' : 'Storage quota exceeded. Please try again tomorrow.';
-          } else if (error.code === 'storage/unauthorized') {
-            errorMsg = language === 'ko' ? '파일 업로드 권한이 없습니다.' : 'Unauthorized to upload file.';
-          } else if (error.code === 'storage/retry-limit-exceeded') {
-            errorMsg = language === 'ko' ? '업로드 시도 횟수가 초과되었습니다. 네트워크 연결을 확인해 주세요.' : 'Upload retry limit exceeded. Please check your network connection.';
-          }
-          alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${errorMsg})`);
-          setUploading(false);
-        }, 
-        async () => {
-          console.log('Upload successful');
-          setUploadProgress(100);
-          try {
-            const url = await getDownloadURL(storageRef);
-            console.log('Download URL obtained:', url);
-            const extension = file.name.split('.').pop()?.toLowerCase();
-            let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
-            if (extension === 'mp3') fileType = 'mp3';
-            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
-            if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
-            if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
-            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
-            
-            let textContent = '';
-            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
-              textContent = await file.text();
-            }
-            
-            setNewResource(prev => ({ 
-              ...prev, 
-              fileUrl: url, 
-              fileType,
-              textContent: textContent || prev.textContent
-            }));
+      console.log('Using uploadBytes (Simple) for better compatibility...');
+      setUploadProgress(10); // Start progress
+      
+      const result = await uploadBytes(storageRef, file);
+      console.log('Upload successful (Simple):', result);
+      setUploadProgress(100);
+      
+      const url = await getDownloadURL(storageRef);
+      console.log('Download URL obtained:', url);
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      const mimeType = file.type;
+      let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
+      
+      if (extension === 'mp3' || mimeType.startsWith('audio/')) fileType = 'mp3';
+      else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '') || mimeType.startsWith('image/')) fileType = 'image';
+      else if (['ppt', 'pptx'].includes(extension || '') || mimeType.includes('presentation') || mimeType.includes('powerpoint')) fileType = 'ppt';
+      else if (['doc', 'docx'].includes(extension || '') || mimeType.includes('word') || mimeType.includes('officedocument.wordprocessingml')) fileType = 'word';
+      else if (['txt', 'md', 'json', 'csv'].includes(extension || '') || mimeType.startsWith('text/')) fileType = 'text';
+      else if (mimeType === 'application/pdf') fileType = 'pdf';
+      
+      let textContent = '';
+      if (fileType === 'text') {
+        textContent = await file.text();
+      }
+      
+      setNewResource(prev => ({ 
+        ...prev, 
+        fileUrl: url, 
+        fileType,
+        textContent: textContent || prev.textContent
+      }));
 
-            if (textContent && editorRef.current) {
-              editorRef.current.innerHTML = textContent;
-            }
+      if (textContent && editorRef.current) {
+        editorRef.current.innerHTML = textContent;
+      }
 
-            alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
-          } catch (err: any) {
-            console.error('Error getting download URL:', err);
-            alert(`${language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.'} (${err.message})`);
-          } finally {
-            setUploading(false);
-          }
-        }
-      );
+      alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+      setUploading(false);
     } catch (error: any) {
       console.error('Upload catch error:', error);
       alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${error.message})`);
@@ -4442,12 +4516,13 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     let file: File | null = null;
     if (input instanceof File) {
       file = input;
-    } else if ('dataTransfer' in (input as any)) {
+    } else if (input && typeof input === 'object' && 'dataTransfer' in input) {
       const e = input as React.DragEvent;
       e.preventDefault();
+      e.stopPropagation();
       setIsDragging(false);
       file = e.dataTransfer.files[0];
-    } else if ('target' in (input as any)) {
+    } else if (input && typeof input === 'object' && 'target' in input) {
       const e = input as React.ChangeEvent<HTMLInputElement>;
       if (e.target.files) {
         file = e.target.files[0];
@@ -4477,69 +4552,56 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
         throw new Error('Firebase Storage is not initialized');
       }
 
-      const storageRef = ref(storage, `resources/${Date.now()}_${file.name}`);
-      console.log('Starting upload (Archive) for:', file.name, 'Size:', file.size, 'Type:', file.type);
+      const safeFileName = file.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+      const storagePath = `resources/${Date.now()}_${safeFileName}`;
+      const storageRef = ref(storage, storagePath);
+      console.warn('!!! UPLOAD ATTEMPT START (Archive) !!!');
+      console.log('Bucket:', storage.app.options.storageBucket);
+      console.log('Path:', storagePath, 'Size:', file.size, 'Type:', file.type);
       
-      const uploadTask = uploadBytesResumable(storageRef, file);
+      if (!storage.app) {
+        console.error('Storage instance is not correctly initialized (missing app)');
+        throw new Error('Storage instance is not correctly initialized');
+      }
 
-      uploadTask.on('state_changed', 
-        (snapshot) => {
-          const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-          setUploadProgress(progress);
-          console.log('Archive upload progress:', progress + '%');
-        }, 
-        (error: any) => {
-          console.error('Archive upload task error:', error);
-          let errorMsg = error.message;
-          if (error.code === 'storage/quota-exceeded') {
-            errorMsg = language === 'ko' ? '저장 공간 할당량이 초과되었습니다. 내일 다시 시도해 주세요.' : 'Storage quota exceeded. Please try again tomorrow.';
-          } else if (error.code === 'storage/unauthorized') {
-            errorMsg = language === 'ko' ? '파일 업로드 권한이 없습니다.' : 'Unauthorized to upload file.';
-          } else if (error.code === 'storage/retry-limit-exceeded') {
-            errorMsg = language === 'ko' ? '업로드 시도 횟수가 초과되었습니다. 네트워크 연결을 확인해 주세요.' : 'Upload retry limit exceeded. Please check your network connection.';
-          }
-          alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${errorMsg})`);
-          setUploading(false);
-        }, 
-        async () => {
-          console.log('Archive upload successful');
-          setUploadProgress(100);
-          try {
-            const url = await getDownloadURL(storageRef);
-            console.log('Archive Download URL obtained:', url);
-            const extension = file.name.split('.').pop()?.toLowerCase();
-            let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
-            if (extension === 'mp3') fileType = 'mp3';
-            if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '')) fileType = 'image';
-            if (['ppt', 'pptx'].includes(extension || '')) fileType = 'ppt';
-            if (['doc', 'docx'].includes(extension || '')) fileType = 'word';
-            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) fileType = 'text';
-            
-            let textContent = '';
-            if (['txt', 'md', 'json', 'csv'].includes(extension || '')) {
-              textContent = await file.text();
-            }
-            
-            setNewResource(prev => ({ 
-              ...prev, 
-              fileUrl: url, 
-              fileType,
-              textContent: textContent || prev.textContent 
-            }));
-            
-            if (textContent && editorRef.current) {
-              editorRef.current.innerHTML = textContent;
-            }
+      console.log('Using uploadBytes (Simple) for better compatibility (Archive)...');
+      setUploadProgress(10);
 
-            alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
-          } catch (err: any) {
-            console.error('Error getting download URL (Archive):', err);
-            alert(`${language === 'ko' ? '다운로드 URL을 가져오는 중 오류가 발생했습니다.' : 'Error getting download URL.'} (${err.message})`);
-          } finally {
-            setUploading(false);
-          }
-        }
-      );
+      const result = await uploadBytes(storageRef, file);
+      console.log('Archive upload successful (Simple):', result);
+      setUploadProgress(100);
+
+      const url = await getDownloadURL(storageRef);
+      console.log('Archive Download URL obtained:', url);
+      const extension = file.name.split('.').pop()?.toLowerCase();
+      const mimeType = file.type;
+      let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
+      
+      if (extension === 'mp3' || mimeType.startsWith('audio/')) fileType = 'mp3';
+      else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '') || mimeType.startsWith('image/')) fileType = 'image';
+      else if (['ppt', 'pptx'].includes(extension || '') || mimeType.includes('presentation') || mimeType.includes('powerpoint')) fileType = 'ppt';
+      else if (['doc', 'docx'].includes(extension || '') || mimeType.includes('word') || mimeType.includes('officedocument.wordprocessingml')) fileType = 'word';
+      else if (['txt', 'md', 'json', 'csv'].includes(extension || '') || mimeType.startsWith('text/')) fileType = 'text';
+      else if (mimeType === 'application/pdf') fileType = 'pdf';
+      
+      let textContent = '';
+      if (fileType === 'text') {
+        textContent = await file.text();
+      }
+      
+      setNewResource(prev => ({ 
+        ...prev, 
+        fileUrl: url, 
+        fileType,
+        textContent: textContent || prev.textContent 
+      }));
+
+      if (textContent && editorRef.current) {
+        editorRef.current.innerHTML = textContent;
+      }
+
+      alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+      setUploading(false);
     } catch (error: any) {
       console.error('Upload catch error (Archive):', error);
       alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${error.message})`);
@@ -5092,9 +5154,13 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
 
                   <button 
                     type="submit"
-                    className="w-full py-4 bg-ink text-paper rounded-2xl font-bold uppercase tracking-widest hover:bg-ink/90 transition-all shadow-xl shadow-ink/10"
+                    disabled={uploading}
+                    className={cn(
+                      "w-full py-4 bg-ink text-paper rounded-2xl font-bold uppercase tracking-widest transition-all shadow-xl shadow-ink/10",
+                      uploading ? "opacity-50 cursor-not-allowed" : "hover:bg-ink/90"
+                    )}
                   >
-                    {editingResource ? (language === 'ko' ? '수정 완료' : 'Update Resource') : (language === 'ko' ? '자료 등록' : 'Create Resource')}
+                    {uploading ? (language === 'ko' ? '업로드 중...' : 'Uploading...') : (editingResource ? (language === 'ko' ? '수정 완료' : 'Update Resource') : (language === 'ko' ? '자료 등록' : 'Create Resource'))}
                   </button>
                 </form>
               </div>
@@ -5342,7 +5408,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
   );
 };
 
-const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void, isEditMode: boolean, siteContent: any }> = ({ language, onBook, isEditMode, siteContent }) => {
+const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void, isEditMode: boolean, isAdmin?: boolean, siteContent: any }> = ({ language, onBook, isEditMode, isAdmin, siteContent }) => {
   const t = TRANSLATIONS[language];
   return (
     <motion.div 
@@ -5401,7 +5467,7 @@ const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void
   );
 };
 
-const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEditMode: boolean, siteContent: any, isEventPeriod: boolean }> = ({ language, setView, isEditMode, siteContent, isEventPeriod }) => {
+const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEditMode: boolean, isAdmin?: boolean, siteContent: any, isEventPeriod: boolean }> = ({ language, setView, isEditMode, isAdmin, siteContent, isEventPeriod }) => {
   const t = TRANSLATIONS[language];
   const event = siteContent['event-discount'];
   const customRate = event?.discountRate;
@@ -5769,7 +5835,7 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
   );
 };
 
-const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventPeriod: boolean, siteContent: any, isEditMode: boolean }> = ({ language, onComplete, isEventPeriod, siteContent, isEditMode }) => {
+const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventPeriod: boolean, siteContent: any, isEditMode: boolean, isAdmin?: boolean }> = ({ language, onComplete, isEventPeriod, siteContent, isEditMode, isAdmin }) => {
   const t = TRANSLATIONS[language];
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
