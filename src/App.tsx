@@ -10,6 +10,9 @@ import {
   Briefcase, 
   Globe, 
   ChevronRight, 
+  ChevronLeft, 
+  ArrowUp, 
+  ArrowDown, 
   ArrowRight,
   User, 
   LogOut, 
@@ -41,9 +44,14 @@ import {
   ExternalLink,
   Copy,
   Minimize2,
-  Maximize2
+  Maximize2,
+  Palette,
+  Type as TypeIcon,
+  Square,
+  Circle,
+  Settings
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { COURSES, calculatePrice, RESOURCE_GROUPS, LEVEL_PRICES } from './constants';
 import { cn } from './lib/utils';
@@ -55,7 +63,7 @@ import { saveAs } from 'file-saver';
 
 import { auth, loginWithGoogle, logout as firebaseLogout, db, storage, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, addDoc, setDoc, serverTimestamp, onSnapshot, query, where, orderBy, doc, getDoc, updateDoc, deleteDoc } from 'firebase/firestore';
+import { collection, addDoc, setDoc, serverTimestamp, onSnapshot, query, where, orderBy, doc, getDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 
 // Helper to convert raw PCM from Gemini TTS to a playable WAV Blob
@@ -190,8 +198,46 @@ export default function App() {
     }
   };
 
+  const styles = useMemo(() => ({
+    paper: siteContent['global.style.paper']?.value || '#f5f2ed',
+    ink: siteContent['global.style.ink']?.value || '#1a1a1a',
+    gold: siteContent['global.style.gold']?.value || '#c5a059',
+    fontSerif: siteContent['global.style.fontSerif']?.value || '"Cormorant Garamond", serif',
+    fontSans: siteContent['global.style.fontSans']?.value || '"Montserrat", sans-serif',
+    landingBg: siteContent['global.style.landingBg']?.value || '',
+    landingOverlay: siteContent['global.style.landingOverlay']?.value || '0',
+    allPagesBg: siteContent['global.style.allPagesBg']?.value || '',
+  }), [siteContent]);
+
   return (
-    <div className="min-h-screen flex flex-col">
+    <div className="min-h-screen flex flex-col bg-paper text-ink font-sans selection:bg-gold selection:text-ink overflow-x-hidden">
+      <style dangerouslySetInnerHTML={{ __html: `
+        :root {
+          --color-paper: ${styles.paper};
+          --color-ink: ${styles.ink};
+          --color-gold: ${styles.gold};
+          --font-serif: ${styles.fontSerif};
+          --font-sans: ${styles.fontSans};
+        }
+        body {
+          background-color: var(--color-paper);
+          color: var(--color-ink);
+          ${styles.allPagesBg ? `background-image: url("${styles.allPagesBg}"); background-size: cover; background-attachment: fixed;` : ''}
+        }
+        ${view === 'landing' && styles.landingBg ? `
+          .landing-hero-bg {
+            background-image: url("${styles.landingBg}");
+            background-size: cover;
+            background-position: center;
+          }
+          .landing-hero-overlay {
+            background-color: rgba(0,0,0,${styles.landingOverlay});
+          }
+        ` : ''}
+      `}} />
+      
+      <GlobalStyleEditor isEditMode={isEditMode} siteContent={siteContent} language={language} />
+
       {/* Scroll to Top Button */}
       <AnimatePresence>
         {showScrollTop && (
@@ -242,7 +288,23 @@ export default function App() {
               </div>
             </div>
             <button 
-              onClick={() => setView('curriculum')} 
+              onClick={() => setView('landing')} 
+              className={cn(
+                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
+                view === 'landing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
+              )}
+            >
+              {language === 'ko' ? '홈' : 'Home'}
+            </button>
+            <button 
+              onClick={() => {
+                if (view === 'landing') {
+                  document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                  setView('landing');
+                  setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100);
+                }
+              }} 
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'curriculum' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
@@ -260,7 +322,14 @@ export default function App() {
               {t.nav.pricing}
             </button>
             <button 
-              onClick={() => setView('archive')} 
+              onClick={() => {
+                if (view === 'landing') {
+                  document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                  setView('landing');
+                  setTimeout(() => document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' }), 100);
+                }
+              }} 
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'archive' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
@@ -417,9 +486,9 @@ export default function App() {
             </div>
           </div>
           <div>
-            <h4 className="text-xs uppercase tracking-widest mb-6 opacity-50">
-              <EditableText contentKey="footer.contact_label" defaultValue={t.footer.contact} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-            </h4>
+            <div className="text-xs uppercase tracking-widest mb-6 opacity-50">
+              <EditableText contentKey="footer.contact_label" defaultValue={t.footer.contact} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h4" />
+            </div>
             <div className="space-y-2">
               <EditableText contentKey="footer.contact_1" defaultValue="lhbin777@gmail.com" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm block" />
               <EditableText contentKey="footer.contact_2" defaultValue="" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm block" />
@@ -430,9 +499,9 @@ export default function App() {
             </div>
           </div>
           <div>
-            <h4 className="text-xs uppercase tracking-widest mb-6 opacity-50">
-              <EditableText contentKey="footer.social_label" defaultValue={t.footer.social} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-            </h4>
+            <div className="text-xs uppercase tracking-widest mb-6 opacity-50">
+              <EditableText contentKey="footer.social_label" defaultValue={t.footer.social} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h4" />
+            </div>
             <div className="flex flex-col gap-3">
               <div className="flex flex-wrap gap-4">
                 <EditableLink contentKey="footer.social_1" defaultText="Instagram" defaultUrl="#" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm hover:text-gold transition-colors" />
@@ -619,10 +688,32 @@ const Repeater: FC<{
   className?: string,
   containerClassName?: string,
   addButtonLabel?: string,
-  defaultCount?: number
-}> = ({ contentKey, isEditMode, language, siteContent, renderItem, className, containerClassName, addButtonLabel, defaultCount = 0 }) => {
+  defaultCount?: number,
+  itemsPerPage?: number
+}> = ({ contentKey, isEditMode, language, siteContent, renderItem, className, containerClassName, addButtonLabel, defaultCount = 0, itemsPerPage = 5 }) => {
   const countKey = `${contentKey}.count`;
   const count = siteContent[countKey]?.value !== undefined ? Number(siteContent[countKey].value) : defaultCount;
+  const [currentPage, setCurrentPage] = useState(0);
+
+  const totalPages = Math.ceil(count / itemsPerPage);
+  const startIndex = currentPage * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, count);
+  
+  // Stable IDs for smooth reordering
+  const [items, setItems] = useState<{id: string, idx: number}[]>([]);
+
+  useEffect(() => {
+    const indices = Array.from({ length: count }).map((_, i) => i);
+    const pageIndices = indices.slice(startIndex, endIndex);
+    
+    setItems(prev => {
+      // Preserve IDs for existing indices to prevent flickering
+      return pageIndices.map(idx => {
+        const existing = prev.find(p => p.idx === idx);
+        return existing || { id: Math.random().toString(36).substring(2, 9), idx };
+      });
+    });
+  }, [count, startIndex, endIndex]);
 
   const handleAdd = async () => {
     const docId = `${language}_${countKey.replace(/\./g, '_')}`;
@@ -633,48 +724,189 @@ const Repeater: FC<{
         value: count + 1,
         updatedAt: serverTimestamp()
       });
+      if (count > 0 && count % itemsPerPage === 0) {
+        setCurrentPage(totalPages);
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
     }
   };
 
-  const handleRemove = async () => {
-    if (count <= 0) return;
+  const handleRemove = async (index: number) => {
     const docId = `${language}_${countKey.replace(/\./g, '_')}`;
     try {
-      await setDoc(doc(db, 'siteContent', docId), {
+      // When removing, we should also shift data to fill the gap
+      const batch = writeBatch(db);
+      const allKeys = Object.keys(siteContent);
+      
+      // Shift all items after the removed one
+      for (let i = index + 1; i < count; i++) {
+        const oldPrefix = `${contentKey}.item_${i}.`;
+        const newPrefix = `${contentKey}.item_${i - 1}.`;
+        const itemKeys = allKeys.filter(k => k.startsWith(oldPrefix));
+        
+        for (const key of itemKeys) {
+          const suffix = key.replace(oldPrefix, '');
+          const newKey = `${newPrefix}${suffix}`;
+          batch.set(doc(db, 'siteContent', `${language}_${newKey.replace(/\./g, '_')}`), {
+            key: newKey, language, value: siteContent[key].value, updatedAt: serverTimestamp()
+          });
+        }
+      }
+
+      // Update count
+      batch.set(doc(db, 'siteContent', docId), {
         key: countKey,
         language,
         value: count - 1,
         updatedAt: serverTimestamp()
       });
+
+      await batch.commit();
+
+      if (currentPage >= Math.ceil((count - 1) / itemsPerPage) && currentPage > 0) {
+        setCurrentPage(currentPage - 1);
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
     }
   };
 
+  const reindexFirestore = async (newOrder: number[]) => {
+    const batch = writeBatch(db);
+    const allKeys = Object.keys(siteContent);
+    
+    // Store all current data in memory
+    const dataMap: Record<number, Record<string, any>> = {};
+    for (const originalIdx of newOrder) {
+      const prefix = `${contentKey}.item_${originalIdx}.`;
+      const itemKeys = allKeys.filter(k => k.startsWith(prefix));
+      dataMap[originalIdx] = {};
+      for (const key of itemKeys) {
+        const suffix = key.replace(prefix, '');
+        dataMap[originalIdx][suffix] = siteContent[key].value;
+      }
+    }
+    
+    // Write back to Firestore with new indices
+    for (let i = 0; i < newOrder.length; i++) {
+      const originalIdx = newOrder[i];
+      const targetIdx = startIndex + i;
+      const data = dataMap[originalIdx];
+      
+      const targetPrefix = `${contentKey}.item_${targetIdx}.`;
+      for (const [suffix, value] of Object.entries(data)) {
+        const targetKey = `${targetPrefix}${suffix}`;
+        batch.set(doc(db, 'siteContent', `${language}_${targetKey.replace(/\./g, '_')}`), {
+          key: targetKey, language, value, updatedAt: serverTimestamp()
+        });
+      }
+    }
+    await batch.commit();
+  };
+
+  const handleMove = async (originalIdx: number, direction: 'up' | 'down') => {
+    const visualIdx = items.findIndex(item => item.idx === originalIdx);
+    const targetVisualIdx = direction === 'up' ? visualIdx - 1 : visualIdx + 1;
+    
+    if (targetVisualIdx < 0 || targetVisualIdx >= items.length) return;
+
+    const newItems = [...items];
+    [newItems[visualIdx], newItems[targetVisualIdx]] = [newItems[targetVisualIdx], newItems[visualIdx]];
+    
+    setItems(newItems);
+    await reindexFirestore(newItems.map(item => item.idx));
+  };
+
+  const handleReorder = async (newItems: typeof items) => {
+    setItems(newItems);
+    await reindexFirestore(newItems.map(item => item.idx));
+  };
+
   return (
     <div className={containerClassName}>
-      <div className={className}>
-        {Array.from({ length: count }).map((_, i) => (
-          <div key={i} className="relative group/repeater-item">
-            {renderItem(i)}
-            {isEditMode && i === count - 1 && (
-              <button 
-                onClick={handleRemove}
-                className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/repeater-item:opacity-100 transition-opacity z-20 shadow-lg hover:scale-110"
-                title="Remove last item"
-              >
-                <X size={12} />
-              </button>
-            )}
+      {isEditMode ? (
+        <Reorder.Group 
+          axis={className?.includes('flex') && !className?.includes('flex-col') ? "x" : "y"} 
+          values={items} 
+          onReorder={handleReorder}
+          className={className}
+        >
+          {items.map((item) => (
+            <Reorder.Item key={item.id} value={item} className="relative group/repeater-item">
+              <div className="cursor-grab active:cursor-grabbing">
+                {renderItem(item.idx)}
+              </div>
+              <div className="absolute -top-2 -right-2 flex gap-1 opacity-0 group-hover/repeater-item:opacity-100 transition-opacity z-20">
+                <button 
+                  onClick={() => handleMove(item.idx, 'up')}
+                  disabled={items.indexOf(item) === 0 && currentPage === 0}
+                  className="w-6 h-6 bg-gold text-ink rounded-full flex items-center justify-center shadow-lg hover:scale-110 disabled:opacity-20"
+                >
+                  <ArrowUp size={12} />
+                </button>
+                <button 
+                  onClick={() => handleMove(item.idx, 'down')}
+                  disabled={items.indexOf(item) === items.length - 1 && currentPage === totalPages - 1}
+                  className="w-6 h-6 bg-gold text-ink rounded-full flex items-center justify-center shadow-lg hover:scale-110 disabled:opacity-20"
+                >
+                  <ArrowDown size={12} />
+                </button>
+                <button 
+                  onClick={() => handleRemove(item.idx)}
+                  className="w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110"
+                >
+                  <X size={12} />
+                </button>
+              </div>
+            </Reorder.Item>
+          ))}
+        </Reorder.Group>
+      ) : (
+        <div className={className}>
+          {items.map((item) => (
+            <div key={item.id} className="relative group/repeater-item">
+              {renderItem(item.idx)}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {totalPages > 1 && (
+        <div className="mt-12 flex items-center justify-center gap-4">
+          <button 
+            disabled={currentPage === 0}
+            onClick={() => setCurrentPage(prev => prev - 1)}
+            className="p-2 rounded-full border border-ink/10 disabled:opacity-20 hover:bg-gold/10 transition-colors"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <div className="flex gap-2">
+            {Array.from({ length: totalPages }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentPage(i)}
+                className={cn(
+                  "w-2 h-2 rounded-full transition-all",
+                  currentPage === i ? "bg-gold w-6" : "bg-ink/10 hover:bg-gold/30"
+                )}
+              />
+            ))}
           </div>
-        ))}
-      </div>
+          <button 
+            disabled={currentPage === totalPages - 1}
+            onClick={() => setCurrentPage(prev => prev + 1)}
+            className="p-2 rounded-full border border-ink/10 disabled:opacity-20 hover:bg-gold/10 transition-colors"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      )}
+
       {isEditMode && (
         <button 
           onClick={handleAdd}
-          className="mt-6 flex items-center gap-2 px-6 py-3 bg-gold/10 text-gold border border-gold/20 rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all mx-auto group"
+          className="mt-12 flex items-center gap-2 px-6 py-3 bg-gold/10 text-gold border border-gold/20 rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all mx-auto group"
         >
           <Plus size={16} className="group-hover:rotate-90 transition-transform" /> {addButtonLabel || 'Add Item'}
         </button>
@@ -682,7 +914,6 @@ const Repeater: FC<{
     </div>
   );
 };
-
 const QuickPostModal: FC<{
   isOpen: boolean,
   onClose: () => void,
@@ -797,10 +1028,17 @@ const DynamicContentArea: FC<{
   contentKey: string,
   isEditMode: boolean,
   language: string,
-  siteContent: Record<string, any>
-}> = ({ contentKey, isEditMode, language, siteContent }) => {
+  siteContent: Record<string, any>,
+  itemsPerPage?: number
+}> = ({ contentKey, isEditMode, language, siteContent, itemsPerPage = 5 }) => {
   const countKey = `${contentKey}.count`;
   const count = siteContent[countKey]?.value !== undefined ? Number(siteContent[countKey].value) : 0;
+  const [currentPage, setCurrentPage] = useState(0);
+
+  const totalPages = Math.ceil(count / itemsPerPage);
+  const startIndex = currentPage * itemsPerPage;
+  const endIndex = Math.min(startIndex + itemsPerPage, count);
+  const visibleIndices = Array.from({ length: count }).map((_, i) => i).slice(startIndex, endIndex);
 
   const handleAdd = async (type: string) => {
     const countDocId = `${language}_${countKey.replace(/\./g, '_')}`;
@@ -821,12 +1059,16 @@ const DynamicContentArea: FC<{
         value: count + 1,
         updatedAt: serverTimestamp()
       });
+
+      if (count > 0 && count % itemsPerPage === 0) {
+        setCurrentPage(totalPages);
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
     }
   };
 
-  const handleRemove = async () => {
+  const handleRemove = async (index: number) => {
     if (count <= 0) return;
     const countDocId = `${language}_${countKey.replace(/\./g, '_')}`;
     try {
@@ -836,6 +1078,50 @@ const DynamicContentArea: FC<{
         value: count - 1,
         updatedAt: serverTimestamp()
       });
+      if (currentPage >= Math.ceil((count - 1) / itemsPerPage) && currentPage > 0) {
+        setCurrentPage(currentPage - 1);
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
+  const handleMove = async (index: number, direction: 'up' | 'down') => {
+    const targetIndex = direction === 'up' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= count) return;
+
+    const itemIKeys = Object.keys(siteContent).filter(k => k.startsWith(`${contentKey}.item_${index}.`));
+    const itemJKeys = Object.keys(siteContent).filter(k => k.startsWith(`${contentKey}.item_${targetIndex}.`));
+
+    try {
+      // Swap type first
+      const typeKeyI = `${contentKey}.item_${index}.type`;
+      const typeKeyJ = `${contentKey}.item_${targetIndex}.type`;
+      const valTypeI = siteContent[typeKeyI]?.value;
+      const valTypeJ = siteContent[typeKeyJ]?.value;
+
+      await setDoc(doc(db, 'siteContent', `${language}_${typeKeyI.replace(/\./g, '_')}`), {
+        key: typeKeyI, language, value: valTypeJ, updatedAt: serverTimestamp()
+      });
+      await setDoc(doc(db, 'siteContent', `${language}_${typeKeyJ.replace(/\./g, '_')}`), {
+        key: typeKeyJ, language, value: valTypeI, updatedAt: serverTimestamp()
+      });
+
+      // Swap other properties
+      for (const key of itemIKeys) {
+        if (key === typeKeyI) continue;
+        const suffix = key.replace(`${contentKey}.item_${index}.`, '');
+        const targetKey = `${contentKey}.item_${targetIndex}.${suffix}`;
+        const valI = siteContent[key].value;
+        const valJ = siteContent[targetKey]?.value;
+
+        await setDoc(doc(db, 'siteContent', `${language}_${key.replace(/\./g, '_')}`), {
+          key, language, value: valJ, updatedAt: serverTimestamp()
+        });
+        await setDoc(doc(db, 'siteContent', `${language}_${targetKey.replace(/\./g, '_')}`), {
+          key: targetKey, language, value: valI, updatedAt: serverTimestamp()
+        });
+      }
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
     }
@@ -843,74 +1129,123 @@ const DynamicContentArea: FC<{
 
   return (
     <div className="space-y-32">
-      {Array.from({ length: count }).map((_, i) => {
-        const typeKey = `${contentKey}.item_${i}.type`;
-        const type = siteContent[typeKey]?.value || 'text';
-        
-        return (
-          <div key={i} className="relative group/dynamic-block">
-            {type === 'text' && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                className="max-w-3xl mx-auto text-center space-y-8"
-              >
-                <h3 className="text-4xl md:text-5xl font-serif font-light">
-                  <EditableText contentKey={`${contentKey}.item_${i}.title`} defaultValue="New Section Title" isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                </h3>
-                <div className="text-lg opacity-70 font-serif leading-relaxed">
-                  <EditableText contentKey={`${contentKey}.item_${i}.content`} defaultValue="Add your content here. This is a dynamic text section that you can edit directly." isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
+      <div className="space-y-32">
+        {visibleIndices.map((i) => {
+          const typeKey = `${contentKey}.item_${i}.type`;
+          const type = siteContent[typeKey]?.value || 'text';
+          
+          return (
+            <div key={i} className="relative group/dynamic-block">
+              {type === 'text' && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  className="max-w-3xl mx-auto text-center space-y-8"
+                >
+                  <div className="text-4xl md:text-5xl font-serif font-light">
+                    <EditableText contentKey={`${contentKey}.item_${i}.title`} defaultValue="New Section Title" isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" />
+                  </div>
+                  <div className="text-lg opacity-70 font-serif leading-relaxed">
+                    <EditableText contentKey={`${contentKey}.item_${i}.content`} defaultValue="Add your content here. This is a dynamic text section that you can edit directly." isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
+                  </div>
+                </motion.div>
+              )}
+              {type === 'image' && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  className="max-w-5xl mx-auto aspect-video rounded-[40px] overflow-hidden shadow-2xl"
+                >
+                  <EditableImage 
+                    contentKey={`${contentKey}.item_${i}.image`}
+                    defaultUrl={`https://picsum.photos/seed/dynamic-${i}/1200/800`}
+                    alt="Dynamic Image"
+                    isEditMode={isEditMode}
+                    language={language}
+                    siteContent={siteContent}
+                    rounded="rounded-[40px]"
+                  />
+                </motion.div>
+              )}
+              {type === 'quote' && (
+                <motion.div 
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  className="max-w-4xl mx-auto p-12 bg-gold/5 border-l-4 border-gold rounded-r-[40px] space-y-6"
+                >
+                  <div className="text-3xl font-serif italic opacity-80">
+                    <EditableText contentKey={`${contentKey}.item_${i}.quote`} defaultValue="A meaningful quote or highlight that stands out." isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                  </div>
+                  <div className="text-xs uppercase tracking-widest font-bold text-gold">
+                    <EditableText contentKey={`${contentKey}.item_${i}.author`} defaultValue="Author Name" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                  </div>
+                </motion.div>
+              )}
+              
+              {isEditMode && (
+                <div className="absolute -top-4 -right-4 flex gap-2 opacity-0 group-hover/dynamic-block:opacity-100 transition-opacity z-20">
+                  <button 
+                    onClick={() => handleMove(i, 'up')}
+                    disabled={i === 0}
+                    className="w-8 h-8 bg-gold text-ink rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform disabled:opacity-20"
+                  >
+                    <ArrowUp size={16} />
+                  </button>
+                  <button 
+                    onClick={() => handleMove(i, 'down')}
+                    disabled={i === count - 1}
+                    className="w-8 h-8 bg-gold text-ink rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform disabled:opacity-20"
+                  >
+                    <ArrowDown size={16} />
+                  </button>
+                  <button 
+                    onClick={() => handleRemove(i)}
+                    className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform"
+                    title="Remove block"
+                  >
+                    <X size={16} />
+                  </button>
                 </div>
-              </motion.div>
-            )}
-            {type === 'image' && (
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.95 }}
-                whileInView={{ opacity: 1, scale: 1 }}
-                viewport={{ once: true }}
-                className="max-w-5xl mx-auto aspect-video rounded-[40px] overflow-hidden shadow-2xl"
-              >
-                <EditableImage 
-                  contentKey={`${contentKey}.item_${i}.image`}
-                  defaultUrl={`https://picsum.photos/seed/dynamic-${i}/1200/800`}
-                  alt="Dynamic Image"
-                  isEditMode={isEditMode}
-                  language={language}
-                  siteContent={siteContent}
-                  rounded="rounded-[40px]"
-                />
-              </motion.div>
-            )}
-            {type === 'quote' && (
-              <motion.div 
-                initial={{ opacity: 0, x: -20 }}
-                whileInView={{ opacity: 1, x: 0 }}
-                viewport={{ once: true }}
-                className="max-w-4xl mx-auto p-12 bg-gold/5 border-l-4 border-gold rounded-r-[40px] space-y-6"
-              >
-                <div className="text-3xl font-serif italic opacity-80">
-                  <EditableText contentKey={`${contentKey}.item_${i}.quote`} defaultValue="A meaningful quote or highlight that stands out." isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                </div>
-                <div className="text-xs uppercase tracking-widest font-bold text-gold">
-                  <EditableText contentKey={`${contentKey}.item_${i}.author`} defaultValue="Author Name" isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                </div>
-              </motion.div>
-            )}
-            
-            {isEditMode && i === count - 1 && (
-              <button 
-                onClick={handleRemove}
-                className="absolute -top-4 -right-4 w-10 h-10 bg-red-500 text-white rounded-full flex items-center justify-center opacity-0 group-hover/dynamic-block:opacity-100 transition-opacity z-20 shadow-2xl hover:scale-110"
-                title="Remove this section"
-              >
-                <X size={20} />
-              </button>
-            )}
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-4">
+          <button 
+            disabled={currentPage === 0}
+            onClick={() => setCurrentPage(prev => prev - 1)}
+            className="p-2 rounded-full border border-ink/10 disabled:opacity-20 hover:bg-gold/10 transition-colors"
+          >
+            <ChevronLeft size={20} />
+          </button>
+          <div className="flex gap-2">
+            {Array.from({ length: totalPages }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentPage(i)}
+                className={cn(
+                  "w-2 h-2 rounded-full transition-all",
+                  currentPage === i ? "bg-gold w-6" : "bg-ink/10 hover:bg-gold/30"
+                )}
+              />
+            ))}
           </div>
-        );
-      })}
-      
+          <button 
+            disabled={currentPage === totalPages - 1}
+            onClick={() => setCurrentPage(prev => prev + 1)}
+            className="p-2 rounded-full border border-ink/10 disabled:opacity-20 hover:bg-gold/10 transition-colors"
+          >
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      )}
+
       {isEditMode && (
         <div className="max-w-4xl mx-auto py-20 border-2 border-dashed border-gold/20 rounded-[40px] bg-gold/5 flex flex-col items-center gap-8">
           <div className="text-center space-y-2">
@@ -1110,6 +1445,209 @@ const EditableLink: FC<{
   return <a href={url} target="_blank" rel="noopener noreferrer" className={className}>{text}</a>;
 };
 
+const GlobalStyleEditor: FC<{
+  isEditMode: boolean,
+  siteContent: Record<string, any>,
+  language: string
+}> = ({ isEditMode, siteContent, language }) => {
+  const [isOpen, setIsOpen] = useState(false);
+
+  const updateStyle = async (key: string, value: string) => {
+    const docId = `${language}_global_style_${key}`;
+    try {
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: `global.style.${key}`,
+        language,
+        value,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
+  if (!isEditMode) return null;
+
+  const styles = {
+    paper: siteContent['global.style.paper']?.value || '#f5f2ed',
+    ink: siteContent['global.style.ink']?.value || '#1a1a1a',
+    gold: siteContent['global.style.gold']?.value || '#c5a059',
+    fontSerif: siteContent['global.style.fontSerif']?.value || '"Cormorant Garamond", serif',
+    fontSans: siteContent['global.style.fontSans']?.value || '"Montserrat", sans-serif',
+    landingBg: siteContent['global.style.landingBg']?.value || '',
+    landingOverlay: siteContent['global.style.landingOverlay']?.value || '0',
+    allPagesBg: siteContent['global.style.allPagesBg']?.value || '',
+  };
+
+  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
+
+  return (
+    <>
+      <button 
+        onClick={() => setIsOpen(true)}
+        className="fixed bottom-8 right-8 w-14 h-14 bg-gold text-ink rounded-full flex items-center justify-center shadow-2xl z-50 hover:scale-110 transition-transform group"
+      >
+        <Palette size={24} className="group-hover:rotate-12 transition-transform" />
+      </button>
+
+      <AnimatePresence>
+        {isOpen && (
+          <div className="fixed inset-0 z-[60] flex items-center justify-end p-6 pointer-events-none">
+            <motion.div 
+              initial={{ x: 400, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              exit={{ x: 400, opacity: 0 }}
+              className="w-80 bg-paper border border-ink/10 rounded-[40px] shadow-2xl p-8 space-y-8 pointer-events-auto max-h-[90vh] overflow-y-auto custom-scrollbar"
+            >
+              <div className="flex items-center justify-between">
+                <h3 className="text-xl font-serif font-bold">{t.globalStyle.title}</h3>
+                <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-ink/5 rounded-full transition-colors">
+                  <X size={20} />
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.colors}</label>
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="space-y-2">
+                      <input 
+                        type="color" 
+                        value={styles.paper} 
+                        onChange={(e) => updateStyle('paper', e.target.value)}
+                        className="w-full h-10 rounded-xl cursor-pointer border-none bg-transparent"
+                      />
+                      <p className="text-[8px] text-center uppercase opacity-40">{t.globalStyle.paper}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <input 
+                        type="color" 
+                        value={styles.ink} 
+                        onChange={(e) => updateStyle('ink', e.target.value)}
+                        className="w-full h-10 rounded-xl cursor-pointer border-none bg-transparent"
+                      />
+                      <p className="text-[8px] text-center uppercase opacity-40">{t.globalStyle.ink}</p>
+                    </div>
+                    <div className="space-y-2">
+                      <input 
+                        type="color" 
+                        value={styles.gold} 
+                        onChange={(e) => updateStyle('gold', e.target.value)}
+                        className="w-full h-10 rounded-xl cursor-pointer border-none bg-transparent"
+                      />
+                      <p className="text-[8px] text-center uppercase opacity-40">{t.globalStyle.gold}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.backgrounds}</label>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <p className="text-[10px] opacity-60">{t.globalStyle.landingBg}</p>
+                      <input 
+                        type="text" 
+                        value={styles.landingBg} 
+                        onChange={(e) => updateStyle('landingBg', e.target.value)}
+                        placeholder="https://..."
+                        className="w-full p-2 text-xs bg-ink/5 border border-ink/10 rounded-lg"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[10px] opacity-60">{t.globalStyle.landingOverlay} ({styles.landingOverlay})</p>
+                      <input 
+                        type="range" 
+                        min="0" max="1" step="0.1"
+                        value={styles.landingOverlay} 
+                        onChange={(e) => updateStyle('landingOverlay', e.target.value)}
+                        className="w-full accent-gold"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-[10px] opacity-60">{t.globalStyle.allPagesBg}</p>
+                      <input 
+                        type="text" 
+                        value={styles.allPagesBg} 
+                        onChange={(e) => updateStyle('allPagesBg', e.target.value)}
+                        placeholder="https://..."
+                        className="w-full p-2 text-xs bg-ink/5 border border-ink/10 rounded-lg"
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.serifFont}</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {[
+                      { name: 'Cormorant', value: '"Cormorant Garamond", serif' },
+                      { name: 'Playfair', value: '"Playfair Display", serif' },
+                      { name: 'Lora', value: '"Lora", serif' },
+                      { name: 'Merriweather', value: '"Merriweather", serif' }
+                    ].map(f => (
+                      <button 
+                        key={f.name}
+                        onClick={() => updateStyle('fontSerif', f.value)}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-sm font-serif border transition-all text-left",
+                          styles.fontSerif === f.value ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
+                        )}
+                      >
+                        {f.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.sansFont}</label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {[
+                      { name: 'Montserrat', value: '"Montserrat", sans-serif' },
+                      { name: 'Inter', value: '"Inter", sans-serif' },
+                      { name: 'Outfit', value: '"Outfit", sans-serif' },
+                      { name: 'Space Grotesk', value: '"Space Grotesk", sans-serif' }
+                    ].map(f => (
+                      <button 
+                        key={f.name}
+                        onClick={() => updateStyle('fontSans', f.value)}
+                        className={cn(
+                          "px-4 py-2 rounded-xl text-sm font-sans border transition-all text-left",
+                          styles.fontSans === f.value ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
+                        )}
+                      >
+                        {f.name}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-ink/5">
+                  <button 
+                    onClick={() => {
+                      updateStyle('paper', '#f5f2ed');
+                      updateStyle('ink', '#1a1a1a');
+                      updateStyle('gold', '#c5a059');
+                      updateStyle('fontSerif', '"Cormorant Garamond", serif');
+                      updateStyle('fontSans', '"Montserrat", sans-serif');
+                      updateStyle('landingBg', '');
+                      updateStyle('landingOverlay', '0');
+                      updateStyle('allPagesBg', '');
+                    }}
+                    className="w-full py-3 bg-ink/5 text-[10px] uppercase tracking-widest font-bold rounded-xl hover:bg-red-500 hover:text-white transition-all"
+                  >
+                    {t.globalStyle.reset}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+    </>
+  );
+};
+
 const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode, isEditMode: boolean, siteContent: Record<string, any>, isEventPeriod: boolean }> = ({ setView, onBook, setInitialArchiveFilter, language, isEditMode, siteContent, isEventPeriod }) => {
   const t = TRANSLATIONS[language];
   
@@ -1120,8 +1658,11 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       exit={{ opacity: 0 }}
       className="space-y-32"
     >
+      <DynamicContentArea contentKey="landing.top" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+
       {/* Hero Section */}
-      <section className="relative h-[90vh] flex items-center overflow-hidden px-6">
+      <section className="relative h-[90vh] flex items-center overflow-hidden px-6 landing-hero-bg">
+        <div className="absolute inset-0 landing-hero-overlay pointer-events-none" />
         <div className="absolute right-0 top-0 w-1/2 h-full bg-ink/5 z-0 flex items-center justify-center">
           <div className="w-[80%] aspect-[3/4] bg-ink/10 rounded-[200px] overflow-hidden relative">
             <EditableImage 
@@ -1152,7 +1693,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
             >
               <EditableText contentKey="hero.badge" defaultValue={t.hero.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
             </motion.div>
-            <motion.h1 
+            <motion.div 
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.4 }}
@@ -1164,11 +1705,11 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                 isEditMode={isEditMode} 
                 language={language} 
                 siteContent={siteContent} 
-                as="div" 
+                as="h1" 
                 highlight={language === 'ko' ? "프리미엄 중국어" : "Premium Chinese"}
                 highlightClassName="text-gold"
               />
-            </motion.h1>
+            </motion.div>
             <motion.div 
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
@@ -1219,9 +1760,9 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                     </div>
                   )}
                 />
-                <span className="text-[10px] uppercase tracking-widest opacity-60">
+                <div className="text-[10px] uppercase tracking-widest opacity-60">
                   <EditableText contentKey="hero.students_count" defaultValue={language === 'ko' ? '500+ 수강생 참여' : '500+ Students Joined'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                </span>
+                </div>
               </div>
             </motion.div>
           </div>
@@ -1232,61 +1773,75 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       <section id="curriculum" className="max-w-7xl mx-auto px-6 py-20">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
           <div className="space-y-4">
-            <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+            <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
               <EditableText contentKey="curriculum.badge" defaultValue={t.curriculum.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-            </span>
-            <h2 className="text-5xl font-serif font-light">
-              <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-            </h2>
+            </div>
+            <div className="text-5xl font-serif font-light">
+              <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
+            </div>
           </div>
           <div className="max-w-xs text-sm opacity-60 font-serif italic">
             <EditableText contentKey="curriculum.subtitle" defaultValue={t.curriculum.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-px bg-ink/10 border border-ink/10">
-          {COURSES.map((course, idx) => (
-            <motion.div 
-              key={course.id}
-              whileHover={{ backgroundColor: 'rgba(26, 26, 26, 0.02)' }}
-              className="bg-paper p-8 space-y-8 flex flex-col h-full"
-            >
-              <div className="space-y-4 flex-grow">
-                <div className="w-12 h-12 rounded-full border border-ink/10 flex items-center justify-center">
-                  {idx === 0 && <MessageSquare size={20} />}
-                  {idx === 1 && <GraduationCap size={20} />}
-                  {idx === 2 && <Star size={20} />}
-                  {idx === 3 && <Briefcase size={20} />}
-                  {idx === 4 && <Globe size={20} />}
-                </div>
-                <h3 className="text-2xl font-serif">{course.title}</h3>
-                <p className="text-xs opacity-60 leading-relaxed">{course.description}</p>
-                <div className="flex flex-wrap gap-2">
-                  {course.levels.map(level => (
-                    <span key={level} className="text-[9px] uppercase tracking-widest px-2 py-1 bg-ink/5 rounded-sm">{level}</span>
-                  ))}
-                </div>
-              </div>
-              <button 
-                onClick={() => onBook(course)}
-                className="group flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold hover:text-gold transition-colors"
+        <Repeater 
+          contentKey="landing.curriculum"
+          isEditMode={isEditMode}
+          language={language}
+          siteContent={siteContent}
+          defaultCount={COURSES.length}
+          className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-px bg-ink/10 border border-ink/10"
+          addButtonLabel={language === 'ko' ? '과정 추가' : 'Add Course'}
+          renderItem={(idx) => {
+            const course = COURSES[idx] || { id: `custom_${idx}`, title: 'New Course', description: 'Course description...', levels: ['Basic'] };
+            return (
+              <motion.div 
+                whileHover={{ backgroundColor: 'rgba(26, 26, 26, 0.02)' }}
+                className="bg-paper p-8 space-y-8 flex flex-col h-full"
               >
-                {language === 'ko' ? '수강 신청' : t.curriculum.bookNow} <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
-              </button>
-            </motion.div>
-          ))}
-        </div>
+                <div className="space-y-4 flex-grow">
+                  <div className="w-12 h-12 rounded-full border border-ink/10 flex items-center justify-center">
+                    {idx === 0 && <MessageSquare size={20} />}
+                    {idx === 1 && <GraduationCap size={20} />}
+                    {idx === 2 && <Star size={20} />}
+                    {idx === 3 && <Briefcase size={20} />}
+                    {idx === 4 && <Globe size={20} />}
+                    {idx >= 5 && <BookOpen size={20} />}
+                  </div>
+                  <div className="text-2xl font-serif">
+                    <EditableText contentKey={`curriculum.item_${idx}.title`} defaultValue={course.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="span" />
+                  </div>
+                  <div className="text-xs opacity-60 leading-relaxed">
+                    <EditableText contentKey={`curriculum.item_${idx}.desc`} defaultValue={course.description} isEditMode={isEditMode} language={language} siteContent={siteContent} as="span" />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {course.levels.map(level => (
+                      <span key={level} className="text-[9px] uppercase tracking-widest px-2 py-1 bg-ink/5 rounded-sm">{level}</span>
+                    ))}
+                  </div>
+                </div>
+                <button 
+                  onClick={() => onBook(course)}
+                  className="group flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold hover:text-gold transition-colors"
+                >
+                  {language === 'ko' ? '수강 신청' : t.curriculum.bookNow} <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                </button>
+              </motion.div>
+            );
+          }}
+        />
       </section>
 
       {/* Dynamic Gallery Section */}
       <section className="max-w-7xl mx-auto px-6 py-20">
         <div className="text-center space-y-4 mb-20">
-          <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+          <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
             <EditableText contentKey="gallery.badge" defaultValue="Gallery & Highlights" isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </span>
-          <h2 className="text-5xl font-serif font-light">
-            <EditableText contentKey="gallery.title" defaultValue={language === 'ko' ? '우리의 특별한 순간들' : 'Our Special Moments'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </h2>
+          </div>
+          <div className="text-5xl font-serif font-light">
+            <EditableText contentKey="gallery.title" defaultValue={language === 'ko' ? '우리의 특별한 순간들' : 'Our Special Moments'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
+          </div>
         </div>
 
         <Repeater 
@@ -1317,12 +1872,12 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                 />
               </div>
               <div className="space-y-2 px-4">
-                <h4 className="text-lg font-serif">
-                  <EditableText contentKey={`gallery.item_${i}.title`} defaultValue={language === 'ko' ? `하이라이트 ${i + 1}` : `Highlight ${i + 1}`} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                </h4>
-                <p className="text-xs opacity-60 leading-relaxed">
-                  <EditableText contentKey={`gallery.item_${i}.desc`} defaultValue={language === 'ko' ? '특별한 학습 경험과 문화적 통찰력을 공유합니다.' : 'Sharing special learning experiences and cultural insights.'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                </p>
+                <div className="text-lg font-serif">
+                  <EditableText contentKey={`gallery.item_${i}.title`} defaultValue={language === 'ko' ? `하이라이트 ${i + 1}` : `Highlight ${i + 1}`} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h4" />
+                </div>
+                <div className="text-xs opacity-60 leading-relaxed">
+                  <EditableText contentKey={`gallery.item_${i}.desc`} defaultValue={language === 'ko' ? '특별한 학습 경험과 문화적 통찰력을 공유합니다.' : 'Sharing special learning experiences and cultural insights.'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="p" />
+                </div>
               </div>
             </motion.div>
           )}
@@ -1360,12 +1915,12 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
         <div className="max-w-7xl mx-auto space-y-20">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
             <div className="space-y-8">
-              <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+              <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
                 <EditableText contentKey="library.badge" defaultValue="Knowledge Library" isEditMode={isEditMode} language={language} siteContent={siteContent} />
-              </span>
-              <h2 className="text-5xl md:text-6xl font-serif font-light leading-tight">
-                <EditableText contentKey="library.title" defaultValue={language === 'ko' ? '"언어는 고립된 기호가 아니라, 역사가 숨 쉬는 생명체입니다."' : '"Language is not an isolated symbol, but a living organism where history breathes."'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
-              </h2>
+              </div>
+              <div className="text-5xl md:text-6xl font-serif font-light leading-tight">
+                <EditableText contentKey="library.title" defaultValue={language === 'ko' ? '"언어는 고립된 기호가 아니라, 역사가 숨 쉬는 생명체입니다."' : '"Language is not an isolated symbol, but a living organism where history breathes."'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
+              </div>
               <div className="text-lg opacity-70 font-serif leading-relaxed">
                 <EditableText contentKey="library.description" defaultValue={language === 'ko' ? 'L.C.L Knowledge Library는 중국 언어학 박사의 학문적 엄격함과 20년 현지 체류의 직관을 결합한 지식의 정수입니다. 단순한 학습 자료를 넘어, 언어의 구조적 원리와 문화적 맥락을 관통하는 통찰력을 제공합니다.' : 'The L.C.L Knowledge Library is the essence of knowledge that combines the academic rigor of a PhD in Chinese linguistics with the intuition of 20 years of local residence. Beyond simple learning materials, it provides insight into the structural principles and cultural context of language.'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
               </div>
@@ -1438,6 +1993,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
           </div>
         </div>
       </section>
+      <DynamicContentArea contentKey="landing.bottom" isEditMode={isEditMode} language={language} siteContent={siteContent} />
     </motion.div>
   );
 };
@@ -4566,12 +5122,12 @@ const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void
     >
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
         <div className="space-y-4">
-          <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+          <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
             <EditableText contentKey="curriculum.badge" defaultValue={t.curriculum.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </span>
-          <h2 className="text-5xl font-serif font-light">
-            <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </h2>
+          </div>
+          <div className="text-5xl font-serif font-light">
+            <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
+          </div>
         </div>
         <div className="max-w-xs text-sm opacity-60 font-serif italic">
           <EditableText contentKey="curriculum.subtitle" defaultValue={t.curriculum.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
@@ -4685,12 +5241,12 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
     >
       <div className="max-w-7xl mx-auto w-full">
         <div className="text-center space-y-6 mb-20">
-          <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+          <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
             <EditableText contentKey="pricing.badge" defaultValue={t.pricing.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </span>
-          <h2 className="text-5xl font-serif font-light">
-            <EditableText contentKey="pricing.title" defaultValue={t.pricing.title} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </h2>
+          </div>
+          <div className="text-5xl font-serif font-light">
+            <EditableText contentKey="pricing.title" defaultValue={t.pricing.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
+          </div>
           <div className="max-w-xl mx-auto opacity-60 font-serif italic">
             <EditableText contentKey="pricing.subtitle" defaultValue={t.pricing.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
@@ -5104,24 +5660,24 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
       className="max-w-3xl mx-auto px-6 py-20"
     >
       <div className="text-center space-y-4 mb-16">
-        <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+        <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
           <EditableText contentKey="inquiry.badge" defaultValue={t.inquiry.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-        </span>
-        <h2 className="text-5xl font-serif font-light">
-          <EditableText contentKey="inquiry.title" defaultValue={t.inquiry.title} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-        </h2>
-        <p className="text-lg opacity-60 font-serif italic">
-          <EditableText contentKey="inquiry.subtitle" defaultValue={t.inquiry.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-        </p>
+        </div>
+        <div className="text-5xl font-serif font-light">
+          <EditableText contentKey="inquiry.title" defaultValue={t.inquiry.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
+        </div>
+        <div className="text-lg opacity-60 font-serif italic">
+          <EditableText contentKey="inquiry.subtitle" defaultValue={t.inquiry.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="p" />
+        </div>
       </div>
 
       <form onSubmit={handleSubmit} className="space-y-12">
         {/* 1. Name */}
         <div className="space-y-4">
-          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+          <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">1</span>
             <EditableText contentKey="inquiry.nameLabel" defaultValue={t.inquiry.nameLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </label>
+          </div>
           <input 
             type="text"
             required
@@ -5134,10 +5690,10 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
 
         {/* 2. Contact */}
         <div className="space-y-4">
-          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+          <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">2</span>
             <EditableText contentKey="inquiry.contactLabel" defaultValue={t.inquiry.contactLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </label>
+          </div>
           <input 
             type="text"
             required
@@ -5150,10 +5706,10 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
 
         {/* 3. History */}
         <div className="space-y-4">
-          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+          <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">3</span>
             <EditableText contentKey="inquiry.historyLabel" defaultValue={t.inquiry.historyLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </label>
+          </div>
           <textarea 
             placeholder={t.inquiry.historyPlaceholder}
             value={formData.history}
@@ -5164,10 +5720,10 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
 
         {/* 4. Level & Concerns */}
         <div className="space-y-6">
-          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+          <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">4</span>
             <EditableText contentKey="inquiry.levelLabel" defaultValue={t.inquiry.levelLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </label>
+          </div>
           <div className="grid grid-cols-1 gap-3">
             {t.inquiry.levelOptions.map((option: string) => (
               <div key={option} className="space-y-3">
@@ -5207,10 +5763,10 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
 
         {/* 5. Goals */}
         <div className="space-y-4">
-          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+          <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">5</span>
             <EditableText contentKey="inquiry.goalsLabel" defaultValue={t.inquiry.goalsLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </label>
+          </div>
           <textarea 
             placeholder={t.inquiry.goalsPlaceholder}
             value={formData.goals || ''}
@@ -5222,10 +5778,10 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
         {/* 5. Desired Duration & Hours */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
           <div className="space-y-6">
-            <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
               <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">5</span>
               <EditableText contentKey="inquiry.durationLabel" defaultValue={language === 'ko' ? '희망 수강 기간' : 'Desired Duration'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-            </label>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {[4, 8, 10, 12].map(w => (
                 <button 
@@ -5244,10 +5800,10 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
           </div>
 
           <div className="space-y-6">
-            <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
               <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">6</span>
               <EditableText contentKey="inquiry.hoursLabel" defaultValue={language === 'ko' ? '희망 수업 시간' : 'Desired Class Duration'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-            </label>
+            </div>
             <div className="grid grid-cols-3 gap-3">
               {[1, 1.5, 2].map(h => (
                 <button 
@@ -5314,10 +5870,10 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
 
         {/* 6. Desired Course */}
         <div className="space-y-6">
-          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+          <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">6</span>
             <EditableText contentKey="inquiry.classLabel" defaultValue={t.inquiry.classLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </label>
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {t.inquiry.classOptions.map((option: string) => (
               <div key={option} className="space-y-3">
@@ -5384,10 +5940,10 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
 
         {/* 7. Preferred Schedule */}
         <div className="space-y-6">
-          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+          <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">7</span>
             <EditableText contentKey="inquiry.scheduleLabel" defaultValue={t.inquiry.scheduleLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </label>
+          </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
             {['평일 오전', '평일 오후', '평일 저녁', '주말 오전', '주말 오후', '주말 저녁'].map(slot => (
               <button
@@ -5407,10 +5963,10 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
 
         {/* 8. Additional Requests */}
         <div className="space-y-4">
-          <label className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+          <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">8</span>
             <EditableText contentKey="inquiry.requestsLabel" defaultValue={t.inquiry.requestsLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </label>
+          </div>
           <textarea 
             placeholder={t.inquiry.requestsPlaceholder}
             value={formData.requests || ''}
