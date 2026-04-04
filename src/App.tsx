@@ -42,6 +42,9 @@ import {
   Edit,
   X,
   ExternalLink,
+  Instagram,
+  Facebook,
+  Youtube,
   Copy,
   Minimize2,
   Maximize2,
@@ -503,12 +506,27 @@ export default function App() {
               <EditableText contentKey="footer.social_label" defaultValue={t.footer.social} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h4" />
             </div>
             <div className="flex flex-col gap-3">
-              <div className="flex flex-wrap gap-4">
-                <EditableLink contentKey="footer.social_1" defaultText="Instagram" defaultUrl="#" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm hover:text-gold transition-colors" />
-                <EditableLink contentKey="footer.social_2" defaultText="Blog" defaultUrl="#" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm hover:text-gold transition-colors" />
-                <EditableLink contentKey="footer.social_3" defaultText="" defaultUrl="#" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm hover:text-gold transition-colors" />
-                <EditableLink contentKey="footer.social_4" defaultText="" defaultUrl="#" isEditMode={isEditMode} language={language} siteContent={siteContent} className="text-sm hover:text-gold transition-colors" />
-              </div>
+              <Repeater 
+                contentKey="footer.social_links"
+                isEditMode={isEditMode}
+                language={language}
+                siteContent={siteContent}
+                itemsPerPage={10}
+                defaultCount={2}
+                className="flex flex-wrap gap-4"
+                addButtonLabel={language === 'ko' ? '소셜 링크 추가' : 'Add Social Link'}
+                renderItem={(i) => (
+                  <EditableLink 
+                    contentKey={`footer.social_links.item_${i}`} 
+                    defaultText={i === 0 ? "Instagram" : i === 1 ? "Blog" : "Link"} 
+                    defaultUrl="#" 
+                    isEditMode={isEditMode} 
+                    language={language} 
+                    siteContent={siteContent} 
+                    className="text-sm hover:text-gold transition-colors flex items-center gap-1" 
+                  />
+                )}
+              />
             </div>
           </div>
         </div>
@@ -1269,6 +1287,205 @@ const DynamicContentArea: FC<{
   );
 };
 
+const EditableMedia: FC<{ 
+  contentKey: string, 
+  defaultUrls: string[], 
+  isEditMode: boolean, 
+  language: string,
+  siteContent: Record<string, any>,
+  className?: string,
+  aspectRatio?: string,
+  rounded?: string
+}> = ({ contentKey, defaultUrls, isEditMode, language, siteContent, className, aspectRatio = "aspect-[3/4]", rounded = "rounded-2xl" }) => {
+  const [isUploading, setIsUploading] = useState(false);
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const [isAutoPlay, setIsAutoPlay] = useState(true);
+  const content = siteContent[contentKey] || {};
+  const mediaItems = content.value ? (Array.isArray(content.value) ? content.value : [content.value]) : defaultUrls;
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!isAutoPlay || isEditMode || mediaItems.length <= 1) return;
+    const interval = setInterval(() => {
+      setCurrentIndex((prev) => (prev + 1) % mediaItems.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [isAutoPlay, isEditMode, mediaItems.length]);
+
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+
+    // Limit to 20 files
+    const filesToUpload = files.slice(0, 20);
+    
+    setIsUploading(true);
+    try {
+      const newMediaItems = [...(Array.isArray(content.value) ? content.value : [])];
+      
+      for (const file of filesToUpload) {
+        // Check video duration if it's a video
+        if (file.type.startsWith('video/')) {
+          const video = document.createElement('video');
+          video.preload = 'metadata';
+          const duration = await new Promise<number>((resolve) => {
+            video.onloadedmetadata = () => {
+              window.URL.revokeObjectURL(video.src);
+              resolve(video.duration);
+            };
+            video.src = URL.createObjectURL(file);
+          });
+          
+          if (duration > 16) { // 15s + 1s buffer
+            alert(language === 'ko' ? '동영상은 15초 이내여야 합니다.' : 'Videos must be under 15 seconds.');
+            continue;
+          }
+        }
+
+        const storageRef = ref(storage, `siteContent/${language}/${contentKey}_${Date.now()}_${file.name}`);
+        await uploadBytes(storageRef, file);
+        const downloadUrl = await getDownloadURL(storageRef);
+        newMediaItems.push({
+          url: downloadUrl,
+          type: file.type.startsWith('video/') ? 'video' : 'image'
+        });
+      }
+
+      const docId = `${language}_${contentKey.replace(/\./g, '_')}`;
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: contentKey,
+        language,
+        value: newMediaItems.slice(-20), // Keep last 20
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      console.error('Upload failed', error);
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  const removeItem = async (idx: number) => {
+    const newMediaItems = mediaItems.filter((_: any, i: number) => i !== idx);
+    const docId = `${language}_${contentKey.replace(/\./g, '_')}`;
+    try {
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: contentKey,
+        language,
+        value: newMediaItems,
+        updatedAt: serverTimestamp()
+      });
+      if (currentIndex >= newMediaItems.length) {
+        setCurrentIndex(Math.max(0, newMediaItems.length - 1));
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
+  const currentMedia = mediaItems[currentIndex] || { url: defaultUrls[0], type: 'image' };
+  const url = typeof currentMedia === 'string' ? currentMedia : currentMedia.url;
+  const type = typeof currentMedia === 'string' ? 'image' : currentMedia.type;
+
+  return (
+    <div className={cn("relative group overflow-hidden", aspectRatio, rounded, className)}>
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={currentIndex}
+          initial={{ opacity: 0, x: 20 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: -20 }}
+          className="absolute inset-0"
+        >
+          {type === 'video' ? (
+            <video 
+              src={url} 
+              autoPlay 
+              muted 
+              loop 
+              playsInline 
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <img src={url} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+          )}
+        </motion.div>
+      </AnimatePresence>
+
+      {mediaItems.length > 1 && (
+        <>
+          <div className="absolute inset-0 bg-gradient-to-b from-transparent to-ink/40 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
+          <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-1.5 z-10">
+            {mediaItems.map((_: any, i: number) => (
+              <button
+                key={i}
+                onClick={() => setCurrentIndex(i)}
+                className={cn(
+                  "w-1.5 h-1.5 rounded-full transition-all",
+                  currentIndex === i ? "bg-gold w-4" : "bg-white/50 hover:bg-white"
+                )}
+              />
+            ))}
+          </div>
+          <button 
+            onClick={() => setCurrentIndex((prev) => (prev - 1 + mediaItems.length) % mediaItems.length)}
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/20 backdrop-blur-md text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/40"
+          >
+            <ChevronLeft size={16} />
+          </button>
+          <button 
+            onClick={() => setCurrentIndex((prev) => (prev + 1) % mediaItems.length)}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 bg-white/20 backdrop-blur-md text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity hover:bg-white/40"
+          >
+            <ChevronRight size={16} />
+          </button>
+        </>
+      )}
+
+      {isEditMode && (
+        <div className="absolute top-2 left-2 right-2 flex justify-between items-start z-30">
+          <div className="flex gap-1">
+            <button 
+              onClick={() => setIsAutoPlay(!isAutoPlay)}
+              className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition-all",
+                isAutoPlay ? "bg-gold text-ink" : "bg-white/20 text-white backdrop-blur-md"
+              )}
+              title={language === 'ko' ? "자동 재생" : "Auto Play"}
+            >
+              <Clock size={14} />
+            </button>
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-8 h-8 bg-white text-ink rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+              title={language === 'ko' ? "미디어 추가" : "Add Media"}
+            >
+              {isUploading ? <Plus size={14} className="animate-spin" /> : <Plus size={14} />}
+            </button>
+          </div>
+          {mediaItems.length > 0 && (
+            <button 
+              onClick={() => removeItem(currentIndex)}
+              className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+              title={language === 'ko' ? "현재 항목 삭제" : "Remove Current"}
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+          <input 
+            type="file" 
+            ref={fileInputRef} 
+            onChange={handleUpload} 
+            className="hidden" 
+            multiple
+            accept="image/*,video/*"
+          />
+        </div>
+      )}
+    </div>
+  );
+};
+
 const EditableImage: FC<{ 
   contentKey: string, 
   defaultUrl: string, 
@@ -1333,7 +1550,7 @@ const EditableImage: FC<{
           )}>
             <div className="bg-white text-ink px-6 py-3 rounded-full text-[10px] uppercase tracking-widest font-bold shadow-2xl flex items-center gap-3 transform scale-90 group-hover:scale-100 transition-transform duration-300">
               {isUploading ? <Clock size={14} className="animate-spin text-gold" /> : <Upload size={14} className="text-gold" />}
-              {isUploading ? 'Uploading...' : 'Change Image'}
+              {isUploading ? (language === 'ko' ? '업로드 중...' : 'Uploading...') : (language === 'ko' ? '이미지 변경' : 'Change Image')}
             </div>
           </div>
           
@@ -1370,6 +1587,15 @@ const EditableLink: FC<{
   const content = siteContent[contentKey] || {};
   const [text, setText] = useState(content.value !== undefined ? content.value : defaultText);
   const [url, setUrl] = useState(content.url !== undefined ? content.url : defaultUrl);
+
+  const getIcon = (url: string) => {
+    const lower = url.toLowerCase();
+    if (lower.includes('instagram')) return <Instagram size={14} />;
+    if (lower.includes('facebook')) return <Facebook size={14} />;
+    if (lower.includes('youtube')) return <Youtube size={14} />;
+    if (lower.includes('blog') || lower.includes('naver')) return <BookOpen size={14} />;
+    return <ExternalLink size={14} />;
+  };
 
   const displayValue = text || (isEditMode ? `[+ ${contentKey}]` : "");
 
@@ -1442,7 +1668,12 @@ const EditableLink: FC<{
     );
   }
 
-  return <a href={url} target="_blank" rel="noopener noreferrer" className={className}>{text}</a>;
+  return (
+    <a href={url} target="_blank" rel="noopener noreferrer" className={className}>
+      {getIcon(url)}
+      {text}
+    </a>
+  );
 };
 
 const GlobalStyleEditor: FC<{
@@ -1860,15 +2091,15 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               className="space-y-6 group/gallery-item"
             >
               <div className="aspect-[4/5] bg-ink/5 rounded-[40px] overflow-hidden relative">
-                <EditableImage 
-                  contentKey={`gallery.item_${i}.image`}
-                  defaultUrl={`https://picsum.photos/seed/gallery-${i}/600/800`}
-                  alt="Gallery"
-                  className="w-full h-full object-cover group-hover/gallery-item:scale-105 transition-transform duration-700"
+                <EditableMedia 
+                  contentKey={`gallery.item_${i}.media`}
+                  defaultUrls={[`https://picsum.photos/seed/gallery-${i}/600/800`]}
                   isEditMode={isEditMode}
                   language={language}
                   siteContent={siteContent}
+                  className="w-full h-full"
                   rounded="rounded-[40px]"
+                  aspectRatio="aspect-full"
                 />
               </div>
               <div className="space-y-2 px-4">
