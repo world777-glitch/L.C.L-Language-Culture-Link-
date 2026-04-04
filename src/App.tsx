@@ -48,6 +48,7 @@ import {
   Copy,
   Minimize2,
   Maximize2,
+  Video,
   Palette,
   Type as TypeIcon,
   Square,
@@ -1146,12 +1147,31 @@ const DynamicContentArea: FC<{
     }
   };
 
+  const updateBlockSetting = async (index: number, key: string, value: any) => {
+    const settingKey = `${contentKey}.item_${index}.${key}`;
+    const docId = `${language}_${settingKey.replace(/\./g, '_')}`;
+    try {
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: settingKey,
+        language,
+        value,
+        updatedAt: serverTimestamp()
+      });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
   return (
     <div className="space-y-32">
       <div className="space-y-32">
         {visibleIndices.map((i) => {
           const typeKey = `${contentKey}.item_${i}.type`;
           const type = siteContent[typeKey]?.value || 'text';
+          
+          const aspect = siteContent[`${contentKey}.item_${i}.aspect`]?.value || 'aspect-video';
+          const fit = siteContent[`${contentKey}.item_${i}.fit`]?.value || 'object-cover';
+          const width = siteContent[`${contentKey}.item_${i}.width`]?.value || 'max-w-5xl';
           
           return (
             <div key={i} className="relative group/dynamic-block">
@@ -1175,7 +1195,7 @@ const DynamicContentArea: FC<{
                   initial={{ opacity: 0, scale: 0.95 }}
                   whileInView={{ opacity: 1, scale: 1 }}
                   viewport={{ once: true }}
-                  className="max-w-5xl mx-auto aspect-video rounded-[40px] overflow-hidden shadow-2xl"
+                  className={cn("mx-auto rounded-[40px] overflow-hidden shadow-2xl relative", width, aspect === 'aspect-auto' ? 'h-auto' : aspect)}
                 >
                   <EditableImage 
                     contentKey={`${contentKey}.item_${i}.image`}
@@ -1186,6 +1206,27 @@ const DynamicContentArea: FC<{
                     language={language}
                     siteContent={siteContent}
                     rounded="rounded-[40px]"
+                    className={cn("w-full h-full", fit)}
+                  />
+                </motion.div>
+              )}
+              {type === 'media' && (
+                <motion.div 
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  whileInView={{ opacity: 1, scale: 1 }}
+                  viewport={{ once: true }}
+                  className={cn("mx-auto rounded-[40px] overflow-hidden shadow-2xl relative", width, aspect === 'aspect-auto' ? 'h-auto' : aspect)}
+                >
+                  <EditableMedia 
+                    contentKey={`${contentKey}.item_${i}.media`}
+                    defaultUrls={[`https://picsum.photos/seed/dynamic-${i}-1/1200/800`]}
+                    isEditMode={isEditMode}
+                    isAdmin={isAdmin}
+                    language={language}
+                    siteContent={siteContent}
+                    rounded="rounded-[40px]"
+                    aspectRatio={aspect === 'aspect-auto' ? 'aspect-video' : aspect}
+                    className={cn("w-full h-full", fit)}
                   />
                 </motion.div>
               )}
@@ -1206,28 +1247,98 @@ const DynamicContentArea: FC<{
               )}
               
               {isEditMode && (
-                <div className="absolute -top-4 -right-4 flex gap-2 opacity-0 group-hover/dynamic-block:opacity-100 transition-opacity z-20">
-                  <button 
-                    onClick={() => handleMove(i, 'up')}
-                    disabled={i === 0}
-                    className="w-8 h-8 bg-gold text-ink rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform disabled:opacity-20"
-                  >
-                    <ArrowUp size={16} />
-                  </button>
-                  <button 
-                    onClick={() => handleMove(i, 'down')}
-                    disabled={i === count - 1}
-                    className="w-8 h-8 bg-gold text-ink rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform disabled:opacity-20"
-                  >
-                    <ArrowDown size={16} />
-                  </button>
-                  <button 
-                    onClick={() => handleRemove(i)}
-                    className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform"
-                    title="Remove block"
-                  >
-                    <X size={16} />
-                  </button>
+                <div className="absolute -top-4 -right-4 flex flex-col gap-2 opacity-0 group-hover/dynamic-block:opacity-100 transition-opacity z-20">
+                  <div className="flex gap-2">
+                    <button 
+                      onClick={() => handleMove(i, 'up')}
+                      disabled={i === 0}
+                      className="w-8 h-8 bg-gold text-ink rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform disabled:opacity-20"
+                    >
+                      <ArrowUp size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleMove(i, 'down')}
+                      disabled={i === count - 1}
+                      className="w-8 h-8 bg-gold text-ink rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform disabled:opacity-20"
+                    >
+                      <ArrowDown size={16} />
+                    </button>
+                    <button 
+                      onClick={() => handleRemove(i)}
+                      className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-xl hover:scale-110 transition-transform"
+                      title="Remove block"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                  
+                  {(type === 'image' || type === 'media') && (
+                    <div className="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-2xl border border-gold/20 flex flex-col gap-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[8px] uppercase tracking-widest opacity-50 font-bold">Aspect Ratio</span>
+                        <div className="flex gap-1">
+                          {[
+                            { label: '16:9', val: 'aspect-video' },
+                            { label: '1:1', val: 'aspect-square' },
+                            { label: '4:3', val: 'aspect-[4/3]' },
+                            { label: 'Auto', val: 'aspect-auto' }
+                          ].map(opt => (
+                            <button 
+                              key={opt.val}
+                              onClick={() => updateBlockSetting(i, 'aspect', opt.val)}
+                              className={cn(
+                                "px-2 py-1 text-[8px] rounded-md border transition-all",
+                                aspect === opt.val ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
+                              )}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[8px] uppercase tracking-widest opacity-50 font-bold">Fit</span>
+                        <div className="flex gap-1">
+                          {[
+                            { label: 'Cover', val: 'object-cover' },
+                            { label: 'Contain', val: 'object-contain' }
+                          ].map(opt => (
+                            <button 
+                              key={opt.val}
+                              onClick={() => updateBlockSetting(i, 'fit', opt.val)}
+                              className={cn(
+                                "px-2 py-1 text-[8px] rounded-md border transition-all",
+                                fit === opt.val ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
+                              )}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[8px] uppercase tracking-widest opacity-50 font-bold">Width</span>
+                        <div className="flex gap-1">
+                          {[
+                            { label: 'Narrow', val: 'max-w-3xl' },
+                            { label: 'Medium', val: 'max-w-5xl' },
+                            { label: 'Wide', val: 'max-w-7xl' }
+                          ].map(opt => (
+                            <button 
+                              key={opt.val}
+                              onClick={() => updateBlockSetting(i, 'width', opt.val)}
+                              className={cn(
+                                "px-2 py-1 text-[8px] rounded-md border transition-all",
+                                width === opt.val ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
+                              )}
+                            >
+                              {opt.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -1278,6 +1389,9 @@ const DynamicContentArea: FC<{
             </button>
             <button onClick={() => handleAdd('image')} className="px-8 py-4 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all flex items-center gap-2 shadow-lg">
               <ImageIcon size={14} /> Image Block
+            </button>
+            <button onClick={() => handleAdd('media')} className="px-8 py-4 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all flex items-center gap-2 shadow-lg">
+              <Upload size={14} /> Gallery Block
             </button>
             <button onClick={() => handleAdd('quote')} className="px-8 py-4 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all flex items-center gap-2 shadow-lg">
               <MessageSquare size={14} /> Quote Block
@@ -1460,6 +1574,8 @@ const EditableMedia: FC<{
   const url = typeof currentMedia === 'string' ? currentMedia : currentMedia.url;
   const type = typeof currentMedia === 'string' ? 'image' : currentMedia.type;
 
+  const imgClasses = className?.split(' ').filter(c => ['object-cover', 'object-contain'].includes(c)).join(' ') || 'object-cover';
+
   return (
     <div className={cn("relative group overflow-hidden", aspectRatio, rounded, className)}>
       <AnimatePresence mode="wait">
@@ -1477,10 +1593,10 @@ const EditableMedia: FC<{
               muted 
               loop 
               playsInline 
-              className="w-full h-full object-cover"
+              className={cn("w-full h-full", imgClasses)}
             />
           ) : (
-            <img src={url} className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+            <img src={url} className={cn("w-full h-full", imgClasses)} referrerPolicy="no-referrer" />
           )}
         </motion.div>
       </AnimatePresence>
@@ -2615,8 +2731,9 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
     groupId: RESOURCE_GROUPS[0].id,
     categoryId: RESOURCE_GROUPS[0].categories[0].id,
     fileUrl: '',
+    fileUrls: [] as string[],
     textContent: '',
-    fileType: 'pdf' as 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text',
+    fileType: 'pdf' as 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' | 'video',
     accessLevel: 'member' as 'public' | 'member' | 'premium',
     author: '',
     tags: '',
@@ -2744,6 +2861,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
     const resourceData = {
       ...newResource,
       tags: newResource.tags.split(',').map(t => t.trim()).filter(Boolean),
+      fileUrls: newResource.fileUrls || (newResource.fileUrl ? [newResource.fileUrl] : []),
       updatedAt: serverTimestamp()
     };
     try {
@@ -2763,6 +2881,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
         groupId: RESOURCE_GROUPS[0].id,
         categoryId: RESOURCE_GROUPS[0].categories[0].id,
         fileUrl: '',
+        fileUrls: [] as string[],
         textContent: '',
         fileType: 'pdf',
         accessLevel: 'member',
@@ -2780,95 +2899,128 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
     }
   };
 
-  const handleFileUpload = async (input: React.ChangeEvent<HTMLInputElement> | React.DragEvent | File) => {
-    let file: File | null = null;
+  const handleFileUpload = async (input: React.ChangeEvent<HTMLInputElement> | React.DragEvent | File | FileList | File[]) => {
+    let files: File[] = [];
     if (input instanceof File) {
-      file = input;
-    } else if ('dataTransfer' in (input as any)) {
+      files = [input];
+    } else if (input instanceof FileList) {
+      files = Array.from(input);
+    } else if (Array.isArray(input)) {
+      files = input;
+    } else if (input && typeof input === 'object' && 'dataTransfer' in input) {
       const e = input as React.DragEvent;
       e.preventDefault();
+      e.stopPropagation();
       setIsDragging(false);
-      file = e.dataTransfer.files[0];
-    } else if ('target' in (input as any)) {
+      files = Array.from(e.dataTransfer.files);
+    } else if (input && typeof input === 'object' && 'target' in input) {
       const e = input as React.ChangeEvent<HTMLInputElement>;
       if (e.target.files) {
-        file = e.target.files[0];
+        files = Array.from(e.target.files);
       }
     }
 
-    if (!file) return;
+    if (files.length === 0) return;
+    
+    if (files.length > 20) {
+      alert(language === 'ko' ? '최대 20개까지 업로드 가능합니다.' : 'Maximum 20 files can be uploaded.');
+      return;
+    }
 
     if (!auth.currentUser) {
       alert(language === 'ko' ? '로그인이 필요합니다.' : 'Login required.');
       return;
     }
 
-    // Validation
-    const maxSize = 100 * 1024 * 1024; // 100MB limit
-    if (file.size > maxSize) {
-      alert(language === 'ko' ? '파일 크기가 너무 큽니다 (최대 100MB).' : 'File is too large (max 100MB).');
-      return;
-    }
-
     setUploading(true);
     setUploadProgress(0);
     
+    const uploadedUrls: string[] = [];
+    let detectedFileType: any = null;
+    let combinedTextContent = '';
+
     try {
       if (!storage) {
         throw new Error('Firebase Storage is not initialized');
       }
 
-      const storagePath = `resources/${Date.now()}_${file.name}`;
-      const storageRef = ref(storage, storagePath);
-      console.warn('!!! UPLOAD ATTEMPT START (Admin) !!!');
-      console.log('Bucket:', storage.app.options.storageBucket);
-      console.log('Path:', storagePath, 'Size:', file.size, 'Type:', file.type);
-      
-      if (!storage.app) {
-        console.error('Storage instance is not correctly initialized (missing app)');
-        throw new Error('Storage instance is not correctly initialized');
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const maxSize = 100 * 1024 * 1024; // 100MB limit
+        if (file.size > maxSize) {
+          alert(`${file.name}: ${language === 'ko' ? '파일 크기가 너무 큽니다 (최대 100MB).' : 'File is too large (max 100MB).'}`);
+          continue;
+        }
+
+        const safeFileName = file.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+        const storagePath = `resources/${Date.now()}_${safeFileName}`;
+        const storageRef = ref(storage, storagePath);
+        
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        const mimeType = file.type;
+        let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' | 'video' = 'pdf';
+        
+        if (extension === 'mp3' || mimeType.startsWith('audio/')) fileType = 'mp3';
+        else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '') || mimeType.startsWith('image/')) fileType = 'image';
+        else if (['mp4', 'webm', 'ogg', 'mov'].includes(extension || '') || mimeType.startsWith('video/')) fileType = 'video';
+        else if (['ppt', 'pptx'].includes(extension || '') || mimeType.includes('presentation') || mimeType.includes('powerpoint')) fileType = 'ppt';
+        else if (['doc', 'docx'].includes(extension || '') || mimeType.includes('word') || mimeType.includes('officedocument.wordprocessingml')) fileType = 'word';
+        else if (['txt', 'md', 'json', 'csv'].includes(extension || '') || mimeType.startsWith('text/')) fileType = 'text';
+        else if (mimeType === 'application/pdf') fileType = 'pdf';
+
+        // Video duration check
+        if (fileType === 'video') {
+          const video = document.createElement('video');
+          video.preload = 'metadata';
+          video.src = URL.createObjectURL(file);
+          const isValid = await new Promise<boolean>((resolve) => {
+            video.onloadedmetadata = () => {
+              window.URL.revokeObjectURL(video.src);
+              if (video.duration > 11) { // 10s + buffer
+                alert(`${file.name}: ${language === 'ko' ? '영상은 최대 10초까지 가능합니다.' : 'Video must be max 10 seconds.'}`);
+                resolve(false);
+              } else {
+                resolve(true);
+              }
+            };
+            video.onerror = () => resolve(true);
+          });
+          if (!isValid) continue;
+        }
+
+        console.log(`Uploading ${file.name}...`);
+        await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(storageRef);
+        uploadedUrls.push(url);
+        
+        if (!detectedFileType) detectedFileType = fileType;
+        
+        if (fileType === 'text') {
+          const text = await file.text();
+          combinedTextContent += (combinedTextContent ? '\n\n' : '') + text;
+        }
+
+        setUploadProgress(((i + 1) / files.length) * 100);
       }
 
-      console.log('Using uploadBytes (Simple) for better compatibility...');
-      setUploadProgress(10); // Start progress
-      
-      const result = await uploadBytes(storageRef, file);
-      console.log('Upload successful (Simple):', result);
-      setUploadProgress(100);
-      
-      const url = await getDownloadURL(storageRef);
-      console.log('Download URL obtained:', url);
-      const extension = file.name.split('.').pop()?.toLowerCase();
-      const mimeType = file.type;
-      let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
-      
-      if (extension === 'mp3' || mimeType.startsWith('audio/')) fileType = 'mp3';
-      else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '') || mimeType.startsWith('image/')) fileType = 'image';
-      else if (['ppt', 'pptx'].includes(extension || '') || mimeType.includes('presentation') || mimeType.includes('powerpoint')) fileType = 'ppt';
-      else if (['doc', 'docx'].includes(extension || '') || mimeType.includes('word') || mimeType.includes('officedocument.wordprocessingml')) fileType = 'word';
-      else if (['txt', 'md', 'json', 'csv'].includes(extension || '') || mimeType.startsWith('text/')) fileType = 'text';
-      else if (mimeType === 'application/pdf') fileType = 'pdf';
-      
-      let textContent = '';
-      if (fileType === 'text') {
-        textContent = await file.text();
-      }
-      
-      setNewResource(prev => ({ 
-        ...prev, 
-        fileUrl: url, 
-        fileType,
-        textContent: textContent || prev.textContent
-      }));
+      if (uploadedUrls.length > 0) {
+        setNewResource(prev => ({ 
+          ...prev, 
+          fileUrl: uploadedUrls[0],
+          fileUrls: [...(prev.fileUrls || []), ...uploadedUrls],
+          fileType: detectedFileType || prev.fileType,
+          textContent: combinedTextContent || prev.textContent 
+        }));
 
-      if (textContent && editorRef.current) {
-        editorRef.current.innerHTML = textContent;
-      }
+        if (combinedTextContent && editorRef.current) {
+          editorRef.current.innerHTML = combinedTextContent;
+        }
 
-      alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
+        alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'Files uploaded successfully.');
+      }
       setUploading(false);
     } catch (error: any) {
-      console.error('Upload catch error:', error);
+      console.error('Upload catch error (Admin):', error);
       alert(`${language === 'ko' ? '파일 업로드 중 오류가 발생했습니다.' : 'Error uploading file.'} (${error.message})`);
       setUploading(false);
     }
@@ -2882,6 +3034,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
       groupId: res.groupId,
       categoryId: res.categoryId,
       fileUrl: res.fileUrl || '',
+      fileUrls: res.fileUrls || (res.fileUrl ? [res.fileUrl] : []),
       textContent: res.textContent || '',
       fileType: res.fileType,
       accessLevel: res.accessLevel,
@@ -3093,7 +3246,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
       {/* Quick Actions Bar */}
       <div className="flex flex-wrap gap-4 p-6 bg-gold/5 border border-gold/10 rounded-3xl">
         <button 
-          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', textContent: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '', color: '#F27D26', fontFamily: 'serif', fontSize: 16, fontColor: '#000000', fontWeight: '400' }); }}
+          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', fileUrls: [], textContent: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '', color: '#F27D26', fontFamily: 'serif', fontSize: 16, fontColor: '#000000', fontWeight: '400' }); }}
           className="flex items-center gap-2 px-6 py-3 bg-ink text-paper rounded-xl text-[10px] uppercase tracking-widest font-bold hover:bg-gold transition-all"
         >
           <Upload size={14} />
@@ -3337,6 +3490,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
                       groupId: RESOURCE_GROUPS[0].id,
                       categoryId: RESOURCE_GROUPS[0].categories[0].id,
                       fileUrl: '',
+                      fileUrls: [],
                       textContent: '',
                       fileType: 'pdf',
                       accessLevel: 'member',
@@ -3407,6 +3561,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
                       <option value="pdf">PDF</option>
                       <option value="mp3">MP3</option>
                       <option value="image">Image</option>
+                      <option value="video">Video (Max 10s)</option>
                       <option value="ppt">PPT / PowerPoint</option>
                       <option value="word">Word / Document</option>
                       <option value="text">Text / Content</option>
@@ -3572,6 +3727,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
                     >
                       <input 
                         type="file" 
+                        multiple
                         onChange={handleFileUpload}
                         disabled={uploading}
                         className="hidden"
@@ -4275,8 +4431,9 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     groupId: RESOURCE_GROUPS[0].id,
     categoryId: RESOURCE_GROUPS[0].categories[0].id,
     fileUrl: '',
+    fileUrls: [] as string[],
     textContent: '',
-    fileType: 'pdf' as 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text',
+    fileType: 'pdf' as 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' | 'video',
     accessLevel: 'member' as 'public' | 'member' | 'premium',
     author: '',
     tags: '',
@@ -4475,6 +4632,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     const resourceData = {
       ...newResource,
       tags: newResource.tags.split(',').map(t => t.trim()).filter(Boolean),
+      fileUrls: newResource.fileUrls || (newResource.fileUrl ? [newResource.fileUrl] : []),
       updatedAt: serverTimestamp()
     };
     try {
@@ -4494,6 +4652,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
         groupId: RESOURCE_GROUPS[0].id,
         categoryId: RESOURCE_GROUPS[0].categories[0].id,
         fileUrl: '',
+        fileUrls: [] as string[],
         textContent: '',
         fileType: 'pdf',
         accessLevel: 'member',
@@ -4512,95 +4671,125 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     }
   };
 
-  const handleFileUpload = async (input: React.ChangeEvent<HTMLInputElement> | React.DragEvent | File) => {
-    let file: File | null = null;
+  const handleFileUpload = async (input: React.ChangeEvent<HTMLInputElement> | React.DragEvent | File | FileList | File[]) => {
+    let files: File[] = [];
     if (input instanceof File) {
-      file = input;
+      files = [input];
+    } else if (input instanceof FileList) {
+      files = Array.from(input);
+    } else if (Array.isArray(input)) {
+      files = input;
     } else if (input && typeof input === 'object' && 'dataTransfer' in input) {
       const e = input as React.DragEvent;
       e.preventDefault();
       e.stopPropagation();
       setIsDragging(false);
-      file = e.dataTransfer.files[0];
+      files = Array.from(e.dataTransfer.files);
     } else if (input && typeof input === 'object' && 'target' in input) {
       const e = input as React.ChangeEvent<HTMLInputElement>;
       if (e.target.files) {
-        file = e.target.files[0];
+        files = Array.from(e.target.files);
       }
     }
 
-    if (!file) return;
+    if (files.length === 0) return;
+    
+    if (files.length > 20) {
+      alert(language === 'ko' ? '최대 20개까지 업로드 가능합니다.' : 'Maximum 20 files can be uploaded.');
+      return;
+    }
 
     if (!auth.currentUser) {
       alert(language === 'ko' ? '로그인이 필요합니다.' : 'Login required.');
       return;
     }
 
-    // Validation
-    const maxSize = 100 * 1024 * 1024; // 100MB limit
-    if (file.size > maxSize) {
-      alert(language === 'ko' ? '파일 크기가 너무 큽니다 (최대 100MB).' : 'File is too large (max 100MB).');
-      return;
-    }
-
     setUploading(true);
     setUploadProgress(0);
-    console.log('Starting upload for file (Archive):', file.name, 'Size:', file.size);
     
+    const uploadedUrls: string[] = [];
+    let detectedFileType: any = null;
+    let combinedTextContent = '';
+
     try {
       if (!storage) {
         throw new Error('Firebase Storage is not initialized');
       }
 
-      const safeFileName = file.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
-      const storagePath = `resources/${Date.now()}_${safeFileName}`;
-      const storageRef = ref(storage, storagePath);
-      console.warn('!!! UPLOAD ATTEMPT START (Archive) !!!');
-      console.log('Bucket:', storage.app.options.storageBucket);
-      console.log('Path:', storagePath, 'Size:', file.size, 'Type:', file.type);
-      
-      if (!storage.app) {
-        console.error('Storage instance is not correctly initialized (missing app)');
-        throw new Error('Storage instance is not correctly initialized');
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        const maxSize = 100 * 1024 * 1024; // 100MB limit
+        if (file.size > maxSize) {
+          alert(`${file.name}: ${language === 'ko' ? '파일 크기가 너무 큽니다 (최대 100MB).' : 'File is too large (max 100MB).'}`);
+          continue;
+        }
+
+        const safeFileName = file.name.replace(/[^a-z0-9.]/gi, '_').toLowerCase();
+        const storagePath = `resources/${Date.now()}_${safeFileName}`;
+        const storageRef = ref(storage, storagePath);
+        
+        const extension = file.name.split('.').pop()?.toLowerCase();
+        const mimeType = file.type;
+        let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' | 'video' = 'pdf';
+        
+        if (extension === 'mp3' || mimeType.startsWith('audio/')) fileType = 'mp3';
+        else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '') || mimeType.startsWith('image/')) fileType = 'image';
+        else if (['mp4', 'webm', 'ogg', 'mov'].includes(extension || '') || mimeType.startsWith('video/')) fileType = 'video';
+        else if (['ppt', 'pptx'].includes(extension || '') || mimeType.includes('presentation') || mimeType.includes('powerpoint')) fileType = 'ppt';
+        else if (['doc', 'docx'].includes(extension || '') || mimeType.includes('word') || mimeType.includes('officedocument.wordprocessingml')) fileType = 'word';
+        else if (['txt', 'md', 'json', 'csv'].includes(extension || '') || mimeType.startsWith('text/')) fileType = 'text';
+        else if (mimeType === 'application/pdf') fileType = 'pdf';
+
+        // Video duration check
+        if (fileType === 'video') {
+          const video = document.createElement('video');
+          video.preload = 'metadata';
+          video.src = URL.createObjectURL(file);
+          const isValid = await new Promise<boolean>((resolve) => {
+            video.onloadedmetadata = () => {
+              window.URL.revokeObjectURL(video.src);
+              if (video.duration > 11) { // 10s + buffer
+                alert(`${file.name}: ${language === 'ko' ? '영상은 최대 10초까지 가능합니다.' : 'Video must be max 10 seconds.'}`);
+                resolve(false);
+              } else {
+                resolve(true);
+              }
+            };
+            video.onerror = () => resolve(true);
+          });
+          if (!isValid) continue;
+        }
+
+        console.log(`Uploading ${file.name}...`);
+        await uploadBytes(storageRef, file);
+        const url = await getDownloadURL(storageRef);
+        uploadedUrls.push(url);
+        
+        if (!detectedFileType) detectedFileType = fileType;
+        
+        if (fileType === 'text') {
+          const text = await file.text();
+          combinedTextContent += (combinedTextContent ? '\n\n' : '') + text;
+        }
+
+        setUploadProgress(((i + 1) / files.length) * 100);
       }
 
-      console.log('Using uploadBytes (Simple) for better compatibility (Archive)...');
-      setUploadProgress(10);
+      if (uploadedUrls.length > 0) {
+        setNewResource(prev => ({ 
+          ...prev, 
+          fileUrl: uploadedUrls[0],
+          fileUrls: [...(prev.fileUrls || []), ...uploadedUrls],
+          fileType: detectedFileType || prev.fileType,
+          textContent: combinedTextContent || prev.textContent 
+        }));
 
-      const result = await uploadBytes(storageRef, file);
-      console.log('Archive upload successful (Simple):', result);
-      setUploadProgress(100);
+        if (combinedTextContent && editorRef.current) {
+          editorRef.current.innerHTML = combinedTextContent;
+        }
 
-      const url = await getDownloadURL(storageRef);
-      console.log('Archive Download URL obtained:', url);
-      const extension = file.name.split('.').pop()?.toLowerCase();
-      const mimeType = file.type;
-      let fileType: 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' = 'pdf';
-      
-      if (extension === 'mp3' || mimeType.startsWith('audio/')) fileType = 'mp3';
-      else if (['jpg', 'jpeg', 'png', 'gif', 'webp', 'svg'].includes(extension || '') || mimeType.startsWith('image/')) fileType = 'image';
-      else if (['ppt', 'pptx'].includes(extension || '') || mimeType.includes('presentation') || mimeType.includes('powerpoint')) fileType = 'ppt';
-      else if (['doc', 'docx'].includes(extension || '') || mimeType.includes('word') || mimeType.includes('officedocument.wordprocessingml')) fileType = 'word';
-      else if (['txt', 'md', 'json', 'csv'].includes(extension || '') || mimeType.startsWith('text/')) fileType = 'text';
-      else if (mimeType === 'application/pdf') fileType = 'pdf';
-      
-      let textContent = '';
-      if (fileType === 'text') {
-        textContent = await file.text();
+        alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'Files uploaded successfully.');
       }
-      
-      setNewResource(prev => ({ 
-        ...prev, 
-        fileUrl: url, 
-        fileType,
-        textContent: textContent || prev.textContent 
-      }));
-
-      if (textContent && editorRef.current) {
-        editorRef.current.innerHTML = textContent;
-      }
-
-      alert(language === 'ko' ? '파일이 업로드되었습니다.' : 'File uploaded successfully.');
       setUploading(false);
     } catch (error: any) {
       console.error('Upload catch error (Archive):', error);
@@ -4617,6 +4806,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
       groupId: res.groupId,
       categoryId: res.categoryId,
       fileUrl: res.fileUrl || '',
+      fileUrls: res.fileUrls || (res.fileUrl ? [res.fileUrl] : []),
       textContent: res.textContent || '',
       fileType: res.fileType,
       accessLevel: res.accessLevel,
@@ -4799,6 +4989,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                   {res.fileType === 'pdf' && <FileText size={20} />}
                   {res.fileType === 'mp3' && <Music size={20} />}
                   {res.fileType === 'image' && <ImageIcon size={20} />}
+                  {res.fileType === 'video' && <Video size={20} />}
                   {res.fileType === 'ppt' && <FileText size={20} />}
                   {res.fileType === 'word' && <FileText size={20} />}
                   {res.fileType === 'text' && <FileText size={20} />}
@@ -4970,6 +5161,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                           <option value="pdf">PDF</option>
                           <option value="mp3">MP3</option>
                           <option value="image">Image</option>
+                          <option value="video">Video (Max 10s)</option>
                           <option value="ppt">PPT / PowerPoint</option>
                           <option value="word">Word / Document</option>
                           <option value="text">Text / Content</option>
@@ -5105,6 +5297,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                         >
                           <input 
                             type="file" 
+                            multiple
                             onChange={handleFileUpload}
                             disabled={uploading}
                             className="hidden"
@@ -5226,6 +5419,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                         {selectedResource.fileType === 'pdf' && <FileText size={20} />}
                         {selectedResource.fileType === 'mp3' && <Music size={20} />}
                         {selectedResource.fileType === 'image' && <ImageIcon size={20} />}
+                        {selectedResource.fileType === 'video' && <Video size={20} />}
                         {selectedResource.fileType === 'ppt' && <FileText size={20} />}
                         {selectedResource.fileType === 'word' && <FileText size={20} />}
                         {selectedResource.fileType === 'text' && <FileText size={20} />}
@@ -5253,14 +5447,44 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                 </div>
 
                 {/* Preview Section */}
-                {selectedResource.fileUrl && selectedResource.fileType === 'image' && (
+                {selectedResource.fileUrls && selectedResource.fileUrls.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {selectedResource.fileUrls.map((url: string, idx: number) => (
+                      <div key={idx} className="rounded-3xl overflow-hidden border border-ink/10 bg-ink/5 relative group/img">
+                        {selectedResource.fileType === 'image' ? (
+                          <img 
+                            src={url} 
+                            alt={`${selectedResource.title} ${idx + 1}`} 
+                            className="w-full h-auto max-h-[400px] object-contain cursor-pointer hover:scale-[1.02] transition-transform"
+                            referrerPolicy="no-referrer"
+                            onClick={() => window.open(url, '_blank')}
+                          />
+                        ) : selectedResource.fileType === 'video' ? (
+                          <video 
+                            src={url} 
+                            controls 
+                            className="w-full h-auto max-h-[400px] object-contain"
+                          />
+                        ) : null}
+                      </div>
+                    ))}
+                  </div>
+                ) : selectedResource.fileUrl && (
                   <div className="rounded-3xl overflow-hidden border border-ink/10 bg-ink/5">
-                    <img 
-                      src={selectedResource.fileUrl} 
-                      alt={selectedResource.title} 
-                      className="w-full h-auto max-h-[400px] object-contain"
-                      referrerPolicy="no-referrer"
-                    />
+                    {selectedResource.fileType === 'image' ? (
+                      <img 
+                        src={selectedResource.fileUrl} 
+                        alt={selectedResource.title} 
+                        className="w-full h-auto max-h-[400px] object-contain"
+                        referrerPolicy="no-referrer"
+                      />
+                    ) : selectedResource.fileType === 'video' ? (
+                      <video 
+                        src={selectedResource.fileUrl} 
+                        controls 
+                        className="w-full h-auto max-h-[400px] object-contain"
+                      />
+                    ) : null}
                   </div>
                 )}
 
