@@ -173,10 +173,22 @@ export default function App() {
 
   const [siteContent, setSiteContent] = useState<Record<string, any>>({});
 
-  const navStyle = useMemo(() => ({
-    fontSize: siteContent['global.style.navFontSize']?.value ? `${siteContent['global.style.navFontSize'].value}px` : undefined,
-    color: siteContent['global.style.navFontColor']?.value || undefined,
-    fontWeight: siteContent['global.style.navFontWeight']?.value || undefined,
+  const navStyleL1 = useMemo(() => ({
+    fontSize: siteContent['global.style.navL1FontSize']?.value ? `${siteContent['global.style.navL1FontSize'].value}px` : undefined,
+    color: siteContent['global.style.navL1FontColor']?.value || undefined,
+    fontWeight: siteContent['global.style.navL1FontWeight']?.value || undefined,
+  }), [siteContent]);
+
+  const navStyleL2 = useMemo(() => ({
+    fontSize: siteContent['global.style.navL2FontSize']?.value ? `${siteContent['global.style.navL2FontSize'].value}px` : undefined,
+    color: siteContent['global.style.navL2FontColor']?.value || undefined,
+    fontWeight: siteContent['global.style.navL2FontWeight']?.value || undefined,
+  }), [siteContent]);
+
+  const navStyleL3 = useMemo(() => ({
+    fontSize: siteContent['global.style.navL3FontSize']?.value ? `${siteContent['global.style.navL3FontSize'].value}px` : undefined,
+    color: siteContent['global.style.navL3FontColor']?.value || undefined,
+    fontWeight: siteContent['global.style.navL3FontWeight']?.value || undefined,
   }), [siteContent]);
   const isAdmin = userProfile?.role === 'admin';
 
@@ -367,7 +379,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'landing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
-              style={navStyle}
+              style={navStyleL1}
             >
               {language === 'ko' ? '홈' : 'Home'}
             </button>
@@ -385,7 +397,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'curriculum' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
-              style={navStyle}
+              style={navStyleL1}
             >
               {t.nav.curriculum}
             </button>
@@ -396,7 +408,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'pricing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
-              style={navStyle}
+              style={navStyleL1}
             >
               {t.nav.pricing}
             </button>
@@ -414,7 +426,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'archive' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
-              style={navStyle}
+              style={navStyleL1}
             >
               {t.nav.archive}
             </button>
@@ -425,7 +437,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'community' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
-              style={navStyle}
+              style={navStyleL1}
             >
               {t.nav.community}
             </button>
@@ -439,7 +451,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors font-bold whitespace-nowrap",
                 view === 'inquiry' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
               )}
-              style={{ ...navStyle, color: siteContent['global.style.navFontColor']?.value || '#c5a059' }}
+              style={{ ...navStyleL1, color: siteContent['global.style.navL1FontColor']?.value || '#c5a059' }}
             >
               {t.nav.inquiry}
             </button>
@@ -450,7 +462,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-all font-bold whitespace-nowrap",
                 view === 'level-test' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
               )}
-              style={{ ...navStyle, color: siteContent['global.style.navFontColor']?.value || '#c5a059' }}
+              style={{ ...navStyleL1, color: siteContent['global.style.navL1FontColor']?.value || '#c5a059' }}
             >
               {t.nav.levelTest}
             </button>
@@ -544,7 +556,7 @@ export default function App() {
                         "text-[10px] lg:text-xs uppercase tracking-widest transition-all font-medium whitespace-nowrap",
                         hoveredSubItem === item.id ? "text-gold opacity-100" : "opacity-60 hover:opacity-100 hover:text-gold"
                       )}
-                      style={navStyle}
+                      style={navStyleL2}
                     >
                       {item.label}
                     </button>
@@ -567,7 +579,7 @@ export default function App() {
                                   setHoveredSubItem(null);
                                 }}
                                 className="text-[9px] lg:text-[10px] uppercase tracking-[0.2em] opacity-50 hover:opacity-100 hover:text-gold transition-all whitespace-nowrap"
-                                style={{ ...navStyle, fontSize: siteContent['global.style.navFontSize']?.value ? `${Number(siteContent['global.style.navFontSize'].value) - 2}px` : undefined }}
+                                style={navStyleL3}
                               >
                                 {child.label}
                               </button>
@@ -2134,9 +2146,15 @@ const GlobalStyleEditor: FC<{
     gold: siteContent['global.style.gold']?.value || '#c5a059',
     fontSerif: siteContent['global.style.fontSerif']?.value || '"Cormorant Garamond", serif',
     fontSans: siteContent['global.style.fontSans']?.value || '"Montserrat", sans-serif',
-    navFontSize: siteContent['global.style.navFontSize']?.value || '12',
-    navFontColor: siteContent['global.style.navFontColor']?.value || '#1a1a1a',
-    navFontWeight: siteContent['global.style.navFontWeight']?.value || '500',
+    navL1FontSize: siteContent['global.style.navL1FontSize']?.value || '12',
+    navL1FontColor: siteContent['global.style.navL1FontColor']?.value || '#1a1a1a',
+    navL1FontWeight: siteContent['global.style.navL1FontWeight']?.value || '500',
+    navL2FontSize: siteContent['global.style.navL2FontSize']?.value || '12',
+    navL2FontColor: siteContent['global.style.navL2FontColor']?.value || '#1a1a1a',
+    navL2FontWeight: siteContent['global.style.navL2FontWeight']?.value || '500',
+    navL3FontSize: siteContent['global.style.navL3FontSize']?.value || '10',
+    navL3FontColor: siteContent['global.style.navL3FontColor']?.value || '#1a1a1a',
+    navL3FontWeight: siteContent['global.style.navL3FontWeight']?.value || '400',
     landingBg: siteContent['global.style.landingBg']?.value || '',
     landingOverlay: siteContent['global.style.landingOverlay']?.value || '0',
     allPagesBg: siteContent['global.style.allPagesBg']?.value || '',
@@ -2203,44 +2221,130 @@ const GlobalStyleEditor: FC<{
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navFontSize} ({styles.navFontSize}px)</label>
-                  <input 
-                    type="range" 
-                    min="8" max="32" step="1"
-                    value={styles.navFontSize} 
-                    onChange={(e) => updateStyle('navFontSize', e.target.value)}
-                    className="w-full accent-gold"
-                  />
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navFontColor}</label>
-                  <div className="flex items-center gap-4">
+                {/* Level 1 Navigation */}
+                <div className="p-4 bg-ink/5 rounded-2xl space-y-4">
+                  <p className="text-[10px] uppercase tracking-widest font-bold opacity-40">Level 1 Navigation</p>
+                  <div className="space-y-3">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL1FontSize} ({styles.navL1FontSize}px)</label>
                     <input 
-                      type="color" 
-                      value={styles.navFontColor} 
-                      onChange={(e) => updateStyle('navFontColor', e.target.value)}
-                      className="w-12 h-10 rounded-xl cursor-pointer border-none bg-transparent"
+                      type="range" 
+                      min="8" max="32" step="1"
+                      value={styles.navL1FontSize} 
+                      onChange={(e) => updateStyle('navL1FontSize', e.target.value)}
+                      className="w-full accent-gold"
                     />
-                    <span className="text-xs font-mono opacity-50">{styles.navFontColor}</span>
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL1FontColor}</label>
+                    <div className="flex items-center gap-4">
+                      <input 
+                        type="color" 
+                        value={styles.navL1FontColor} 
+                        onChange={(e) => updateStyle('navL1FontColor', e.target.value)}
+                        className="w-12 h-10 rounded-xl cursor-pointer border-none bg-transparent"
+                      />
+                      <span className="text-xs font-mono opacity-50">{styles.navL1FontColor}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL1FontWeight}</label>
+                    <select 
+                      value={styles.navL1FontWeight} 
+                      onChange={(e) => updateStyle('navL1FontWeight', e.target.value)}
+                      className="w-full p-2 text-xs bg-ink/5 border border-ink/10 rounded-lg"
+                    >
+                      <option value="300">Light (300)</option>
+                      <option value="400">Regular (400)</option>
+                      <option value="500">Medium (500)</option>
+                      <option value="600">Semi-Bold (600)</option>
+                      <option value="700">Bold (700)</option>
+                      <option value="800">Extra-Bold (800)</option>
+                    </select>
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navFontWeight}</label>
-                  <select 
-                    value={styles.navFontWeight} 
-                    onChange={(e) => updateStyle('navFontWeight', e.target.value)}
-                    className="w-full p-2 text-xs bg-ink/5 border border-ink/10 rounded-lg"
-                  >
-                    <option value="300">Light (300)</option>
-                    <option value="400">Regular (400)</option>
-                    <option value="500">Medium (500)</option>
-                    <option value="600">Semi-Bold (600)</option>
-                    <option value="700">Bold (700)</option>
-                    <option value="800">Extra-Bold (800)</option>
-                  </select>
+                {/* Level 2 Navigation */}
+                <div className="p-4 bg-ink/5 rounded-2xl space-y-4">
+                  <p className="text-[10px] uppercase tracking-widest font-bold opacity-40">Level 2 Navigation</p>
+                  <div className="space-y-3">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL2FontSize} ({styles.navL2FontSize}px)</label>
+                    <input 
+                      type="range" 
+                      min="8" max="32" step="1"
+                      value={styles.navL2FontSize} 
+                      onChange={(e) => updateStyle('navL2FontSize', e.target.value)}
+                      className="w-full accent-gold"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL2FontColor}</label>
+                    <div className="flex items-center gap-4">
+                      <input 
+                        type="color" 
+                        value={styles.navL2FontColor} 
+                        onChange={(e) => updateStyle('navL2FontColor', e.target.value)}
+                        className="w-12 h-10 rounded-xl cursor-pointer border-none bg-transparent"
+                      />
+                      <span className="text-xs font-mono opacity-50">{styles.navL2FontColor}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL2FontWeight}</label>
+                    <select 
+                      value={styles.navL2FontWeight} 
+                      onChange={(e) => updateStyle('navL2FontWeight', e.target.value)}
+                      className="w-full p-2 text-xs bg-ink/5 border border-ink/10 rounded-lg"
+                    >
+                      <option value="300">Light (300)</option>
+                      <option value="400">Regular (400)</option>
+                      <option value="500">Medium (500)</option>
+                      <option value="600">Semi-Bold (600)</option>
+                      <option value="700">Bold (700)</option>
+                      <option value="800">Extra-Bold (800)</option>
+                    </select>
+                  </div>
+                </div>
+
+                {/* Level 3 Navigation */}
+                <div className="p-4 bg-ink/5 rounded-2xl space-y-4">
+                  <p className="text-[10px] uppercase tracking-widest font-bold opacity-40">Level 3 Navigation</p>
+                  <div className="space-y-3">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL3FontSize} ({styles.navL3FontSize}px)</label>
+                    <input 
+                      type="range" 
+                      min="8" max="32" step="1"
+                      value={styles.navL3FontSize} 
+                      onChange={(e) => updateStyle('navL3FontSize', e.target.value)}
+                      className="w-full accent-gold"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL3FontColor}</label>
+                    <div className="flex items-center gap-4">
+                      <input 
+                        type="color" 
+                        value={styles.navL3FontColor} 
+                        onChange={(e) => updateStyle('navL3FontColor', e.target.value)}
+                        className="w-12 h-10 rounded-xl cursor-pointer border-none bg-transparent"
+                      />
+                      <span className="text-xs font-mono opacity-50">{styles.navL3FontColor}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-3">
+                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL3FontWeight}</label>
+                    <select 
+                      value={styles.navL3FontWeight} 
+                      onChange={(e) => updateStyle('navL3FontWeight', e.target.value)}
+                      className="w-full p-2 text-xs bg-ink/5 border border-ink/10 rounded-lg"
+                    >
+                      <option value="300">Light (300)</option>
+                      <option value="400">Regular (400)</option>
+                      <option value="500">Medium (500)</option>
+                      <option value="600">Semi-Bold (600)</option>
+                      <option value="700">Bold (700)</option>
+                      <option value="800">Extra-Bold (800)</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -2333,9 +2437,15 @@ const GlobalStyleEditor: FC<{
                       updateStyle('gold', '#c5a059');
                       updateStyle('fontSerif', '"Cormorant Garamond", serif');
                       updateStyle('fontSans', '"Montserrat", sans-serif');
-                      updateStyle('navFontSize', '12');
-                      updateStyle('navFontColor', '#1a1a1a');
-                      updateStyle('navFontWeight', '500');
+                      updateStyle('navL1FontSize', '12');
+                      updateStyle('navL1FontColor', '#1a1a1a');
+                      updateStyle('navL1FontWeight', '500');
+                      updateStyle('navL2FontSize', '12');
+                      updateStyle('navL2FontColor', '#1a1a1a');
+                      updateStyle('navL2FontWeight', '500');
+                      updateStyle('navL3FontSize', '10');
+                      updateStyle('navL3FontColor', '#1a1a1a');
+                      updateStyle('navL3FontWeight', '400');
                       updateStyle('landingBg', '');
                       updateStyle('landingOverlay', '0');
                       updateStyle('allPagesBg', '');
