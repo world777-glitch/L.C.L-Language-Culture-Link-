@@ -83,7 +83,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
     curriculum: {
       badge: '커리큘럼',
       title: 'L.C.L 프리미엄 커리큘럼',
-      subtitle: '중국 언어학 박사의 전문성과 20년 현지 내공 및 교학 경력 15년+ 이 담긴 5대 핵심 카테고리입니다.',
+      subtitle: '중국 언어학 박사의 전문성과 20년 현지 내공 및 교학 경력 15년+ 이 담긴 6대 핵심 카테고리입니다.',
       bookNow: '예약하기',
     },
     pricing: {
@@ -153,9 +153,10 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
     courses: [
       { id: 'conv', title: '회화 (Conversation)', description: '일상 생활에서 즉각적으로 활용 가능한 실전 회화 중심 과정', levels: ['입문', '초급', '중급', '고급', '초고급'] },
       { id: 'hsk', title: 'HSK (Chinese Proficiency Test)', description: '중국 언어학 박사의 노하우가 담긴 HSK 고득점 전략 과정', levels: ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6'] },
+      { id: 'acad', title: '중·고교 내신 관리 (School Grades)', description: '중·고교 내신 1등급을 위한 체계적인 문법 정리 및 실전 문제 풀이 과정', levels: ['Level 1 (기초)', 'Level 2 (심화)', 'Level 3 (완성)'], levelDescriptions: ['개념 정리 및 기본적인 문제를 통한 중국어 기초 다지기', '기출 문제 빈출 문법 분석과 고난도 응용 문제로 실전 감각 익히기', '심화 과정 및 수행평가 완벽 대비로 내신 1등급 굳히기'] },
       { id: 'disc', title: '토론 (Discussion)', description: '논리적 스피킹과 비판적 사고를 기르는 심화 토론 과정', levels: ['초급', '중급', '고급', '초고급'] },
+      { id: 'cult', title: '문화 (Culture)', description: '중국 사회와 문화에 대한 인문학적 심층 연구 과정 (준비중)', levels: ['준비중'] },
       { id: 'biz', title: '비즈니스 (Business)', description: '실무 회의, 계약, 프레젠테이션 중심의 전문 비즈니스 과정', levels: ['초급', '중급', '고급', '초고급'] },
-      { id: 'cult', title: '문화 (Culture)', description: '중국 사회와 문화에 대한 인문학적 심층 연구 과정', levels: ['Special Session'] }
     ],
     resourceGroups: [
       {
@@ -261,20 +262,25 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
         '비즈니스/전문 분야(IT, 기술 등) 중국어가 필요하다.',
         '기타 (직접 입력)'
       ],
-      goalsLabel: '5. 구체적인 학습 목표 (Specific Goals)',
-      goalsPlaceholder: '예: 3개월 내 HSK 5급 취득, 비즈니스 미팅 가능 수준 등',
-      classLabel: '6. 희망 수업 과정 (Desired Course)',
+      durationLabel: '5. 희망 수강 기간 (Desired Duration)',
+      durationOptions: ['4주 패키지', '8주 패키지', '10주 패키지', '12주 패키지'],
+      hoursLabel: '6. 희망 수업 시간 (Desired Class Hours)',
+      hoursOptions: ['1시간', '1.5시간', '2시간'],
+      classLabel: '7. 희망 수업 과정 (Desired Course)',
       classOptions: [
         '회화 (Conversation)',
         'HSK (Chinese Proficiency Test)',
+        '중·고교 내신 관리 (School Grades)',
         '토론 (Discussion)',
         '비즈니스 (Business)',
         '문화 (Culture)',
         '소수 그룹반',
         '기타 (직접 입력)'
       ],
-      scheduleLabel: '7. 희망 수업 시간대 (Preferred Schedule)',
-      requestsLabel: '8. 기타 요청 사항 (Additional Requests)',
+      goalsLabel: '8. 구체적인 학습 목표 (Specific Goals)',
+      goalsPlaceholder: '예: 3개월 내 HSK 5급 취득, 비즈니스 미팅 가능 수준 등',
+      scheduleLabel: '9. 희망 수업 시간대 (Preferred Schedule)',
+      requestsLabel: '10. 기타 요청 사항 (Additional Requests)',
       requestsPlaceholder: '수업 방식, 교재, 특별히 집중하고 싶은 부분 등',
       submit: '신청 완료 (Confirm)',
       successTitle: '신청 완료!',
@@ -314,20 +320,25 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
         'I need Chinese for business/professional fields (IT, technology, etc.).',
         'Other (Enter directly)'
       ],
-      goalsLabel: '5. Specific Learning Goals',
-      goalsPlaceholder: 'e.g., Obtain HSK 5 within 3 months, reach business meeting level, etc.',
-      classLabel: '6. Desired Course',
+      durationLabel: '5. Desired Duration',
+      durationOptions: ['4-Week Package', '8-Week Package', '10-Week Package', '12-Week Package'],
+      hoursLabel: '6. Desired Class Hours',
+      hoursOptions: ['1 Hour', '1.5 Hours', '2 Hours'],
+      classLabel: '7. Desired Course',
       classOptions: [
         'Conversation',
         'HSK (Chinese Proficiency Test)',
+        'School Grades Management',
         'Discussion',
         'Business',
         'Culture',
         'Small Group Class',
         'Other (Enter directly)'
       ],
-      scheduleLabel: '7. Preferred Schedule',
-      requestsLabel: '8. Additional Requests',
+      goalsLabel: '8. Specific Learning Goals',
+      goalsPlaceholder: 'e.g., Obtain HSK 5 within 3 months, reach business meeting level, etc.',
+      scheduleLabel: '9. Preferred Schedule',
+      requestsLabel: '10. Additional Requests',
       requestsPlaceholder: 'Teaching style, materials, specific areas to focus on, etc.',
       submit: 'Apply for Diagnosis',
       successTitle: 'Application Complete!',
@@ -431,9 +442,10 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
     courses: [
       { id: 'conv', title: 'Conversation', description: 'Practical conversation-oriented course for immediate use in daily life', levels: ['Intro', 'Beginner', 'Intermediate', 'Advanced', 'Expert'] },
       { id: 'hsk', title: 'HSK (Chinese Proficiency Test)', description: 'HSK high-score strategy course with PhD know-how', levels: ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6'] },
+      { id: 'acad', title: 'School Grades Management', description: 'Systematic grammar and exam preparation for middle/high school students', levels: ['Level 1 (Basic)', 'Level 2 (Advanced)', 'Level 3 (Completion)'], levelDescriptions: ['Building foundation through concept summary and basic problems', 'Analyzing frequent grammar and high-difficulty problems', 'Perfect preparation for school performance evaluation and 1st grade'] },
       { id: 'disc', title: 'Discussion', description: 'Advanced discussion course to develop logical speaking and critical thinking', levels: ['Beginner', 'Intermediate', 'Advanced', 'Expert'] },
       { id: 'biz', title: 'Business', description: 'Professional business course focused on meetings, contracts, and presentations', levels: ['Beginner', 'Intermediate', 'Advanced', 'Expert'] },
-      { id: 'cult', title: 'Culture', description: 'In-depth humanities research course on Chinese society and culture', levels: ['Special Session'] }
+      { id: 'cult', title: 'Culture', description: 'In-depth humanities research course on Chinese society and culture (Coming Soon)', levels: ['Coming Soon'] },
     ],
     resourceGroups: [
       {
@@ -552,16 +564,25 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
         '需要商务/专业领域(IT、技术等)汉语。',
         '其他 (直接输入)'
       ],
-      classLabel: '5. 希望参加的课程',
+      durationLabel: '5. 希望学习期间',
+      durationOptions: ['4周套餐', '8周套餐', '10周套餐', '12周套餐'],
+      hoursLabel: '6. 希望上课时间',
+      hoursOptions: ['1小时', '1.5小时', '2小时'],
+      classLabel: '7. 希望参加的课程',
       classOptions: [
         '会话 (Conversation)',
         'HSK (Chinese Proficiency Test)',
+        '中小学课内成绩管理 (School Grades)',
         '讨论 (Discussion)',
         '商务 (Business)',
         '文化 (Culture)',
         '小班课 (Small Group)',
         '其他 (直接输入)'
       ],
+      goalsLabel: '8. 具体学习目标',
+      goalsPlaceholder: '例如：3个月内取得 HSK 5级，达到商务会议水平等',
+      scheduleLabel: '9. 希望上课时间段',
+      requestsLabel: '10. 其他要求',
       submit: '申请诊断',
       successTitle: '申请完成！',
       successMessage: '申请已提交。李老师将在分析后尽快与您联系。'
@@ -630,9 +651,10 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
     courses: [
       { id: 'conv', title: '会话 (Conversation)', description: '日常生活中可立即使用的实战会话中心课程', levels: ['入门', '初级', '中级', '高级', '特级'] },
       { id: 'hsk', title: 'HSK (Chinese Proficiency Test)', description: '包含语言学博士秘诀的 HSK 高分策略课程', levels: ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6'] },
+      { id: 'acad', title: '中小学课内成绩管理 (School Grades)', description: '为中小学课内成绩1等级而进行的系统语法整理及实战解题课程', levels: ['Level 1 (基础)', 'Level 2 (深化)', 'Level 3 (完成)'], levelDescriptions: ['通过概念整理及基础题目夯实汉语基础', '通过历年真题频发语法分析和高难度应用题培养实战感', '完美备战深化课程及随堂测评，稳固课内成绩1等级'] },
       { id: 'disc', title: '讨论 (Discussion)', description: '培养逻辑表达和批判性思维的深度讨论课程', levels: ['初级', '中级', '高级', '特级'] },
       { id: 'biz', title: '商务 (Business)', description: '以实务会议、合同、演示为中心的专业商务课程', levels: ['初级', '中级', '高级', '特级'] },
-      { id: 'cult', title: '文化 (Culture)', description: '对中国社会与文化的人文深度研究课程', levels: ['Special Session'] }
+      { id: 'cult', title: '文化 (Culture)', description: '对中国社会与文化的人文深度研究课程 (准备中)', levels: ['准备中'] },
     ],
     resourceGroups: [
       {
@@ -745,22 +767,31 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       historyPlaceholder: '学習期間や中国居住・留学経験を簡単に記入してください。(例: 独学1年、上海留学6ヶ月など)',
       levelLabel: '4. 現在の中国語の実力と悩み',
       levelOptions: [
-        '基礎文法の原理を体系的に整理したい。',
+        '基礎文法の原理를 体系的に整理したい。',
         'HSK級(4-6級)の取得および高得点が目標。',
         'ネイティブのような自然な会話表現を学びたい。',
         'ビジネス・専門分野(IT、技术など)の中国語が必要。',
         'その他 (直接入力)'
       ],
-      classLabel: '5. 受講を希望するコース',
+      durationLabel: '5. 希望受講期間',
+      durationOptions: ['4週間パッケージ', '8週間パッケージ', '10週間パッケージ', '12週間パッケージ'],
+      hoursLabel: '6. 希望授業時間',
+      hoursOptions: ['1時間', '1.5時間', '2時間'],
+      classLabel: '7. 受講を希望するコース',
       classOptions: [
         '会話 (Conversation)',
         'HSK (Chinese Proficiency Test)',
+        '中・高校内申管理 (School Grades)',
         '討論 (Discussion)',
         'ビジネス (Business)',
         '文化 (Culture)',
         '少人数グループ (Small Group)',
         'その他 (直接入力)'
       ],
+      goalsLabel: '8. 具体的な学習目標',
+      goalsPlaceholder: '例: 3ヶ月以内にHSK 5級取得、ビジネス会議レベルなど',
+      scheduleLabel: '9. 希望授業時間帯',
+      requestsLabel: '10. その他要望事項',
       submit: '診断を申し込む',
       successTitle: '申し込み完了！',
       successMessage: '申し込みが完了しました。李博士が分析後、すぐにご連絡いたします。'
@@ -831,7 +862,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       { id: 'hsk', title: 'HSK (Chinese Proficiency Test)', description: '言語学博士のノウハウが詰まったHSK高得点戦略コース', levels: ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6'] },
       { id: 'disc', title: '討論 (Discussion)', description: '論理的なスピーキングと批判的思考を養う深化討論コース', levels: ['初級', '中級', '上級', '最上級'] },
       { id: 'biz', title: 'ビジネス (Business)', description: '実務会議、契約、プレゼンテーション中心の専門ビジネスコース', levels: ['初級', '中級', '上級', '最上級'] },
-      { id: 'cult', title: '文化 (Culture)', description: '中国社会と文化に関する人文学的な深層研究コース', levels: ['Special Session'] }
+      { id: 'cult', title: '文化 (Culture)', description: '中国社会と文化に関する人文学的な深層研究コース (準備中)', levels: ['準備中'] },
     ],
     resourceGroups: [
       {

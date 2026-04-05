@@ -119,6 +119,7 @@ export default function App() {
     curriculum: [
       { id: 'conv', label: '회화 (Conversation)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
       { id: 'hsk', label: 'HSK (Proficiency Test)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
+      { id: 'acad', label: '중·고교 내신 관리 (School Grades)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
       { id: 'disc', label: '토론 (Discussion)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
       { id: 'biz', label: '비즈니스 (Business)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
       { id: 'cult', label: '문화 (Culture)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
@@ -5778,12 +5779,27 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
 
 const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void, isEditMode: boolean, isAdmin?: boolean, siteContent: any }> = ({ language, onBook, isEditMode, isAdmin, siteContent }) => {
   const t = TRANSLATIONS[language];
+  const [currentPage, setCurrentPage] = useState(0);
+  const itemsPerPage = 5;
+  const courses = t.courses || COURSES;
+  const totalPages = Math.ceil(courses.length / itemsPerPage);
+  
+  const currentCourses = courses.slice(currentPage * itemsPerPage, (currentPage + 1) * itemsPerPage);
+
+  const nextPage = () => {
+    if (currentPage < totalPages - 1) setCurrentPage(prev => prev + 1);
+  };
+
+  const prevPage = () => {
+    if (currentPage > 0) setCurrentPage(prev => prev - 1);
+  };
+
   return (
     <motion.div 
       initial={{ opacity: 0, y: 20 }} 
       animate={{ opacity: 1, y: 0 }} 
       exit={{ opacity: 0, y: -20 }}
-      className="max-w-7xl mx-auto px-6 py-32"
+      className="max-w-7xl mx-auto px-6 md:px-20 py-32"
     >
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
         <div className="space-y-4">
@@ -5799,37 +5815,100 @@ const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-px bg-ink/10 border border-ink/10">
-        {(t.courses || COURSES).map((course: any, idx: number) => (
-          <motion.div 
-            key={course.id}
-            whileHover={{ backgroundColor: 'rgba(26, 26, 26, 0.02)' }}
-            className="bg-paper p-8 space-y-8 flex flex-col h-full"
-          >
-            <div className="space-y-4 flex-grow">
-              <div className="w-12 h-12 rounded-full border border-ink/10 flex items-center justify-center">
-                {idx === 0 && <MessageSquare size={20} />}
-                {idx === 1 && <GraduationCap size={20} />}
-                {idx === 2 && <Star size={20} />}
-                {idx === 3 && <Briefcase size={20} />}
-                {idx === 4 && <Globe size={20} />}
-              </div>
-              <h3 className="text-2xl font-serif">{course.title}</h3>
-              <p className="text-xs opacity-60 leading-relaxed">{course.description}</p>
-              <div className="flex flex-wrap gap-2">
-                {course.levels.map(level => (
-                  <span key={level} className="text-[9px] uppercase tracking-widest px-2 py-1 bg-ink/5 rounded-sm">{level}</span>
-                ))}
-              </div>
-            </div>
-            <button 
-              onClick={() => onBook(course)}
-              className="group flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold hover:text-gold transition-colors"
+      <div className="relative group/carousel">
+        {/* Navigation Arrows */}
+        <button 
+          onClick={prevPage}
+          disabled={currentPage === 0}
+          className={cn(
+            "absolute -left-4 md:-left-16 top-1/2 -translate-y-1/2 z-10 w-10 h-10 md:w-16 md:h-16 bg-paper border border-ink/10 rounded-full flex items-center justify-center shadow-2xl transition-all group/arrow",
+            currentPage === 0 ? "opacity-20 cursor-not-allowed" : "opacity-100 hover:bg-gold hover:text-ink hover:border-gold"
+          )}
+        >
+          <ChevronLeft size={28} className={cn("transition-transform", currentPage !== 0 && "group-hover/arrow:-translate-x-1")} />
+        </button>
+        
+        <button 
+          onClick={nextPage}
+          disabled={currentPage >= totalPages - 1}
+          className={cn(
+            "absolute -right-4 md:-right-16 top-1/2 -translate-y-1/2 z-10 w-10 h-10 md:w-16 md:h-16 bg-paper border border-ink/10 rounded-full flex items-center justify-center shadow-2xl transition-all group/arrow",
+            currentPage >= totalPages - 1 ? "opacity-20 cursor-not-allowed" : "opacity-100 hover:bg-gold hover:text-ink hover:border-gold"
+          )}
+        >
+          <ChevronRight size={28} className={cn("transition-transform", currentPage < totalPages - 1 && "group-hover/arrow:translate-x-1")} />
+        </button>
+
+        <div className="overflow-visible">
+          <AnimatePresence mode="wait">
+            <motion.div 
+              key={currentPage}
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -20 }}
+              transition={{ duration: 0.4, ease: "easeInOut" }}
+              className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-px bg-ink/10 border border-ink/10"
             >
-              {language === 'ko' ? '수강 신청' : t.curriculum.bookNow} <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
-            </button>
-          </motion.div>
-        ))}
+              {currentCourses.map((course: any) => (
+                <motion.div 
+                  key={course.id}
+                  whileHover={{ backgroundColor: 'rgba(26, 26, 26, 0.02)' }}
+                  className="bg-paper p-8 space-y-8 flex flex-col h-full min-h-[500px]"
+                >
+                  <div className="space-y-4 flex-grow">
+                    <div className="w-12 h-12 rounded-full border border-ink/10 flex items-center justify-center">
+                      {course.id === 'conv' && <MessageSquare size={20} />}
+                      {course.id === 'hsk' && <GraduationCap size={20} />}
+                      {course.id === 'acad' && <BookOpen size={20} />}
+                      {course.id === 'disc' && <Star size={20} />}
+                      {course.id === 'biz' && <Briefcase size={20} />}
+                      {course.id === 'cult' && <Globe size={20} />}
+                    </div>
+                    <h3 className="text-2xl font-serif">{course.title}</h3>
+                    <p className="text-xs opacity-60 leading-relaxed line-clamp-3">{course.description}</p>
+                    <div className="space-y-3 pt-2">
+                      {course.levels.map((level: string, lIdx: number) => (
+                        <div key={level} className="space-y-1">
+                          <span className="inline-block text-[9px] uppercase tracking-widest px-2 py-1 bg-ink/5 rounded-sm font-bold">{level}</span>
+                          {course.levelDescriptions && course.levelDescriptions[lIdx] && (
+                            <p className="text-[10px] opacity-50 leading-tight pl-1">{course.levelDescriptions[lIdx]}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                  <button 
+                    onClick={() => onBook(course)}
+                    className="group flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold hover:text-gold transition-colors"
+                  >
+                    {language === 'ko' ? '수강 신청' : t.curriculum.bookNow} <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                  </button>
+                </motion.div>
+              ))}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+
+        {/* Pagination Info */}
+        <div className="mt-12 flex flex-col items-center gap-4">
+          <div className="flex gap-2">
+            {Array.from({ length: totalPages }).map((_, i) => (
+              <button
+                key={i}
+                onClick={() => setCurrentPage(i)}
+                className={cn(
+                  "w-2 h-2 rounded-full transition-all",
+                  currentPage === i ? "bg-gold w-8" : "bg-ink/10 hover:bg-ink/30"
+                )}
+              />
+            ))}
+          </div>
+          <p className="text-[10px] uppercase tracking-[0.2em] opacity-40 font-bold">
+            {language === 'ko' 
+              ? `${currentPage + 1}페이지 ${currentPage * itemsPerPage + 1}-${Math.min((currentPage + 1) * itemsPerPage, courses.length)}개`
+              : `Page ${currentPage + 1}: ${currentPage * itemsPerPage + 1}-${Math.min((currentPage + 1) * itemsPerPage, courses.length)} items`}
+          </p>
+        </div>
       </div>
     </motion.div>
   );
@@ -6022,7 +6101,7 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
             <div className="space-y-6">
               <h3 className="text-xs uppercase tracking-[0.3em] opacity-50">1. {language === 'ko' ? '과정 선택' : 'Select Course'}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {COURSES.slice(0, 3).map(course => (
+                {COURSES.map(course => (
                   <button
                     key={course.id}
                     onClick={() => setSelectedCourse(course)}
@@ -6032,7 +6111,7 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
                     )}
                   >
                     <p className={cn("text-sm font-bold mb-1", selectedCourse.id === course.id ? "text-gold" : "opacity-80")}>{course.title}</p>
-                    <p className="text-[10px] opacity-40 leading-relaxed">{course.description}</p>
+                    <p className="text-[10px] opacity-40 leading-relaxed line-clamp-2">{course.description}</p>
                   </button>
                 ))}
               </div>
@@ -6042,17 +6121,27 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
             <div className="space-y-6">
               <h3 className="text-xs uppercase tracking-[0.3em] opacity-50">2. {language === 'ko' ? '레벨 선택' : 'Select Level'}</h3>
               <div className="flex flex-wrap gap-3">
-                {selectedCourse.levels.map(level => (
-                  <button
-                    key={level}
-                    onClick={() => setSelectedLevel(level)}
-                    className={cn(
-                      "px-6 py-3 rounded-full border text-xs uppercase tracking-widest transition-all",
-                      selectedLevel === level ? "bg-gold text-ink border-gold font-bold" : "border-paper/10 hover:border-paper/30"
+                {selectedCourse.levels.map((level, lIdx) => (
+                  <div key={level} className="flex flex-col gap-2">
+                    <button
+                      onClick={() => setSelectedLevel(level)}
+                      className={cn(
+                        "px-6 py-3 rounded-full border text-xs uppercase tracking-widest transition-all",
+                        selectedLevel === level ? "bg-gold text-ink border-gold font-bold" : "border-paper/10 hover:border-paper/30"
+                      )}
+                    >
+                      {level}
+                    </button>
+                    {selectedLevel === level && selectedCourse.levelDescriptions && selectedCourse.levelDescriptions[lIdx] && (
+                      <motion.p 
+                        initial={{ opacity: 0, y: -5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="text-[10px] opacity-50 italic max-w-[200px] leading-tight"
+                      >
+                        * {selectedCourse.levelDescriptions[lIdx]}
+                      </motion.p>
                     )}
-                  >
-                    {level}
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -6226,6 +6315,16 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
     preferredSlots: [] as string[],
     requests: ''
   });
+
+  // Update level when course changes
+  useEffect(() => {
+    if (formData.desiredClass.length > 0) {
+      const firstSelectedCourse = COURSES.find(c => formData.desiredClass.some(dc => dc.includes(c.title)));
+      if (firstSelectedCourse && !firstSelectedCourse.levels.includes(formData.desiredLevel)) {
+        setFormData(prev => ({ ...prev, desiredLevel: firstSelectedCourse.levels[0] }));
+      }
+    }
+  }, [formData.desiredClass, language]);
 
   const priceResult = useMemo(() => {
     const customRate = siteContent['event-discount']?.discountRate;
@@ -6426,117 +6525,64 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
           </div>
         </div>
 
-        {/* 5. Goals */}
-        <div className="space-y-4">
+        {/* 5. Desired Duration */}
+        <div className="space-y-6">
           <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">5</span>
-            <EditableText contentKey="inquiry.goalsLabel" defaultValue={t.inquiry.goalsLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+            <EditableText contentKey="inquiry.durationLabel" defaultValue={t.inquiry.durationLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
-          <textarea 
-            placeholder={t.inquiry.goalsPlaceholder}
-            value={formData.goals || ''}
-            onChange={(e) => setFormData(prev => ({ ...prev, goals: e.target.value }))}
-            className="w-full p-6 bg-ink/5 border border-ink/10 rounded-3xl focus:border-gold outline-none transition-colors text-lg min-h-[100px]"
-          />
-        </div>
-
-        {/* 5. Desired Duration & Hours */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-          <div className="space-y-6">
-            <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
-              <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">5</span>
-              <EditableText contentKey="inquiry.durationLabel" defaultValue={language === 'ko' ? '희망 수강 기간' : 'Desired Duration'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              {[4, 8, 10, 12].map(w => (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            {t.inquiry.durationOptions.map((option: string, idx: number) => {
+              const weekValues = [4, 8, 10, 12];
+              const w = weekValues[idx];
+              return (
                 <button 
-                  key={w}
+                  key={option}
                   type="button"
                   onClick={() => setFormData(prev => ({ ...prev, desiredWeeks: w }))}
                   className={cn(
-                    "py-4 border rounded-2xl text-sm transition-all",
-                    formData.desiredWeeks === w ? "border-gold bg-gold/10 text-gold font-bold" : "border-ink/10 hover:border-gold/50"
+                    "py-5 border rounded-2xl text-sm transition-all",
+                    formData.desiredWeeks === w ? "border-gold bg-gold/10 text-gold font-bold" : "bg-paper border-ink/10 hover:border-gold/50"
                   )}
                 >
-                  {w}{t.pricing.weeks}
+                  {option}
                 </button>
-              ))}
-            </div>
-          </div>
-
-          <div className="space-y-6">
-            <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
-              <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">6</span>
-              <EditableText contentKey="inquiry.hoursLabel" defaultValue={language === 'ko' ? '희망 수업 시간' : 'Desired Class Duration'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-            </div>
-            <div className="grid grid-cols-3 gap-3">
-              {[1, 1.5, 2].map(h => (
-                <button 
-                  key={h}
-                  type="button"
-                  onClick={() => setFormData(prev => ({ ...prev, desiredHours: h }))}
-                  className={cn(
-                    "py-4 border rounded-2xl text-sm transition-all",
-                    formData.desiredHours === h ? "border-gold bg-gold/10 text-gold font-bold" : "border-ink/10 hover:border-gold/50"
-                  )}
-                >
-                  {h}{language === 'ko' ? '시간' : 'h'}
-                </button>
-              ))}
-            </div>
+              );
+            })}
           </div>
         </div>
 
-        <div className="p-8 bg-gold/5 border border-gold/20 rounded-[32px] space-y-6">
-          <div className="flex justify-between items-center">
-            <h3 className="text-xl font-serif">{language === 'ko' ? '예상 수강료' : 'Estimated Tuition'}</h3>
-            {isEventPeriod && (
-              <span className="text-[10px] bg-gold text-ink px-3 py-1 rounded-full font-bold uppercase tracking-widest">
-                {language === 'ko' ? '이벤트 할인 적용됨' : 'Event Discount Applied'}
-              </span>
-            )}
-          </div>
-          
-          <div className="space-y-4">
-            <div className="flex justify-between items-center opacity-60">
-              <span className="text-sm">{language === 'ko' ? '기본 수강료' : 'Base Tuition'}</span>
-              <span className="line-through">₩{priceResult.originalPrice.toLocaleString()}</span>
-            </div>
-            
-            <div className="flex justify-between items-center text-xs opacity-60 italic">
-              <span>{formData.desiredWeeks}{t.pricing.weeks} / {formData.desiredHours}{language === 'ko' ? '시간' : 'h'}</span>
-            </div>
-            
-            {priceResult.weeksDiscountRate > 0 && (
-              <div className="flex justify-between items-center text-green-600">
-                <span className="text-sm">{formData.desiredWeeks}{t.pricing.weeks} {language === 'ko' ? '장기 할인' : 'Duration Discount'}</span>
-                <span>-{Math.round(priceResult.weeksDiscountRate * 100)}%</span>
-              </div>
-            )}
-
-            {priceResult.isEventDiscount && (
-              <div className="flex justify-between items-center text-gold">
-                <span className="text-sm">{language === 'ko' ? '이벤트 추가 할인' : 'Event Extra Discount'}</span>
-                <span>-{Math.round(priceResult.eventDiscountRate * 100)}%</span>
-              </div>
-            )}
-
-            <div className="pt-4 border-t border-gold/10 flex justify-between items-center">
-              <span className="text-lg font-serif">{language === 'ko' ? '최종 혜택가' : 'Final Price'}</span>
-              <div className="text-right">
-                <span className="text-3xl font-serif text-gold">₩{priceResult.discountedPrice.toLocaleString()}</span>
-                <p className="text-[10px] opacity-40 mt-1 italic">
-                  {language === 'ko' ? '* 주 1회, 1시간 기준 예상 금액입니다.' : '* Estimated for 1 session/week, 1 hour.'}
-                </p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* 6. Desired Course */}
+        {/* 6. Desired Class Hours */}
         <div className="space-y-6">
           <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
             <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">6</span>
+            <EditableText contentKey="inquiry.hoursLabel" defaultValue={t.inquiry.hoursLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </div>
+          <div className="grid grid-cols-3 gap-3">
+            {t.inquiry.hoursOptions.map((option: string, idx: number) => {
+              const hourValues = [1, 1.5, 2];
+              const h = hourValues[idx];
+              return (
+                <button 
+                  key={option}
+                  type="button"
+                  onClick={() => setFormData(prev => ({ ...prev, desiredHours: h }))}
+                  className={cn(
+                    "py-5 border rounded-2xl text-sm transition-all",
+                    formData.desiredHours === h ? "border-gold bg-gold/10 text-gold font-bold" : "bg-paper border-ink/10 hover:border-gold/50"
+                  )}
+                >
+                  {option}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* 7. Desired Course */}
+        <div className="space-y-6">
+          <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">7</span>
             <EditableText contentKey="inquiry.classLabel" defaultValue={t.inquiry.classLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -6603,10 +6649,70 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
           )}
         </div>
 
-        {/* 7. Preferred Schedule */}
+        <div className="p-8 bg-gold/5 border border-gold/20 rounded-[32px] space-y-6">
+          <div className="flex justify-between items-center">
+            <h3 className="text-xl font-serif">{language === 'ko' ? '예상 수강료' : 'Estimated Tuition'}</h3>
+            {isEventPeriod && (
+              <span className="text-[10px] bg-gold text-ink px-3 py-1 rounded-full font-bold uppercase tracking-widest">
+                {language === 'ko' ? '이벤트 할인 적용됨' : 'Event Discount Applied'}
+              </span>
+            )}
+          </div>
+          
+          <div className="space-y-4">
+            <div className="flex justify-between items-center opacity-60">
+              <span className="text-sm">{language === 'ko' ? '기본 수강료' : 'Base Tuition'}</span>
+              <span className="line-through">₩{priceResult.originalPrice.toLocaleString()}</span>
+            </div>
+            
+            <div className="flex justify-between items-center text-xs opacity-60 italic">
+              <span>{formData.desiredWeeks}{t.pricing.weeks} / {formData.desiredHours}{language === 'ko' ? '시간' : 'h'}</span>
+            </div>
+            
+            {priceResult.weeksDiscountRate > 0 && (
+              <div className="flex justify-between items-center text-green-600">
+                <span className="text-sm">{formData.desiredWeeks}{t.pricing.weeks} {language === 'ko' ? '장기 할인' : 'Duration Discount'}</span>
+                <span>-{Math.round(priceResult.weeksDiscountRate * 100)}%</span>
+              </div>
+            )}
+
+            {priceResult.isEventDiscount && (
+              <div className="flex justify-between items-center text-gold">
+                <span className="text-sm">{language === 'ko' ? '이벤트 추가 할인' : 'Event Extra Discount'}</span>
+                <span>-{Math.round(priceResult.eventDiscountRate * 100)}%</span>
+              </div>
+            )}
+
+            <div className="pt-4 border-t border-gold/10 flex justify-between items-center">
+              <span className="text-lg font-serif">{language === 'ko' ? '최종 혜택가' : 'Final Price'}</span>
+              <div className="text-right">
+                <span className="text-3xl font-serif text-gold">₩{priceResult.discountedPrice.toLocaleString()}</span>
+                <p className="text-[10px] opacity-40 mt-1 italic">
+                  {language === 'ko' ? '* 주 1회, 1시간 기준 예상 금액입니다.' : '* Estimated for 1 session/week, 1 hour.'}
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 8. Goals */}
+        <div className="space-y-4">
+          <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
+            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">8</span>
+            <EditableText contentKey="inquiry.goalsLabel" defaultValue={t.inquiry.goalsLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </div>
+          <textarea 
+            placeholder={t.inquiry.goalsPlaceholder}
+            value={formData.goals || ''}
+            onChange={(e) => setFormData(prev => ({ ...prev, goals: e.target.value }))}
+            className="w-full p-6 bg-ink/5 border border-ink/10 rounded-3xl focus:border-gold outline-none transition-colors text-lg min-h-[100px]"
+          />
+        </div>
+
+        {/* 9. Preferred Schedule */}
         <div className="space-y-6">
           <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
-            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">7</span>
+            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">9</span>
             <EditableText contentKey="inquiry.scheduleLabel" defaultValue={t.inquiry.scheduleLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -6626,10 +6732,10 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
           </div>
         </div>
 
-        {/* 8. Additional Requests */}
+        {/* 10. Additional Requests */}
         <div className="space-y-4">
           <div className="text-xs uppercase tracking-widest font-bold flex items-center gap-2">
-            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">8</span>
+            <span className="w-6 h-6 bg-ink text-paper rounded-full flex items-center justify-center text-[10px]">10</span>
             <EditableText contentKey="inquiry.requestsLabel" defaultValue={t.inquiry.requestsLabel} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
           <textarea 

@@ -1,10 +1,11 @@
-export type CourseCategory = 'Conversation' | 'HSK' | 'Discussion' | 'Business' | 'Culture';
+export type CourseCategory = 'Conversation' | 'HSK' | 'Discussion' | 'Business' | 'Culture' | 'Academic';
 
 export interface Course {
   id: string;
   category: CourseCategory;
   title: string;
   levels: string[];
+  levelDescriptions?: string[];
   description: string;
 }
 
@@ -24,6 +25,18 @@ export const COURSES: Course[] = [
     description: '중국 언어학 박사의 노하우가 담긴 HSK 고득점 전략 과정'
   },
   {
+    id: 'acad',
+    category: 'Academic',
+    title: '중·고교 내신 관리 (School Grades)',
+    levels: ['Level 1 (기초)', 'Level 2 (심화)', 'Level 3 (완성)'],
+    levelDescriptions: [
+      '개념 정리 및 기본적인 문제를 통한 중국어 기초 다지기',
+      '기출 문제 빈출 문법 분석과 고난도 응용 문제로 실전 감각 익히기',
+      '심화 과정 및 수행평가 완벽 대비로 내신 1등급 굳히기'
+    ],
+    description: '중·고교 내신 1등급을 위한 체계적인 문법 정리 및 실전 문제 풀이 과정'
+  },
+  {
     id: 'disc',
     category: 'Discussion',
     title: '토론 (Discussion)',
@@ -41,8 +54,8 @@ export const COURSES: Course[] = [
     id: 'cult',
     category: 'Culture',
     title: '문화 (Culture)',
-    levels: ['Special Session'],
-    description: '중국 사회와 문화에 대한 인문학적 심층 연구 과정'
+    levels: ['준비중'],
+    description: '중국 사회와 문화에 대한 인문학적 심층 연구 과정 (준비중)'
   }
 ];
 
@@ -105,6 +118,9 @@ export const LEVEL_PRICES: Record<string, number> = {
   'HSK5': 119000,
   'HSK6': 129000,
   'Special Session': 129000,
+  'Level 1 (기초)': 109000,
+  'Level 2 (심화)': 119000,
+  'Level 3 (완성)': 129000,
 };
 
 export interface PriceResult {
