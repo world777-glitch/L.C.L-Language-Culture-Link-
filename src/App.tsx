@@ -57,7 +57,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
-import { COURSES, calculatePrice, RESOURCE_GROUPS, LEVEL_PRICES, CourseCategory } from './constants';
+import { COURSES, calculatePrice, RESOURCE_GROUPS, LEVEL_PRICES, CourseCategory, Course } from './constants';
 import { cn } from './lib/utils';
 import { LANGUAGES, TRANSLATIONS, LanguageCode } from './translations';
 import { jsPDF } from 'jspdf';
@@ -106,6 +106,7 @@ export default function App() {
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [view, setView] = useState<'landing' | 'booking' | 'mypage' | 'admin' | 'image-gen' | 'archive' | 'community' | 'inquiry' | 'curriculum' | 'pricing' | 'level-test'>('landing');
   const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
+  const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
   const [initialArchiveFilter, setInitialArchiveFilter] = useState<{ groupId: string | null, categoryId: string | null }>({ groupId: null, categoryId: null });
   const [initialCommunityFilter, setInitialCommunityFilter] = useState<string>('all');
   const [language, setLanguage] = useState<LanguageCode>('ko');
@@ -114,21 +115,51 @@ export default function App() {
 
   const [isEditMode, setIsEditMode] = useState(false);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
+  const [hoveredSubItem, setHoveredSubItem] = useState<string | null>(null);
 
-  const navSubMenus: Record<string, { id: string, label: string, action: () => void }[]> = {
-    curriculum: [
-      { id: 'conv', label: '회화 (Conversation)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
-      { id: 'hsk', label: 'HSK (Proficiency Test)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
-      { id: 'acad', label: '중·고교 내신 관리 (School Grades)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
-      { id: 'disc', label: '토론 (Discussion)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
-      { id: 'biz', label: '비즈니스 (Business)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
-      { id: 'cult', label: '문화 (Culture)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
-    ],
+  const navSubMenus: Record<string, { id: string, label: string, action: () => void, children?: { id: string, label: string, action: () => void }[] }[]> = {
+    curriculum: COURSES.map(course => ({
+      id: course.id,
+      label: course.title,
+      action: () => { 
+        setView('landing'); 
+        setTimeout(() => {
+          const el = document.getElementById('curriculum');
+          if (el) el.scrollIntoView({ behavior: 'smooth' });
+        }, 100);
+      },
+      children: course.levels.map(level => ({
+        id: `${course.id}-${level}`,
+        label: level,
+        action: () => {
+          setSelectedCourse(course);
+          setSelectedLevel(level);
+          setView('inquiry');
+        }
+      }))
+    })),
+    pricing: [4, 8, 10, 12].map(weeks => ({
+      id: `pricing-${weeks}`,
+      label: `${weeks}${t.pricing.weeks}`,
+      action: () => { setView('pricing'); }
+    })),
+    'level-test': COURSES.map(course => ({
+      id: `test-${course.id}`,
+      label: course.title,
+      action: () => { setView('level-test'); }
+    })),
     archive: [
       { id: 'all', label: t.archive.all, action: () => { setView('archive'); setInitialArchiveFilter({ groupId: null, categoryId: null }); } },
-      { id: 'public', label: t.archive.access.public, action: () => { setView('archive'); } },
-      { id: 'member', label: t.archive.access.member, action: () => { setView('archive'); } },
-      { id: 'premium', label: t.archive.access.premium, action: () => { setView('archive'); } },
+      ...RESOURCE_GROUPS.map(group => ({
+        id: group.id,
+        label: group.name,
+        action: () => { setView('archive'); setInitialArchiveFilter({ groupId: group.id, categoryId: null }); },
+        children: group.categories.map(cat => ({
+          id: cat.id,
+          label: cat.name,
+          action: () => { setView('archive'); setInitialArchiveFilter({ groupId: group.id, categoryId: cat.id }); }
+        }))
+      }))
     ],
     community: [
       { id: 'all', label: t.community.all, action: () => { setView('community'); setInitialCommunityFilter('all'); } },
@@ -352,7 +383,7 @@ export default function App() {
             </button>
             <button 
               onClick={() => setView('pricing')} 
-              onMouseEnter={() => setHoveredMenu(null)}
+              onMouseEnter={() => setHoveredMenu('pricing')}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'pricing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
@@ -389,7 +420,10 @@ export default function App() {
             </button>
             <button 
               onClick={() => setView('inquiry')} 
-              onMouseEnter={() => setHoveredMenu(null)}
+              onMouseEnter={() => {
+                setHoveredMenu(null);
+                setSelectedLevel(null);
+              }}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors font-bold whitespace-nowrap",
                 view === 'inquiry' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
@@ -399,9 +433,9 @@ export default function App() {
             </button>
             <button 
               onClick={() => setView('level-test')} 
-              onMouseEnter={() => setHoveredMenu(null)}
+              onMouseEnter={() => setHoveredMenu('level-test')}
               className={cn(
-                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors font-bold whitespace-nowrap",
+                "text-[10px] lg:text-xs uppercase tracking-widest transition-all font-bold whitespace-nowrap",
                 view === 'level-test' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
               )}
             >
@@ -479,19 +513,55 @@ export default function App() {
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
               className="bg-ink/5 border-t border-ink/5 overflow-hidden"
+              onMouseLeave={() => setHoveredSubItem(null)}
             >
-              <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-center gap-8">
+              <div className="max-w-7xl mx-auto px-6 py-6 flex items-start justify-center gap-12 flex-wrap">
                 {navSubMenus[hoveredMenu].map(item => (
-                  <button
-                    key={item.id}
-                    onClick={() => {
-                      item.action();
-                      setHoveredMenu(null);
-                    }}
-                    className="text-[10px] lg:text-xs uppercase tracking-widest opacity-60 hover:opacity-100 hover:text-gold transition-all font-medium"
+                  <div 
+                    key={item.id} 
+                    className="flex flex-col items-center gap-3 min-w-[120px]"
+                    onMouseEnter={() => setHoveredSubItem(item.id)}
                   >
-                    {item.label}
-                  </button>
+                    <button
+                      onClick={() => {
+                        item.action();
+                        setHoveredMenu(null);
+                      }}
+                      className={cn(
+                        "text-[10px] lg:text-xs uppercase tracking-widest transition-all font-medium whitespace-nowrap",
+                        hoveredSubItem === item.id ? "text-gold opacity-100" : "opacity-60 hover:opacity-100 hover:text-gold"
+                      )}
+                    >
+                      {item.label}
+                    </button>
+
+                    <div className="min-h-[20px] flex items-center justify-center">
+                      <AnimatePresence>
+                        {hoveredSubItem === item.id && item.children && (
+                          <motion.div
+                            initial={{ opacity: 0, y: -5 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -5 }}
+                            className="flex items-center justify-center gap-4"
+                          >
+                            {item.children.map(child => (
+                              <button
+                                key={child.id}
+                                onClick={() => {
+                                  child.action();
+                                  setHoveredMenu(null);
+                                  setHoveredSubItem(null);
+                                }}
+                                className="text-[9px] lg:text-[10px] uppercase tracking-[0.2em] opacity-50 hover:opacity-100 hover:text-gold transition-all whitespace-nowrap"
+                              >
+                                {child.label}
+                              </button>
+                            ))}
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </div>
+                  </div>
                 ))}
               </div>
             </motion.div>
@@ -511,7 +581,7 @@ export default function App() {
           {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} />}
           {view === 'community' && <CommunityView key="community" language={language} initialFilter={initialCommunityFilter} onClearFilter={() => setInitialCommunityFilter('all')} />}
           {view === 'level-test' && <LevelTestView key="level-test" language={language} isAdmin={isAdmin} isEditMode={isEditMode} siteContent={siteContent} />}
-          {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} isEventPeriod={isEventPeriod} siteContent={siteContent} isEditMode={isEditMode} isAdmin={isAdmin} />}
+          {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} isEventPeriod={isEventPeriod} siteContent={siteContent} isEditMode={isEditMode} isAdmin={isAdmin} initialCourse={selectedCourse} initialLevel={selectedLevel || undefined} />}
         </AnimatePresence>
 
         {/* Edit Mode Instruction Bar */}
@@ -6292,7 +6362,16 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
   );
 };
 
-const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventPeriod: boolean, siteContent: any, isEditMode: boolean, isAdmin?: boolean }> = ({ language, onComplete, isEventPeriod, siteContent, isEditMode, isAdmin }) => {
+const InquiryView: FC<{ 
+  language: LanguageCode, 
+  onComplete: () => void, 
+  isEventPeriod: boolean, 
+  siteContent: any, 
+  isEditMode: boolean, 
+  isAdmin?: boolean,
+  initialCourse?: Course,
+  initialLevel?: string
+}> = ({ language, onComplete, isEventPeriod, siteContent, isEditMode, isAdmin, initialCourse, initialLevel }) => {
   const t = TRANSLATIONS[language];
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -6307,9 +6386,9 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
     levelConcerns: [] as string[],
     otherLevelConcern: '',
     goals: '',
-    desiredClass: [] as string[],
+    desiredClass: initialCourse ? [initialCourse.title] : [] as string[],
     otherDesiredClass: '',
-    desiredLevel: '입문',
+    desiredLevel: initialLevel || (initialCourse ? initialCourse.levels[0] : '입문'),
     desiredWeeks: 12,
     desiredHours: 1,
     preferredSlots: [] as string[],
