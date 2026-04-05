@@ -48,6 +48,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       archive: '자료실',
       community: '커뮤니티',
       inquiry: '수강 문의',
+      levelTest: '레벨테스트',
       aiStudio: 'AI 스튜디오',
       admin: '관리자',
       post: '게시',
@@ -118,9 +119,29 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       inquiry: '학습 문의',
       request: '자료 요청',
       titleLabel: '제목',
-      titlePlaceholder: '궁금한 신조어나 어법 고민을 한 줄로 적어주세요.',
       contentLabel: '내용',
-      contentPlaceholder: '현지 뉴스에서 본 문장이나, 평소 헷갈렸던 표현을 자유롭게 남겨주시면 박사가 직접 답변해 드립니다.',
+      placeholders: {
+        trend: {
+          title: '요즘 유행하는 이 단어, 무슨 뜻인가요?',
+          content: 'SNS나 영상에서 본 신조어의 의미가 궁금하다면 남겨주세요. 박사가 유래와 용법을 설명해 드립니다.',
+        },
+        clinic: {
+          title: '헷갈리는 어법이나 작문 교정을 요청합니다.',
+          content: '평소 헷갈렸던 표현이나 직접 쓴 문장을 남겨주시면 박사가 직접 처방해 드립니다.',
+        },
+        insight: {
+          title: '뉴스 기사 공유 또는 현지 문화에 대해 궁금해요.',
+          content: '현지 뉴스에서 본 흥미로운 내용이나 문화적 통찰을 자유롭게 나눠주세요.',
+        },
+        challenge: {
+          title: '<이성어> 학습 인증 또는 퀴즈 참여합니다!',
+          content: '교재 학습 인증이나 성어 퀴즈 결과를 이미지와 함께 올려주세요. 함께 공부해요!',
+        },
+        consult: {
+          title: '학습 상담이나 필요한 자료를 요청합니다.',
+          content: '본인의 학습 상황에 맞는 상담이나 필요한 자료명을 적어주세요.',
+        },
+      },
       submit: '등록하기',
       cancel: '취소',
       loginRequired: '로그인이 필요합니다.',
@@ -268,6 +289,7 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       archive: 'Archive',
       community: 'Community',
       inquiry: 'Inquiry',
+      levelTest: 'Level Test',
       aiStudio: 'AI Studio',
       admin: 'Admin',
       post: 'Post',
@@ -375,9 +397,29 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       inquiry: 'Learning Inquiry',
       request: 'Resource Request',
       titleLabel: 'Title',
-      titlePlaceholder: 'Enter your question or topic in one line.',
       contentLabel: 'Content',
-      contentPlaceholder: 'Feel free to share sentences from news or expressions you are confused about.',
+      placeholders: {
+        trend: {
+          title: 'What does this trending word mean?',
+          content: 'Share a new word you saw on SNS or videos. Dr. Lee will explain its origin and usage.',
+        },
+        clinic: {
+          title: 'Is this grammar/expression correct?',
+          content: 'Leave your grammar questions or writing for correction. Dr. Lee will give you a "Grammar Prescription".',
+        },
+        insight: {
+          title: "I'm curious about Chinese news or culture.",
+          content: 'Feel free to share local news articles or your thoughts on cultural differences.',
+        },
+        challenge: {
+          title: "Participating in today's study certification / idiom quiz!",
+          content: "Share your study certification photos or idiom challenge results. Let's study together!",
+        },
+        consult: {
+          title: 'Requesting learning consultation or materials.',
+          content: 'Describe your learning situation for consultation or specify the materials you need.',
+        },
+      },
       submit: 'Submit',
       cancel: 'Cancel',
       loginRequired: 'Login is required.',

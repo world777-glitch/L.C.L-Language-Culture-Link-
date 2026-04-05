@@ -104,14 +104,41 @@ export default function App() {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
-  const [view, setView] = useState<'landing' | 'booking' | 'mypage' | 'admin' | 'image-gen' | 'archive' | 'community' | 'inquiry' | 'curriculum' | 'pricing'>('landing');
+  const [view, setView] = useState<'landing' | 'booking' | 'mypage' | 'admin' | 'image-gen' | 'archive' | 'community' | 'inquiry' | 'curriculum' | 'pricing' | 'level-test'>('landing');
   const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
   const [initialArchiveFilter, setInitialArchiveFilter] = useState<{ groupId: string | null, categoryId: string | null }>({ groupId: null, categoryId: null });
+  const [initialCommunityFilter, setInitialCommunityFilter] = useState<string>('all');
   const [language, setLanguage] = useState<LanguageCode>('ko');
   const [adminTab, setAdminTab] = useState<'reservations' | 'resources' | 'community' | 'users' | 'stats' | 'inquiries'>('reservations');
   const t = TRANSLATIONS[language];
 
   const [isEditMode, setIsEditMode] = useState(false);
+  const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
+
+  const navSubMenus: Record<string, { id: string, label: string, action: () => void }[]> = {
+    curriculum: [
+      { id: 'conv', label: '회화 (Conversation)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
+      { id: 'hsk', label: 'HSK (Proficiency Test)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
+      { id: 'disc', label: '토론 (Discussion)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
+      { id: 'biz', label: '비즈니스 (Business)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
+      { id: 'cult', label: '문화 (Culture)', action: () => { setView('landing'); setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100); } },
+    ],
+    archive: [
+      { id: 'all', label: t.archive.all, action: () => { setView('archive'); setInitialArchiveFilter({ groupId: null, categoryId: null }); } },
+      { id: 'public', label: t.archive.access.public, action: () => { setView('archive'); } },
+      { id: 'member', label: t.archive.access.member, action: () => { setView('archive'); } },
+      { id: 'premium', label: t.archive.access.premium, action: () => { setView('archive'); } },
+    ],
+    community: [
+      { id: 'all', label: t.community.all, action: () => { setView('community'); setInitialCommunityFilter('all'); } },
+      { id: 'trend', label: t.community.trend, action: () => { setView('community'); setInitialCommunityFilter('trend'); } },
+      { id: 'clinic', label: t.community.clinic, action: () => { setView('community'); setInitialCommunityFilter('clinic'); } },
+      { id: 'insight', label: t.community.insight, action: () => { setView('community'); setInitialCommunityFilter('insight'); } },
+      { id: 'challenge', label: t.community.challenge, action: () => { setView('community'); setInitialCommunityFilter('challenge'); } },
+      { id: 'consult', label: t.community.consult, action: () => { setView('community'); setInitialCommunityFilter('consult'); } },
+    ]
+  };
+
   const [siteContent, setSiteContent] = useState<Record<string, any>>({});
   const isAdmin = userProfile?.role === 'admin';
 
@@ -258,11 +285,15 @@ export default function App() {
       </AnimatePresence>
 
       {/* Navigation */}
-      <nav className="sticky top-0 z-50 bg-paper/80 backdrop-blur-md border-b border-ink/10">
+      <nav 
+        className="sticky top-0 z-50 bg-paper/80 backdrop-blur-md border-b border-ink/10"
+        onMouseLeave={() => setHoveredMenu(null)}
+      >
         <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
           <div 
             className="flex items-center gap-3 cursor-pointer group" 
             onClick={() => setView('landing')}
+            onMouseEnter={() => setHoveredMenu(null)}
           >
             <div className="flex flex-col items-start justify-center leading-none">
               <span className="font-serif text-2xl font-bold tracking-tighter group-hover:text-gold transition-colors">L.C.L</span>
@@ -293,6 +324,7 @@ export default function App() {
             </div>
             <button 
               onClick={() => setView('landing')} 
+              onMouseEnter={() => setHoveredMenu(null)}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'landing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
@@ -309,6 +341,7 @@ export default function App() {
                   setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100);
                 }
               }} 
+              onMouseEnter={() => setHoveredMenu('curriculum')}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'curriculum' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
@@ -318,6 +351,7 @@ export default function App() {
             </button>
             <button 
               onClick={() => setView('pricing')} 
+              onMouseEnter={() => setHoveredMenu(null)}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'pricing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
@@ -334,6 +368,7 @@ export default function App() {
                   setTimeout(() => document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' }), 100);
                 }
               }} 
+              onMouseEnter={() => setHoveredMenu('archive')}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'archive' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
@@ -343,6 +378,7 @@ export default function App() {
             </button>
             <button 
               onClick={() => setView('community')} 
+              onMouseEnter={() => setHoveredMenu('community')}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'community' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
@@ -352,12 +388,23 @@ export default function App() {
             </button>
             <button 
               onClick={() => setView('inquiry')} 
+              onMouseEnter={() => setHoveredMenu(null)}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors font-bold whitespace-nowrap",
                 view === 'inquiry' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
               )}
             >
               {t.nav.inquiry}
+            </button>
+            <button 
+              onClick={() => setView('level-test')} 
+              onMouseEnter={() => setHoveredMenu(null)}
+              className={cn(
+                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors font-bold whitespace-nowrap",
+                view === 'level-test' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
+              )}
+            >
+              {t.nav.levelTest}
             </button>
             <button 
               onClick={() => setIsPostModalOpen(true)}
@@ -368,6 +415,7 @@ export default function App() {
             {(isAdmin || siteContent['ai-studio-access']?.access === 'all' || (siteContent['ai-studio-access']?.access === 'premium' && userProfile?.role === 'premium') || (siteContent['ai-studio-access']?.access === 'member' && userProfile)) && (
               <button 
                 onClick={() => setView('image-gen')} 
+                onMouseEnter={() => setHoveredMenu(null)}
                 className={cn(
                   "text-[10px] lg:text-xs uppercase tracking-widest transition-colors flex items-center gap-1 whitespace-nowrap",
                   view === 'image-gen' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
@@ -400,6 +448,7 @@ export default function App() {
                 )}
                 <button 
                   onClick={() => setView('mypage')}
+                  onMouseEnter={() => setHoveredMenu(null)}
                   className={cn(
                     "flex items-center gap-1 text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                     view === 'mypage' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
@@ -412,6 +461,7 @@ export default function App() {
             ) : (
               <button 
                 onClick={handleLogin}
+                onMouseEnter={() => setHoveredMenu(null)}
                 className="px-4 py-1.5 border border-ink rounded-full text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-all whitespace-nowrap"
               >
                 {t.nav.login}
@@ -419,6 +469,33 @@ export default function App() {
             )}
           </div>
         </div>
+
+        {/* Mega Menu Bar */}
+        <AnimatePresence>
+          {hoveredMenu && navSubMenus[hoveredMenu] && (
+            <motion.div
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-ink/5 border-t border-ink/5 overflow-hidden"
+            >
+              <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-center gap-8">
+                {navSubMenus[hoveredMenu].map(item => (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      item.action();
+                      setHoveredMenu(null);
+                    }}
+                    className="text-[10px] lg:text-xs uppercase tracking-widest opacity-60 hover:opacity-100 hover:text-gold transition-all font-medium"
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </nav>
 
       <main className="flex-grow">
@@ -431,7 +508,8 @@ export default function App() {
           {view === 'admin' && <AdminView key="admin" language={language} siteContent={siteContent} initialTab={adminTab} />}
           {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} siteContent={siteContent} />}
           {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} />}
-          {view === 'community' && <CommunityView key="community" language={language} />}
+          {view === 'community' && <CommunityView key="community" language={language} initialFilter={initialCommunityFilter} onClearFilter={() => setInitialCommunityFilter('all')} />}
+          {view === 'level-test' && <LevelTestView key="level-test" language={language} isAdmin={isAdmin} isEditMode={isEditMode} siteContent={siteContent} />}
           {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} isEventPeriod={isEventPeriod} siteContent={siteContent} isEditMode={isEditMode} isAdmin={isAdmin} />}
         </AnimatePresence>
 
@@ -6576,12 +6654,246 @@ const InquiryView: FC<{ language: LanguageCode, onComplete: () => void, isEventP
   );
 };
 
-const CommunityView: FC<{ language: LanguageCode }> = ({ language }) => {
+const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: boolean, siteContent: any }> = ({ language, isAdmin, isEditMode, siteContent }) => {
+  const t = TRANSLATIONS[language];
+  const [tests, setTests] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isUploading, setIsUploading] = useState(false);
+  const [editingTestId, setEditingTestId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [newName, setNewName] = useState('');
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    const q = query(collection(db, 'levelTests'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      setTests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!isAdmin || !window.confirm(language === 'ko' ? '삭제하시겠습니까?' : 'Are you sure you want to delete?')) return;
+    try {
+      await deleteDoc(doc(db, 'levelTests', id));
+    } catch (error) {
+      console.error("Error deleting test:", error);
+    }
+  };
+
+  const handleUpdateName = async (id: string) => {
+    if (!editName.trim()) return;
+    try {
+      await updateDoc(doc(db, 'levelTests', id), {
+        name: editName.trim()
+      });
+      setEditingTestId(null);
+    } catch (error) {
+      console.error("Error updating test name:", error);
+    }
+  };
+
+  const handleAddTest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    const file = fileInputRef.current?.files?.[0];
+    if (!file || !newName.trim() || !isAdmin) return;
+
+    setIsUploading(true);
+    try {
+      const storageRef = ref(storage, `levelTests/${Date.now()}_${file.name}`);
+      const uploadTask = uploadBytesResumable(storageRef, file);
+
+      uploadTask.on('state_changed', 
+        null,
+        (error) => {
+          console.error("Upload failed", error);
+          setIsUploading(false);
+        },
+        async () => {
+          const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
+          await addDoc(collection(db, 'levelTests'), {
+            name: newName.trim(),
+            url: downloadURL,
+            type: file.type,
+            size: file.size,
+            createdAt: serverTimestamp()
+          });
+          setIsUploading(false);
+          setShowAddForm(false);
+          setNewName('');
+          if (fileInputRef.current) fileInputRef.current.value = '';
+        }
+      );
+    } catch (error) {
+      console.error("Error uploading file:", error);
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-4xl mx-auto px-6 py-20">
+      <div className="text-center space-y-4 mb-16">
+        <h2 className="text-5xl font-serif font-light">{t.nav.levelTest}</h2>
+        <p className="text-lg opacity-60 font-serif italic">
+          {language === 'ko' ? '박사가 직접 설계한 레벨테스트로 실력을 진단해 보세요.' : 'Diagnose your skills with level tests designed by the PhD.'}
+        </p>
+      </div>
+
+      {isAdmin && (
+        <div className="mb-12">
+          {!showAddForm ? (
+            <button 
+              onClick={() => setShowAddForm(true)}
+              className="flex items-center gap-2 px-8 py-4 bg-gold text-ink rounded-full text-sm uppercase tracking-widest font-bold hover:scale-105 transition-transform mx-auto shadow-lg shadow-gold/20"
+            >
+              <Plus size={18} />
+              {language === 'ko' ? '새 레벨테스트 추가' : 'Add New Level Test'}
+            </button>
+          ) : (
+            <div className="p-8 bg-gold/5 border border-gold/20 rounded-3xl">
+              <form onSubmit={handleAddTest} className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">
+                    {language === 'ko' ? '테스트 이름' : 'Test Name'}
+                  </label>
+                  <input 
+                    type="text"
+                    value={newName}
+                    onChange={(e) => setNewName(e.target.value)}
+                    placeholder={language === 'ko' ? '예: 초급 레벨테스트' : 'e.g., Beginner Level Test'}
+                    className="w-full p-4 bg-white border border-ink/10 rounded-xl outline-none focus:border-gold transition-colors"
+                    required
+                  />
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">
+                    {language === 'ko' ? '파일 선택' : 'Select File'}
+                  </label>
+                  <input 
+                    type="file" 
+                    ref={fileInputRef} 
+                    className="w-full p-4 bg-white border border-ink/10 rounded-xl outline-none focus:border-gold transition-colors"
+                    required
+                  />
+                </div>
+                <div className="flex items-center justify-center gap-4">
+                  <button 
+                    type="button"
+                    onClick={() => setShowAddForm(false)}
+                    className="px-8 py-3 border border-ink/10 rounded-full text-xs uppercase tracking-widest font-bold hover:bg-ink/5 transition-colors"
+                  >
+                    {language === 'ko' ? '취소' : 'Cancel'}
+                  </button>
+                  <button 
+                    type="submit"
+                    disabled={isUploading}
+                    className="px-8 py-3 bg-gold text-ink rounded-full text-xs uppercase tracking-widest font-bold hover:scale-105 transition-transform disabled:opacity-50"
+                  >
+                    {isUploading ? (language === 'ko' ? '업로드 중...' : 'Uploading...') : (language === 'ko' ? '추가하기' : 'Add Test')}
+                  </button>
+                </div>
+              </form>
+            </div>
+          )}
+        </div>
+      )}
+
+      <div className="grid gap-4">
+        {loading ? (
+          <div className="text-center py-20 opacity-40 uppercase tracking-widest text-xs">{t.community.loading}</div>
+        ) : tests.length === 0 ? (
+          <div className="text-center py-20 opacity-40 uppercase tracking-widest text-xs">
+            {language === 'ko' ? '등록된 레벨테스트가 없습니다.' : 'No level tests registered.'}
+          </div>
+        ) : (
+          tests.map(test => (
+            <div key={test.id} className="group p-6 bg-paper border border-ink/10 rounded-2xl flex items-center justify-between hover:border-gold/50 transition-all">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-ink/5 rounded-xl flex items-center justify-center text-gold">
+                  <FileText size={24} />
+                </div>
+                <div className="flex-grow">
+                  {editingTestId === test.id ? (
+                    <div className="flex items-center gap-2">
+                      <input 
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="flex-grow p-2 bg-white border border-gold rounded-lg text-sm outline-none"
+                        autoFocus
+                      />
+                      <button 
+                        onClick={() => handleUpdateName(test.id)}
+                        className="p-2 bg-gold text-ink rounded-lg hover:opacity-80 transition-opacity"
+                      >
+                        <Check size={16} />
+                      </button>
+                      <button 
+                        onClick={() => setEditingTestId(null)}
+                        className="p-2 bg-ink/5 text-ink rounded-lg hover:bg-ink/10 transition-colors"
+                      >
+                        <X size={16} />
+                      </button>
+                    </div>
+                  ) : (
+                    <>
+                      <h3 className="font-bold text-lg">{test.name}</h3>
+                      <p className="text-[10px] uppercase tracking-widest opacity-40">
+                        {test.createdAt?.toDate ? new Date(test.createdAt.toDate()).toLocaleDateString() : ''} • {(test.size / 1024 / 1024).toFixed(2)}MB
+                      </p>
+                    </>
+                  )}
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <a 
+                  href={test.url} 
+                  target="_blank" 
+                  rel="noopener noreferrer"
+                  className="px-6 py-2 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all"
+                >
+                  {t.archive.download}
+                </a>
+                {isAdmin && (
+                  <div className="flex items-center gap-1">
+                    <button 
+                      onClick={() => {
+                        setEditingTestId(test.id);
+                        setEditName(test.name);
+                      }}
+                      className="p-2 text-gold hover:bg-gold/10 rounded-full transition-colors"
+                    >
+                      <Edit size={18} />
+                    </button>
+                    <button 
+                      onClick={() => handleDelete(test.id)}
+                      className="p-2 text-red-500 hover:bg-red-50 rounded-full transition-colors"
+                    >
+                      <Trash2 size={18} />
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+};
+
+const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClearFilter?: () => void }> = ({ language, initialFilter, onClearFilter }) => {
   const t = TRANSLATIONS[language];
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [filter, setFilter] = useState('all');
+  const [filter, setFilter] = useState(initialFilter || 'all');
+
+  useEffect(() => {
+    if (initialFilter) setFilter(initialFilter);
+  }, [initialFilter]);
   const [newPost, setNewPost] = useState({ title: '', content: '', type: 'trend', imageUrl: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -6766,7 +7078,7 @@ const CommunityView: FC<{ language: LanguageCode }> = ({ language }) => {
                   required
                   value={newPost.title}
                   onChange={(e) => setNewPost(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder={t.community.titlePlaceholder || "Enter title"}
+                  placeholder={t.community.placeholders[newPost.type as keyof typeof t.community.placeholders]?.title || "Enter title"}
                   className="w-full p-4 bg-ink/5 border border-transparent rounded-2xl text-sm outline-none focus:bg-white focus:border-gold transition-all"
                 />
               </div>
@@ -6777,7 +7089,7 @@ const CommunityView: FC<{ language: LanguageCode }> = ({ language }) => {
                     required
                     value={newPost.content}
                     onChange={(e) => setNewPost(prev => ({ ...prev, content: e.target.value }))}
-                    placeholder={t.community.contentPlaceholder || "Enter content"}
+                    placeholder={t.community.placeholders[newPost.type as keyof typeof t.community.placeholders]?.content || "Enter content"}
                     rows={6}
                     className="w-full p-4 bg-ink/5 border border-transparent rounded-2xl text-sm outline-none focus:bg-white focus:border-gold transition-all"
                   />
