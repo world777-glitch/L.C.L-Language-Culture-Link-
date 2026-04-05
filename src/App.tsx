@@ -6581,8 +6581,19 @@ const CommunityView: FC<{ language: LanguageCode }> = ({ language }) => {
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
-  const [newPost, setNewPost] = useState({ title: '', content: '', type: 'inquiry' as 'inquiry' | 'request' });
+  const [filter, setFilter] = useState('all');
+  const [newPost, setNewPost] = useState({ title: '', content: '', type: 'trend', imageUrl: '' });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const categories = [
+    { id: 'trend', label: t.community.trend, color: 'bg-orange-100 text-orange-700' },
+    { id: 'clinic', label: t.community.clinic, color: 'bg-emerald-100 text-emerald-700' },
+    { id: 'insight', label: t.community.insight, color: 'bg-blue-100 text-blue-700' },
+    { id: 'challenge', label: t.community.challenge, color: 'bg-purple-100 text-purple-700' },
+    { id: 'consult', label: t.community.consult, color: 'bg-amber-100 text-amber-700' },
+  ];
 
   useEffect(() => {
     const path = 'community';
@@ -6601,6 +6612,24 @@ const CommunityView: FC<{ language: LanguageCode }> = ({ language }) => {
     loginWithGoogle().catch(console.error);
   };
 
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const storageRef = ref(storage, `community/${Date.now()}_${file.name}`);
+    try {
+      await uploadBytes(storageRef, file);
+      const url = await getDownloadURL(storageRef);
+      setNewPost(prev => ({ ...prev, imageUrl: url }));
+    } catch (error) {
+      console.error("Upload error:", error);
+      alert("Image upload failed.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!auth.currentUser) {
@@ -6617,7 +6646,7 @@ const CommunityView: FC<{ language: LanguageCode }> = ({ language }) => {
         userName: auth.currentUser.displayName || auth.currentUser.email,
         createdAt: serverTimestamp()
       });
-      setNewPost({ title: '', content: '', type: 'inquiry' });
+      setNewPost({ title: '', content: '', type: 'trend', imageUrl: '' });
       setShowForm(false);
       alert(language === 'ko' ? '게시글이 등록되었습니다.' : 'Post has been registered.');
     } catch (error) {
@@ -6626,6 +6655,8 @@ const CommunityView: FC<{ language: LanguageCode }> = ({ language }) => {
       setIsSubmitting(false);
     }
   };
+
+  const filteredPosts = filter === 'all' ? posts : posts.filter(p => p.type === filter);
 
   if (loading) return <div className="py-20 text-center font-serif italic opacity-50">{t.community.loading}</div>;
 
@@ -6657,79 +6688,144 @@ const CommunityView: FC<{ language: LanguageCode }> = ({ language }) => {
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }}
-      className="max-w-4xl mx-auto px-6 py-20 space-y-16"
+      className="max-w-4xl mx-auto px-6 py-20 space-y-12"
     >
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
         <div className="space-y-4">
-          <span className="text-gold text-[10px] uppercase tracking-[0.4em]">Community</span>
-          <h2 className="text-5xl font-serif font-light">{t.community.title}</h2>
+          <span className="text-gold text-[10px] uppercase tracking-[0.4em] font-bold">Community</span>
+          <h2 className="text-5xl font-serif font-light tracking-tight">{t.community.title}</h2>
         </div>
         {!showForm && (
           <button 
             onClick={() => setShowForm(true)}
-            className="px-8 py-3 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:bg-gold hover:text-ink transition-all flex items-center gap-2"
+            className="px-8 py-3 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:bg-gold hover:text-ink transition-all flex items-center gap-2 shadow-xl"
           >
             <Plus size={16} /> {t.community.newPost}
           </button>
         )}
       </div>
 
+      {/* Filter Tabs */}
+      <div className="flex flex-wrap gap-2 pb-4 border-b border-ink/5">
+        <button
+          onClick={() => setFilter('all')}
+          className={cn(
+            "px-5 py-2 rounded-full text-xs font-bold transition-all",
+            filter === 'all' ? "bg-ink text-paper" : "bg-ink/5 hover:bg-ink/10"
+          )}
+        >
+          {t.community.all}
+        </button>
+        {categories.map(cat => (
+          <button
+            key={cat.id}
+            onClick={() => setFilter(cat.id)}
+            className={cn(
+              "px-5 py-2 rounded-full text-xs font-bold transition-all",
+              filter === cat.id ? cat.color : "bg-ink/5 hover:bg-ink/10"
+            )}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
+
       <AnimatePresence>
         {showForm && (
           <motion.form 
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
             onSubmit={handleSubmit}
-            className="p-8 border border-ink/10 rounded-3xl bg-ink/5 space-y-6 overflow-hidden"
+            className="p-8 border border-ink/10 rounded-[40px] bg-white shadow-2xl space-y-8 overflow-hidden relative"
           >
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest opacity-50">Type</label>
-                <select 
-                  value={newPost.type}
-                  onChange={(e) => setNewPost(prev => ({ ...prev, type: e.target.value as any }))}
-                  className="w-full p-3 bg-white border border-ink/10 rounded-xl text-sm outline-none focus:border-gold"
-                >
-                  <option value="inquiry">{t.community.inquiry}</option>
-                  <option value="request">{t.community.request}</option>
-                </select>
+            <div className="space-y-4">
+              <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">Select Category</label>
+              <div className="flex flex-wrap gap-2">
+                {categories.map(cat => (
+                  <button
+                    key={cat.id}
+                    type="button"
+                    onClick={() => setNewPost(prev => ({ ...prev, type: cat.id }))}
+                    className={cn(
+                      "px-4 py-2 rounded-full text-[10px] font-bold transition-all border",
+                      newPost.type === cat.id ? `${cat.color} border-current` : "bg-transparent border-ink/10 opacity-50 hover:opacity-100"
+                    )}
+                  >
+                    {cat.label}
+                  </button>
+                ))}
               </div>
+            </div>
+
+            <div className="space-y-4">
               <div className="space-y-2">
-                <label className="text-[10px] uppercase tracking-widest opacity-50">Title</label>
+                <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.community.titleLabel}</label>
                 <input 
                   type="text" 
                   required
                   value={newPost.title}
                   onChange={(e) => setNewPost(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder={language === 'ko' ? "제목을 입력하세요" : "Enter title"}
-                  className="w-full p-3 bg-white border border-ink/10 rounded-xl text-sm outline-none focus:border-gold"
+                  placeholder={t.community.titlePlaceholder || "Enter title"}
+                  className="w-full p-4 bg-ink/5 border border-transparent rounded-2xl text-sm outline-none focus:bg-white focus:border-gold transition-all"
                 />
               </div>
+              <div className="space-y-2">
+                <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.community.contentLabel}</label>
+                <div className="relative">
+                  <textarea 
+                    required
+                    value={newPost.content}
+                    onChange={(e) => setNewPost(prev => ({ ...prev, content: e.target.value }))}
+                    placeholder={t.community.contentPlaceholder || "Enter content"}
+                    rows={6}
+                    className="w-full p-4 bg-ink/5 border border-transparent rounded-2xl text-sm outline-none focus:bg-white focus:border-gold transition-all"
+                  />
+                  <div className="absolute bottom-4 right-4 flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      className="w-10 h-10 bg-white shadow-md rounded-full flex items-center justify-center text-ink hover:text-gold transition-colors"
+                      title="Upload Image"
+                    >
+                      {isUploading ? <Clock size={18} className="animate-spin" /> : <Upload size={18} />}
+                    </button>
+                    <input 
+                      type="file" 
+                      ref={fileInputRef} 
+                      onChange={handleImageUpload} 
+                      accept="image/*" 
+                      className="hidden" 
+                    />
+                  </div>
+                </div>
+                {newPost.imageUrl && (
+                  <div className="relative w-32 h-32 rounded-xl overflow-hidden border border-ink/10 group">
+                    <img src={newPost.imageUrl} className="w-full h-full object-cover" />
+                    <button 
+                      type="button"
+                      onClick={() => setNewPost(prev => ({ ...prev, imageUrl: '' }))}
+                      className="absolute inset-0 bg-red-500/80 text-white opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
-            <div className="space-y-2">
-              <label className="text-[10px] uppercase tracking-widest opacity-50">{t.community.contentLabel}</label>
-              <textarea 
-                required
-                value={newPost.content}
-                onChange={(e) => setNewPost(prev => ({ ...prev, content: e.target.value }))}
-                placeholder={language === 'ko' ? "내용을 입력하세요" : "Enter content"}
-                rows={4}
-                className="w-full p-4 bg-white border border-ink/10 rounded-xl text-sm outline-none focus:border-gold"
-              />
-            </div>
-            <div className="flex justify-end gap-4">
+
+            <div className="flex justify-end gap-4 pt-4">
               <button 
                 type="button"
                 onClick={() => setShowForm(false)}
-                className="px-6 py-3 text-xs uppercase tracking-widest opacity-50 hover:opacity-100"
+                className="px-8 py-3 text-xs uppercase tracking-widest opacity-50 hover:opacity-100 font-bold"
               >
                 {t.community.cancel}
               </button>
               <button 
                 type="submit"
-                disabled={isSubmitting}
-                className="px-10 py-3 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:bg-gold hover:text-ink transition-all disabled:opacity-50"
+                disabled={isSubmitting || isUploading}
+                className="px-12 py-3 bg-[#4a3728] text-paper rounded-full text-xs uppercase tracking-widest hover:bg-gold hover:text-ink transition-all disabled:opacity-50 shadow-lg font-bold"
               >
                 {isSubmitting ? '...' : t.community.submit}
               </button>
@@ -6738,47 +6834,62 @@ const CommunityView: FC<{ language: LanguageCode }> = ({ language }) => {
         )}
       </AnimatePresence>
 
-      <div className="space-y-6">
-        {posts.length > 0 ? posts.map(post => (
-          <div key={post.id} className="p-8 border border-ink/10 rounded-3xl space-y-6 bg-white hover:shadow-lg hover:shadow-ink/5 transition-all">
-            <div className="flex justify-between items-start">
-              <div className="space-y-2">
-                <div className="flex items-center gap-3">
-                  <span className={cn(
-                    "text-[8px] uppercase tracking-widest px-2 py-0.5 rounded-full font-bold",
-                    post.type === 'request' ? "bg-blue-100 text-blue-700" : "bg-purple-100 text-purple-700"
-                  )}>
-                    {post.type === 'request' ? t.community.request : t.community.inquiry}
-                  </span>
-                  <h3 className="text-xl font-bold">{post.title}</h3>
+      <div className="space-y-8">
+        {filteredPosts.length > 0 ? filteredPosts.map(post => {
+          const cat = categories.find(c => c.id === post.type) || categories[0];
+          return (
+            <motion.div 
+              layout
+              key={post.id} 
+              className="p-8 border border-ink/10 rounded-[40px] space-y-6 bg-white hover:shadow-2xl hover:shadow-ink/5 transition-all group"
+            >
+              <div className="flex justify-between items-start">
+                <div className="space-y-3">
+                  <div className="flex items-center gap-3">
+                    <span className={cn(
+                      "text-[8px] uppercase tracking-widest px-3 py-1 rounded-full font-bold",
+                      cat.color
+                    )}>
+                      {cat.label}
+                    </span>
+                    <h3 className="text-2xl font-serif font-medium tracking-tight">{post.title}</h3>
+                  </div>
+                  <div className="flex items-center gap-3 text-[10px] opacity-40 font-bold uppercase tracking-widest">
+                    <span>{post.userName}</span>
+                    <span>•</span>
+                    <span>{post.createdAt?.toDate().toLocaleDateString()}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3 text-[10px] opacity-40">
-                  <span>{post.userName}</span>
-                  <span>•</span>
-                  <span>{post.createdAt?.toDate().toLocaleDateString()}</span>
-                </div>
+                {post.reply && (
+                  <div className="flex items-center gap-2 text-gold bg-gold/5 px-3 py-1 rounded-full">
+                    <Check size={14} />
+                    <span className="text-[10px] uppercase tracking-widest font-bold">{t.community.answered}</span>
+                  </div>
+                )}
               </div>
+              
+              <div className="space-y-4">
+                <p className="text-base opacity-70 leading-relaxed font-serif">{post.content}</p>
+                {post.imageUrl && (
+                  <div className="max-w-lg rounded-2xl overflow-hidden border border-ink/5">
+                    <img src={post.imageUrl} className="w-full h-auto" referrerPolicy="no-referrer" />
+                  </div>
+                )}
+              </div>
+              
               {post.reply && (
-                <div className="flex items-center gap-2 text-gold">
-                  <Check size={14} />
-                  <span className="text-[10px] uppercase tracking-widest font-bold">{t.community.answered}</span>
+                <div className="p-8 bg-ink/5 rounded-[32px] space-y-4 border-l-4 border-gold">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck size={16} className="text-gold" />
+                    <span className="text-[10px] uppercase tracking-widest font-bold">{t.community.replyTitle}</span>
+                  </div>
+                  <p className="text-base italic opacity-80 font-serif">"{post.reply}"</p>
                 </div>
               )}
-            </div>
-            <p className="text-sm opacity-70 leading-relaxed">{post.content}</p>
-            
-            {post.reply && (
-              <div className="p-6 bg-ink/5 rounded-2xl space-y-3 border-l-4 border-gold">
-                <div className="flex items-center gap-2">
-                  <ShieldCheck size={14} className="text-gold" />
-                  <span className="text-[10px] uppercase tracking-widest font-bold">{t.community.replyTitle}</span>
-                </div>
-                <p className="text-sm italic opacity-80">"{post.reply}"</p>
-              </div>
-            )}
-          </div>
-        )) : (
-          <div className="py-20 text-center opacity-30 font-serif italic">
+            </motion.div>
+          );
+        }) : (
+          <div className="py-32 text-center opacity-30 font-serif italic text-xl">
             {t.community.noPosts}
           </div>
         )}
