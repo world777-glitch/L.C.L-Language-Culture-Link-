@@ -57,7 +57,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
-import { COURSES, calculatePrice, RESOURCE_GROUPS, LEVEL_PRICES } from './constants';
+import { COURSES, calculatePrice, RESOURCE_GROUPS, LEVEL_PRICES, CourseCategory } from './constants';
 import { cn } from './lib/utils';
 import { LANGUAGES, TRANSLATIONS, LanguageCode } from './translations';
 import { jsPDF } from 'jspdf';
@@ -6663,6 +6663,12 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
   const [editName, setEditName] = useState('');
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState('');
+  const [newCategory, setNewCategory] = useState<CourseCategory>(COURSES[0].category);
+  const [newLevel, setNewLevel] = useState<string>(COURSES[0].levels[0]);
+  const [filterCategory, setFilterCategory] = useState<CourseCategory | 'All'>('All');
+  const [filterLevel, setFilterLevel] = useState<string>('All');
+  const [editingCategory, setEditingCategory] = useState<CourseCategory>(COURSES[0].category);
+  const [editingLevel, setEditingLevel] = useState<string>(COURSES[0].levels[0]);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -6687,18 +6693,23 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
     if (!editName.trim()) return;
     try {
       await updateDoc(doc(db, 'levelTests', id), {
-        name: editName.trim()
+        name: editName.trim(),
+        category: editingCategory,
+        level: editingLevel
       });
       setEditingTestId(null);
     } catch (error) {
-      console.error("Error updating test name:", error);
+      console.error("Error updating test:", error);
     }
   };
 
   const handleAddTest = async (e: React.FormEvent) => {
     e.preventDefault();
     const file = fileInputRef.current?.files?.[0];
-    if (!file || !newName.trim() || !isAdmin) return;
+    if (!file || !newName.trim() || !isAdmin) {
+      if (!file) alert(language === 'ko' ? '파일을 선택해 주세요.' : 'Please select a file.');
+      return;
+    }
 
     setIsUploading(true);
     try {
@@ -6710,11 +6721,14 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
         (error) => {
           console.error("Upload failed", error);
           setIsUploading(false);
+          alert(language === 'ko' ? '업로드에 실패했습니다.' : 'Upload failed.');
         },
         async () => {
           const downloadURL = await getDownloadURL(uploadTask.snapshot.ref);
           await addDoc(collection(db, 'levelTests'), {
             name: newName.trim(),
+            category: newCategory,
+            level: newLevel,
             url: downloadURL,
             type: file.type,
             size: file.size,
@@ -6723,6 +6737,8 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
           setIsUploading(false);
           setShowAddForm(false);
           setNewName('');
+          setNewCategory(COURSES[0].category);
+          setNewLevel(COURSES[0].levels[0]);
           if (fileInputRef.current) fileInputRef.current.value = '';
         }
       );
@@ -6731,6 +6747,14 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
       setIsUploading(false);
     }
   };
+
+  const filteredTests = useMemo(() => {
+    return tests.filter(test => {
+      const matchCategory = filterCategory === 'All' || test.category === filterCategory;
+      const matchLevel = filterLevel === 'All' || test.level === filterLevel;
+      return matchCategory && matchLevel;
+    });
+  }, [tests, filterCategory, filterLevel]);
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-20">
@@ -6754,6 +6778,62 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
           ) : (
             <div className="p-8 bg-gold/5 border border-gold/20 rounded-3xl">
               <form onSubmit={handleAddTest} className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">
+                      {language === 'ko' ? '카테고리' : 'Category'}
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {COURSES.map(course => (
+                        <button
+                          key={course.id}
+                          type="button"
+                          onClick={() => {
+                            setNewCategory(course.category);
+                            const firstLevel = course.levels[0];
+                            setNewLevel(firstLevel);
+                            setNewName(`${course.title.split(' (')[0]} ${firstLevel} ${t.nav.levelTest}`);
+                          }}
+                          className={cn(
+                            "px-4 py-2 rounded-full text-xs font-bold transition-all border",
+                            newCategory === course.category 
+                              ? "bg-gold text-ink border-gold" 
+                              : "bg-white text-ink/60 border-ink/10 hover:border-gold/50"
+                          )}
+                        >
+                          {course.title.split(' (')[0]}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">
+                      {language === 'ko' ? '레벨' : 'Level'}
+                    </label>
+                    <div className="flex flex-wrap gap-2">
+                      {COURSES.find(c => c.category === newCategory)?.levels.map(lvl => (
+                        <button
+                          key={lvl}
+                          type="button"
+                          onClick={() => {
+                            setNewLevel(lvl);
+                            const catTitle = COURSES.find(c => c.category === newCategory)?.title.split(' (')[0] || newCategory;
+                            setNewName(`${catTitle} ${lvl} ${t.nav.levelTest}`);
+                          }}
+                          className={cn(
+                            "px-4 py-2 rounded-full text-xs font-bold transition-all border",
+                            newLevel === lvl 
+                              ? "bg-ink text-paper border-ink" 
+                              : "bg-white text-ink/60 border-ink/10 hover:border-gold/50"
+                          )}
+                        >
+                          {lvl}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
                 <div className="space-y-2">
                   <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">
                     {language === 'ko' ? '테스트 이름' : 'Test Name'}
@@ -6800,15 +6880,91 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
         </div>
       )}
 
+      {/* Filters */}
+      <div className="mb-8 p-6 bg-ink/5 rounded-2xl flex flex-col md:flex-row gap-6 items-start md:items-center">
+        <div className="space-y-2 flex-grow">
+          <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">
+            {language === 'ko' ? '카테고리 필터' : 'Category Filter'}
+          </label>
+          <div className="flex flex-wrap gap-2">
+            <button
+              onClick={() => {
+                setFilterCategory('All');
+                setFilterLevel('All');
+              }}
+              className={cn(
+                "px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border",
+                filterCategory === 'All' 
+                  ? "bg-ink text-paper border-ink" 
+                  : "bg-white text-ink/60 border-ink/10 hover:border-gold/50"
+              )}
+            >
+              {language === 'ko' ? '전체' : 'All'}
+            </button>
+            {COURSES.map(course => (
+              <button
+                key={course.id}
+                onClick={() => {
+                  setFilterCategory(course.category);
+                  setFilterLevel('All');
+                }}
+                className={cn(
+                  "px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border",
+                  filterCategory === course.category 
+                    ? "bg-gold text-ink border-gold" 
+                    : "bg-white text-ink/60 border-ink/10 hover:border-gold/50"
+                )}
+              >
+                {course.title.split(' (')[0]}
+              </button>
+            ))}
+          </div>
+        </div>
+        {filterCategory !== 'All' && (
+          <div className="space-y-2 flex-grow">
+            <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">
+              {language === 'ko' ? '레벨 필터' : 'Level Filter'}
+            </label>
+            <div className="flex flex-wrap gap-2">
+              <button
+                onClick={() => setFilterLevel('All')}
+                className={cn(
+                  "px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border",
+                  filterLevel === 'All' 
+                    ? "bg-ink text-paper border-ink" 
+                    : "bg-white text-ink/60 border-ink/10 hover:border-gold/50"
+                )}
+              >
+                {language === 'ko' ? '전체' : 'All'}
+              </button>
+              {COURSES.find(c => c.category === filterCategory)?.levels.map(lvl => (
+                <button
+                  key={lvl}
+                  onClick={() => setFilterLevel(lvl)}
+                  className={cn(
+                    "px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border",
+                    filterLevel === lvl 
+                      ? "bg-ink text-paper border-ink" 
+                      : "bg-white text-ink/60 border-ink/10 hover:border-gold/50"
+                  )}
+                >
+                  {lvl}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+
       <div className="grid gap-4">
         {loading ? (
           <div className="text-center py-20 opacity-40 uppercase tracking-widest text-xs">{t.community.loading}</div>
-        ) : tests.length === 0 ? (
+        ) : filteredTests.length === 0 ? (
           <div className="text-center py-20 opacity-40 uppercase tracking-widest text-xs">
             {language === 'ko' ? '등록된 레벨테스트가 없습니다.' : 'No level tests registered.'}
           </div>
         ) : (
-          tests.map(test => (
+          filteredTests.map(test => (
             <div key={test.id} className="group p-6 bg-paper border border-ink/10 rounded-2xl flex items-center justify-between hover:border-gold/50 transition-all">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-ink/5 rounded-xl flex items-center justify-center text-gold">
@@ -6816,29 +6972,72 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
                 </div>
                 <div className="flex-grow">
                   {editingTestId === test.id ? (
-                    <div className="flex items-center gap-2">
-                      <input 
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="flex-grow p-2 bg-white border border-gold rounded-lg text-sm outline-none"
-                        autoFocus
-                      />
-                      <button 
-                        onClick={() => handleUpdateName(test.id)}
-                        className="p-2 bg-gold text-ink rounded-lg hover:opacity-80 transition-opacity"
-                      >
-                        <Check size={16} />
-                      </button>
-                      <button 
-                        onClick={() => setEditingTestId(null)}
-                        className="p-2 bg-ink/5 text-ink rounded-lg hover:bg-ink/10 transition-colors"
-                      >
-                        <X size={16} />
-                      </button>
+                    <div className="space-y-4">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="space-y-1">
+                          <label className="text-[8px] uppercase tracking-widest opacity-40 font-bold">Category</label>
+                          <select 
+                            value={editingCategory}
+                            onChange={(e) => {
+                              const cat = e.target.value as CourseCategory;
+                              setEditingCategory(cat);
+                              const firstLevel = COURSES.find(c => c.category === cat)?.levels[0] || '';
+                              setEditingLevel(firstLevel);
+                              const catTitle = COURSES.find(c => c.category === cat)?.title.split(' (')[0] || cat;
+                              setEditName(`${catTitle} ${firstLevel} ${t.nav.levelTest}`);
+                            }}
+                            className="w-full p-2 bg-white border border-gold rounded-lg text-xs outline-none"
+                          >
+                            {COURSES.map(c => <option key={c.id} value={c.category}>{c.title.split(' (')[0]}</option>)}
+                          </select>
+                        </div>
+                        <div className="space-y-1">
+                          <label className="text-[8px] uppercase tracking-widest opacity-40 font-bold">Level</label>
+                          <select 
+                            value={editingLevel}
+                            onChange={(e) => {
+                            const lvl = e.target.value;
+                            setEditingLevel(lvl);
+                            const catTitle = COURSES.find(c => c.category === editingCategory)?.title.split(' (')[0] || editingCategory;
+                            setEditName(`${catTitle} ${lvl} ${t.nav.levelTest}`);
+                          }}
+                            className="w-full p-2 bg-white border border-gold rounded-lg text-xs outline-none"
+                          >
+                            {COURSES.find(c => c.category === editingCategory)?.levels.map(lvl => <option key={lvl} value={lvl}>{lvl}</option>)}
+                          </select>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <input 
+                          type="text"
+                          value={editName}
+                          onChange={(e) => setEditName(e.target.value)}
+                          className="flex-grow p-2 bg-white border border-gold rounded-lg text-sm outline-none"
+                        />
+                        <button 
+                          onClick={() => handleUpdateName(test.id)}
+                          className="p-2 bg-gold text-ink rounded-lg hover:opacity-80 transition-opacity"
+                        >
+                          <Check size={16} />
+                        </button>
+                        <button 
+                          onClick={() => setEditingTestId(null)}
+                          className="p-2 bg-ink/5 text-ink rounded-lg hover:bg-ink/10 transition-colors"
+                        >
+                          <X size={16} />
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     <>
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="px-2 py-0.5 bg-gold/20 text-gold rounded text-[8px] font-bold uppercase tracking-widest">
+                          {test.category}
+                        </span>
+                        <span className="px-2 py-0.5 bg-ink/5 text-ink/60 rounded text-[8px] font-bold uppercase tracking-widest">
+                          {test.level}
+                        </span>
+                      </div>
                       <h3 className="font-bold text-lg">{test.name}</h3>
                       <p className="text-[10px] uppercase tracking-widest opacity-40">
                         {test.createdAt?.toDate ? new Date(test.createdAt.toDate()).toLocaleDateString() : ''} • {(test.size / 1024 / 1024).toFixed(2)}MB
@@ -6862,6 +7061,8 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
                       onClick={() => {
                         setEditingTestId(test.id);
                         setEditName(test.name);
+                        setEditingCategory(test.category || COURSES[0].category);
+                        setEditingLevel(test.level || COURSES[0].levels[0]);
                       }}
                       className="p-2 text-gold hover:bg-gold/10 rounded-full transition-colors"
                     >
