@@ -219,6 +219,9 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       allPagesBg: '전체 페이지 배경 URL',
       serifFont: '세리프 폰트 (명조체)',
       sansFont: '산세리프 폰트 (고딕체)',
+      navFontSize: '네비게이션 글자 크기',
+      navFontColor: '네비게이션 글자 색상',
+      navFontWeight: '네비게이션 글자 굵기',
       reset: '기본값으로 초기화',
     },
     aiStudio: {
@@ -508,6 +511,9 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       allPagesBg: 'All Pages Background URL',
       serifFont: 'Serif Font',
       sansFont: 'Sans Font',
+      navFontSize: 'Navigation Font Size',
+      navFontColor: 'Navigation Font Color',
+      navFontWeight: 'Navigation Font Weight',
       reset: 'Reset to Default',
     },
     aiStudio: {

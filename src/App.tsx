@@ -172,6 +172,12 @@ export default function App() {
   };
 
   const [siteContent, setSiteContent] = useState<Record<string, any>>({});
+
+  const navStyle = useMemo(() => ({
+    fontSize: siteContent['global.style.navFontSize']?.value ? `${siteContent['global.style.navFontSize'].value}px` : undefined,
+    color: siteContent['global.style.navFontColor']?.value || undefined,
+    fontWeight: siteContent['global.style.navFontWeight']?.value || undefined,
+  }), [siteContent]);
   const isAdmin = userProfile?.role === 'admin';
 
   useEffect(() => {
@@ -321,7 +327,7 @@ export default function App() {
         className="sticky top-0 z-50 bg-paper/80 backdrop-blur-md border-b border-ink/10"
         onMouseLeave={() => setHoveredMenu(null)}
       >
-        <div className="max-w-7xl mx-auto px-6 h-20 flex items-center justify-between">
+        <div className="max-w-[1600px] mx-auto px-2 h-20 flex items-center justify-between">
           <div 
             className="flex items-center gap-3 cursor-pointer group" 
             onClick={() => setView('landing')}
@@ -361,6 +367,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'landing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
+              style={navStyle}
             >
               {language === 'ko' ? '홈' : 'Home'}
             </button>
@@ -378,6 +385,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'curriculum' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
+              style={navStyle}
             >
               {t.nav.curriculum}
             </button>
@@ -388,6 +396,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'pricing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
+              style={navStyle}
             >
               {t.nav.pricing}
             </button>
@@ -405,6 +414,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'archive' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
+              style={navStyle}
             >
               {t.nav.archive}
             </button>
@@ -415,6 +425,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'community' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
+              style={navStyle}
             >
               {t.nav.community}
             </button>
@@ -428,6 +439,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors font-bold whitespace-nowrap",
                 view === 'inquiry' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
               )}
+              style={{ ...navStyle, color: siteContent['global.style.navFontColor']?.value || '#c5a059' }}
             >
               {t.nav.inquiry}
             </button>
@@ -438,6 +450,7 @@ export default function App() {
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-all font-bold whitespace-nowrap",
                 view === 'level-test' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
               )}
+              style={{ ...navStyle, color: siteContent['global.style.navFontColor']?.value || '#c5a059' }}
             >
               {t.nav.levelTest}
             </button>
@@ -515,7 +528,7 @@ export default function App() {
               className="bg-ink/5 border-t border-ink/5 overflow-hidden"
               onMouseLeave={() => setHoveredSubItem(null)}
             >
-              <div className="max-w-7xl mx-auto px-6 py-6 flex items-start justify-center gap-12 flex-wrap">
+              <div className="max-w-[1600px] mx-auto px-6 py-6 flex items-start justify-center gap-12 flex-wrap">
                 {navSubMenus[hoveredMenu].map(item => (
                   <div 
                     key={item.id} 
@@ -531,6 +544,7 @@ export default function App() {
                         "text-[10px] lg:text-xs uppercase tracking-widest transition-all font-medium whitespace-nowrap",
                         hoveredSubItem === item.id ? "text-gold opacity-100" : "opacity-60 hover:opacity-100 hover:text-gold"
                       )}
+                      style={navStyle}
                     >
                       {item.label}
                     </button>
@@ -553,6 +567,7 @@ export default function App() {
                                   setHoveredSubItem(null);
                                 }}
                                 className="text-[9px] lg:text-[10px] uppercase tracking-[0.2em] opacity-50 hover:opacity-100 hover:text-gold transition-all whitespace-nowrap"
+                                style={{ ...navStyle, fontSize: siteContent['global.style.navFontSize']?.value ? `${Number(siteContent['global.style.navFontSize'].value) - 2}px` : undefined }}
                               >
                                 {child.label}
                               </button>
@@ -628,7 +643,7 @@ export default function App() {
       </AnimatePresence>
 
       <footer className="bg-ink text-paper py-20 px-6">
-        <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
+        <div className="max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-4 gap-12">
           <div className="col-span-2">
             <div className="flex items-center gap-2 mb-6">
               <div className="w-8 h-8 bg-paper text-ink rounded-full flex items-center justify-center font-serif text-lg font-bold">L</div>
@@ -680,7 +695,7 @@ export default function App() {
             </div>
           </div>
         </div>
-        <div className="max-w-7xl mx-auto mt-20 pt-8 border-t border-paper/10 flex justify-between items-center">
+        <div className="max-w-[1600px] mx-auto mt-20 pt-8 border-t border-paper/10 flex justify-between items-center">
           <p className="text-[10px] uppercase tracking-widest opacity-40">{t.footer.rights}</p>
           <div className="text-[10px] uppercase tracking-widest opacity-40">
             <EditableText contentKey="footer.tagline" defaultValue={t.footer.tagline} isEditMode={isEditMode} language={language} siteContent={siteContent} />
@@ -1471,7 +1486,7 @@ const DynamicContentArea: FC<{
                           {[
                             { label: 'Narrow', val: 'max-w-3xl' },
                             { label: 'Medium', val: 'max-w-5xl' },
-                            { label: 'Wide', val: 'max-w-7xl' }
+                            { label: 'Wide', val: 'max-w-[1600px]' }
                           ].map(opt => (
                             <button 
                               key={opt.val}
@@ -2119,6 +2134,9 @@ const GlobalStyleEditor: FC<{
     gold: siteContent['global.style.gold']?.value || '#c5a059',
     fontSerif: siteContent['global.style.fontSerif']?.value || '"Cormorant Garamond", serif',
     fontSans: siteContent['global.style.fontSans']?.value || '"Montserrat", sans-serif',
+    navFontSize: siteContent['global.style.navFontSize']?.value || '12',
+    navFontColor: siteContent['global.style.navFontColor']?.value || '#1a1a1a',
+    navFontWeight: siteContent['global.style.navFontWeight']?.value || '500',
     landingBg: siteContent['global.style.landingBg']?.value || '',
     landingOverlay: siteContent['global.style.landingOverlay']?.value || '0',
     allPagesBg: siteContent['global.style.allPagesBg']?.value || '',
@@ -2183,6 +2201,46 @@ const GlobalStyleEditor: FC<{
                       <p className="text-[8px] text-center uppercase opacity-40">{t.globalStyle.gold}</p>
                     </div>
                   </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navFontSize} ({styles.navFontSize}px)</label>
+                  <input 
+                    type="range" 
+                    min="8" max="32" step="1"
+                    value={styles.navFontSize} 
+                    onChange={(e) => updateStyle('navFontSize', e.target.value)}
+                    className="w-full accent-gold"
+                  />
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navFontColor}</label>
+                  <div className="flex items-center gap-4">
+                    <input 
+                      type="color" 
+                      value={styles.navFontColor} 
+                      onChange={(e) => updateStyle('navFontColor', e.target.value)}
+                      className="w-12 h-10 rounded-xl cursor-pointer border-none bg-transparent"
+                    />
+                    <span className="text-xs font-mono opacity-50">{styles.navFontColor}</span>
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navFontWeight}</label>
+                  <select 
+                    value={styles.navFontWeight} 
+                    onChange={(e) => updateStyle('navFontWeight', e.target.value)}
+                    className="w-full p-2 text-xs bg-ink/5 border border-ink/10 rounded-lg"
+                  >
+                    <option value="300">Light (300)</option>
+                    <option value="400">Regular (400)</option>
+                    <option value="500">Medium (500)</option>
+                    <option value="600">Semi-Bold (600)</option>
+                    <option value="700">Bold (700)</option>
+                    <option value="800">Extra-Bold (800)</option>
+                  </select>
                 </div>
 
                 <div className="space-y-3">
@@ -2275,6 +2333,9 @@ const GlobalStyleEditor: FC<{
                       updateStyle('gold', '#c5a059');
                       updateStyle('fontSerif', '"Cormorant Garamond", serif');
                       updateStyle('fontSans', '"Montserrat", sans-serif');
+                      updateStyle('navFontSize', '12');
+                      updateStyle('navFontColor', '#1a1a1a');
+                      updateStyle('navFontWeight', '500');
                       updateStyle('landingBg', '');
                       updateStyle('landingOverlay', '0');
                       updateStyle('allPagesBg', '');
@@ -2306,7 +2367,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       <DynamicContentArea contentKey="landing.top" isEditMode={isEditMode} isAdmin={isAdmin} language={language} siteContent={siteContent} />
 
       {/* Hero Section */}
-      <section className="relative h-[90vh] flex items-center overflow-hidden px-6 landing-hero-bg">
+      <section className="relative h-[90vh] flex items-center overflow-hidden px-4 landing-hero-bg">
         <div className="absolute inset-0 landing-hero-overlay pointer-events-none" />
         <div className="absolute right-0 top-0 w-1/2 h-full bg-ink/5 z-0 flex items-center justify-center">
           <div className="w-[80%] aspect-[3/4] bg-ink/10 rounded-[200px] overflow-hidden relative">
@@ -2329,7 +2390,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto w-full grid grid-cols-1 md:grid-cols-2 relative z-10 pointer-events-none">
+        <div className="max-w-[1600px] mx-auto w-full grid grid-cols-1 md:grid-cols-2 relative z-10 pointer-events-none">
           <div className="space-y-8 pointer-events-auto">
             <motion.div 
               initial={{ x: -50, opacity: 0 }}
@@ -2417,7 +2478,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       </section>
 
       {/* Curriculum Section */}
-      <section id="curriculum" className="max-w-7xl mx-auto px-6 py-20">
+      <section id="curriculum" className="max-w-[1600px] mx-auto px-4 py-20">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
           <div className="space-y-4">
             <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
@@ -2481,7 +2542,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       </section>
 
       {/* Dynamic Gallery Section */}
-      <section className="max-w-7xl mx-auto px-6 py-20">
+      <section className="max-w-[1600px] mx-auto px-4 py-20">
         <div className="text-center space-y-4 mb-20">
           <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
             <EditableText contentKey="gallery.badge" defaultValue="Gallery & Highlights" isEditMode={isEditMode} language={language} siteContent={siteContent} />
@@ -2533,7 +2594,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       </section>
 
       {/* Dynamic Content Sections */}
-      <section id="landing-dynamic-area" className="max-w-7xl mx-auto px-6 py-20">
+      <section id="landing-dynamic-area" className="max-w-[1600px] mx-auto px-4 py-20">
         <DynamicContentArea 
           contentKey="landing.dynamic"
           isEditMode={isEditMode}
@@ -2561,7 +2622,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
 
       {/* Resource Marketing Section - Redesigned with Categories */}
       <section id="library" className="bg-paper py-32 px-6 border-y border-ink/5">
-        <div className="max-w-7xl mx-auto space-y-20">
+        <div className="max-w-[1600px] mx-auto space-y-20">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
             <div className="space-y-8">
               <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
@@ -3435,7 +3496,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }}
-      className="max-w-7xl mx-auto px-6 py-20 space-y-12"
+      className="max-w-[1600px] mx-auto px-6 py-20 space-y-12"
     >
       <div className="flex flex-col md:flex-row justify-between items-end gap-8">
         <div className="space-y-4">
@@ -4516,7 +4577,7 @@ const MyPageView: FC = () => {
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }}
-      className="max-w-7xl mx-auto px-6 py-20 space-y-20"
+      className="max-w-[1600px] mx-auto px-6 py-20 space-y-20"
     >
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
         <div className="space-y-4">
@@ -5057,7 +5118,7 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }}
-      className="max-w-7xl mx-auto px-6 py-20 space-y-16"
+      className="max-w-[1600px] mx-auto px-6 py-20 space-y-16"
     >
       <div className="text-center space-y-4">
         <span className="text-gold text-[10px] uppercase tracking-[0.4em]">L.C.L Archive</span>
@@ -5869,7 +5930,7 @@ const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void
       initial={{ opacity: 0, y: 20 }} 
       animate={{ opacity: 1, y: 0 }} 
       exit={{ opacity: 0, y: -20 }}
-      className="max-w-7xl mx-auto px-6 md:px-20 py-32"
+      className="max-w-[1600px] mx-auto px-6 md:px-20 py-32"
     >
       <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
         <div className="space-y-4">
@@ -6053,7 +6114,7 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
       exit={{ opacity: 0, y: -20 }}
       className="bg-ink text-paper py-32 px-6 min-h-screen"
     >
-      <div className="max-w-7xl mx-auto w-full">
+      <div className="max-w-[1600px] mx-auto w-full">
         <div className="text-center space-y-6 mb-20">
           <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
             <EditableText contentKey="pricing.badge" defaultValue={t.pricing.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
