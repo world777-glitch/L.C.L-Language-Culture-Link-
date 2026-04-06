@@ -49,6 +49,8 @@ import {
   Instagram,
   Facebook,
   Youtube,
+  Twitter,
+  Linkedin,
   Copy,
   Minimize2,
   Maximize2,
@@ -407,44 +409,63 @@ export default function App() {
 
             {/* Home */}
             <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu(null)}>
-              <button 
+              <div 
                 onClick={() => setView('landing')} 
                 className={cn(
-                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4",
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4 cursor-pointer",
                   view === 'landing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
                 )}
                 style={navStyleL1}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setView('landing'); } }}
               >
                 <EditableText contentKey="global.nav.home" defaultValue={language === 'ko' ? '홈' : 'Home'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-              </button>
+              </div>
             </div>
 
             {/* Curriculum */}
             <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('curriculum')} onMouseLeave={() => setHoveredMenu(null)}>
-              <button 
+              <div 
                 onClick={() => scrollToSection('curriculum')} 
                 className={cn(
-                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4",
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4 cursor-pointer",
                   view === 'curriculum' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
                 )}
                 style={navStyleL1}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('curriculum'); } }}
               >
                 <EditableText contentKey="global.nav.curriculum" defaultValue={t.nav.curriculum} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-              </button>
+              </div>
               <AnimatePresence>
                 {hoveredMenu === 'curriculum' && (
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 bg-paper border border-ink/10 rounded-xl shadow-xl z-[60] py-2 min-w-[240px] max-w-[400px]">
                     {navSubMenus.curriculum.map(item => (
                       <div key={item.id} className="relative group/sub px-2">
-                        <button onClick={() => { item.action(); setHoveredMenu(null); }} className="w-full text-left px-4 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors rounded-lg">
+                        <div 
+                          onClick={() => { item.action(); setHoveredMenu(null); }} 
+                          className="w-full text-left px-4 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors rounded-lg cursor-pointer"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.action(); setHoveredMenu(null); } }}
+                        >
                           <EditableText contentKey={`menu.submenu.curriculum.${item.id}.label`} defaultValue={item.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                        </button>
+                        </div>
                         {item.children && (
                           <div className="pl-4 border-l border-ink/5 ml-4 my-1 flex flex-wrap gap-x-3 gap-y-1">
                             {item.children.map(child => (
-                              <button key={child.id} onClick={() => { child.action(); setHoveredMenu(null); }} className="text-left py-1 text-[9px] lg:text-[10px] uppercase tracking-[0.2em] opacity-50 hover:opacity-100 hover:text-gold transition-all whitespace-nowrap">
+                              <div 
+                                key={child.id} 
+                                onClick={() => { child.action(); setHoveredMenu(null); }} 
+                                className="text-left py-1 text-[9px] lg:text-[10px] uppercase tracking-[0.2em] opacity-50 hover:opacity-100 hover:text-gold transition-all whitespace-nowrap cursor-pointer"
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); child.action(); setHoveredMenu(null); } }}
+                              >
                                 <EditableText contentKey={`menu.submenu.curriculum.${item.id}.child.${child.id}.label`} defaultValue={child.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                              </button>
+                              </div>
                             ))}
                           </div>
                         )}
@@ -457,23 +478,33 @@ export default function App() {
 
             {/* Pricing */}
             <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('pricing')} onMouseLeave={() => setHoveredMenu(null)}>
-              <button 
+              <div 
                 onClick={() => setView('pricing')} 
                 className={cn(
-                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4",
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4 cursor-pointer",
                   view === 'pricing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
                 )}
                 style={navStyleL1}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setView('pricing'); } }}
               >
                 <EditableText contentKey="global.nav.pricing" defaultValue={t.nav.pricing} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-              </button>
+              </div>
               <AnimatePresence>
                 {hoveredMenu === 'pricing' && (
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 bg-paper border border-ink/10 rounded-xl shadow-xl z-[60] py-2 min-w-[160px]">
                     {navSubMenus.pricing.map(item => (
-                      <button key={item.id} onClick={() => { item.action(); setHoveredMenu(null); }} className="w-full text-left px-6 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors">
+                      <div 
+                        key={item.id} 
+                        onClick={() => { item.action(); setHoveredMenu(null); }} 
+                        className="w-full text-left px-6 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors cursor-pointer"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.action(); setHoveredMenu(null); } }}
+                      >
                         <EditableText contentKey={`menu.submenu.pricing.${item.id}.label`} defaultValue={item.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                      </button>
+                      </div>
                     ))}
                   </motion.div>
                 )}
@@ -482,30 +513,46 @@ export default function App() {
 
             {/* Archive */}
             <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('archive')} onMouseLeave={() => setHoveredMenu(null)}>
-              <button 
+              <div 
                 onClick={() => scrollToSection('library')} 
                 className={cn(
-                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4",
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4 cursor-pointer",
                   view === 'archive' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
                 )}
                 style={navStyleL1}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); scrollToSection('library'); } }}
               >
                 <EditableText contentKey="global.nav.archive" defaultValue={t.nav.archive} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-              </button>
+              </div>
               <AnimatePresence>
                 {hoveredMenu === 'archive' && (
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 bg-paper border border-ink/10 rounded-xl shadow-xl z-[60] py-2 min-w-[240px] max-w-[400px]">
                     {navSubMenus.archive.map(item => (
                       <div key={item.id} className="relative group/sub px-2">
-                        <button onClick={() => { item.action(); setHoveredMenu(null); }} className="w-full text-left px-4 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors rounded-lg">
+                        <div 
+                          onClick={() => { item.action(); setHoveredMenu(null); }} 
+                          className="w-full text-left px-4 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors rounded-lg cursor-pointer"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.action(); setHoveredMenu(null); } }}
+                        >
                           <EditableText contentKey={`menu.submenu.archive.${item.id}.label`} defaultValue={item.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                        </button>
+                        </div>
                         {item.children && (
                           <div className="pl-4 border-l border-ink/5 ml-4 my-1 flex flex-wrap gap-x-3 gap-y-1">
                             {item.children.map(child => (
-                              <button key={child.id} onClick={() => { child.action(); setHoveredMenu(null); }} className="text-left py-1 text-[9px] lg:text-[10px] uppercase tracking-[0.2em] opacity-50 hover:opacity-100 hover:text-gold transition-all whitespace-nowrap">
+                              <div 
+                                key={child.id} 
+                                onClick={() => { child.action(); setHoveredMenu(null); }} 
+                                className="text-left py-1 text-[9px] lg:text-[10px] uppercase tracking-[0.2em] opacity-50 hover:opacity-100 hover:text-gold transition-all whitespace-nowrap cursor-pointer"
+                                role="button"
+                                tabIndex={0}
+                                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); child.action(); setHoveredMenu(null); } }}
+                              >
                                 <EditableText contentKey={`menu.submenu.archive.${item.id}.child.${child.id}.label`} defaultValue={child.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                              </button>
+                              </div>
                             ))}
                           </div>
                         )}
@@ -518,23 +565,33 @@ export default function App() {
 
             {/* Community */}
             <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('community')} onMouseLeave={() => setHoveredMenu(null)}>
-              <button 
+              <div 
                 onClick={() => setView('community')} 
                 className={cn(
-                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4",
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4 cursor-pointer",
                   view === 'community' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
                 )}
                 style={navStyleL1}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setView('community'); } }}
               >
                 <EditableText contentKey="global.nav.community" defaultValue={t.nav.community} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-              </button>
+              </div>
               <AnimatePresence>
                 {hoveredMenu === 'community' && (
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 bg-paper border border-ink/10 rounded-xl shadow-xl z-[60] py-2 min-w-[160px]">
                     {navSubMenus.community.map(item => (
-                      <button key={item.id} onClick={() => { item.action(); setHoveredMenu(null); }} className="w-full text-left px-6 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors">
+                      <div 
+                        key={item.id} 
+                        onClick={() => { item.action(); setHoveredMenu(null); }} 
+                        className="w-full text-left px-6 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors cursor-pointer"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.action(); setHoveredMenu(null); } }}
+                      >
                         <EditableText contentKey={`menu.submenu.community.${item.id}.label`} defaultValue={item.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                      </button>
+                      </div>
                     ))}
                   </motion.div>
                 )}
@@ -544,23 +601,33 @@ export default function App() {
             {/* Admin */}
             {appMode === 'admin' && (
               <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('admin')} onMouseLeave={() => setHoveredMenu(null)}>
-                <button 
+                <div 
                   onClick={() => setView('admin')}
                   className={cn(
-                    "text-[10px] lg:text-xs uppercase tracking-widest transition-colors text-gold font-bold whitespace-nowrap py-4",
+                    "text-[10px] lg:text-xs uppercase tracking-widest transition-colors text-gold font-bold whitespace-nowrap py-4 cursor-pointer",
                     view === 'admin' ? "underline underline-offset-4" : "hover:opacity-80"
                   )}
                   style={navStyleL1}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setView('admin'); } }}
                 >
                   <EditableText contentKey="global.nav.admin" defaultValue={t.nav.admin} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                </button>
+                </div>
                 <AnimatePresence>
                   {hoveredMenu === 'admin' && (
                     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 bg-paper border border-ink/10 rounded-xl shadow-xl z-[60] py-2 min-w-[160px]">
                       {navSubMenus.admin.map(item => (
-                        <button key={item.id} onClick={() => { item.action(); setHoveredMenu(null); }} className="w-full text-left px-6 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors">
+                        <div 
+                          key={item.id} 
+                          onClick={() => { item.action(); setHoveredMenu(null); }} 
+                          className="w-full text-left px-6 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors cursor-pointer"
+                          role="button"
+                          tabIndex={0}
+                          onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.action(); setHoveredMenu(null); } }}
+                        >
                           <EditableText contentKey={`menu.submenu.admin.${item.id}.label`} defaultValue={item.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                        </button>
+                        </div>
                       ))}
                     </motion.div>
                   )}
@@ -570,37 +637,50 @@ export default function App() {
 
             {/* Inquiry */}
             <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu(null)}>
-              <button 
+              <div 
                 onClick={() => setView('inquiry')} 
                 className={cn(
-                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors font-bold whitespace-nowrap py-4",
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors font-bold whitespace-nowrap py-4 cursor-pointer",
                   view === 'inquiry' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
                 )}
                 style={{ ...navStyleL1, color: siteContent['global.style.navL1FontColor']?.value || '#c5a059' }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setView('inquiry'); } }}
               >
                 <EditableText contentKey="global.nav.inquiry" defaultValue={t.nav.inquiry} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-              </button>
+              </div>
             </div>
 
             {/* Level Test */}
             <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('level-test')} onMouseLeave={() => setHoveredMenu(null)}>
-              <button 
+              <div 
                 onClick={() => setView('level-test')} 
                 className={cn(
-                  "text-[10px] lg:text-xs uppercase tracking-widest transition-all font-bold whitespace-nowrap py-4",
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-all font-bold whitespace-nowrap py-4 cursor-pointer",
                   view === 'level-test' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
                 )}
                 style={{ ...navStyleL1, color: siteContent['global.style.navL1FontColor']?.value || '#c5a059' }}
+                role="button"
+                tabIndex={0}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setView('level-test'); } }}
               >
                 <EditableText contentKey="global.nav.levelTest" defaultValue={t.nav.levelTest} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-              </button>
+              </div>
               <AnimatePresence>
                 {hoveredMenu === 'level-test' && (
                   <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 bg-paper border border-ink/10 rounded-xl shadow-xl z-[60] py-2 min-w-[160px]">
                     {navSubMenus['level-test'].map(item => (
-                      <button key={item.id} onClick={() => { item.action(); setHoveredMenu(null); }} className="w-full text-left px-6 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors">
+                      <div 
+                        key={item.id} 
+                        onClick={() => { item.action(); setHoveredMenu(null); }} 
+                        className="w-full text-left px-6 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors cursor-pointer"
+                        role="button"
+                        tabIndex={0}
+                        onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); item.action(); setHoveredMenu(null); } }}
+                      >
                         <EditableText contentKey={`menu.submenu.level-test.${item.id}.label`} defaultValue={item.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                      </button>
+                      </div>
                     ))}
                   </motion.div>
                 )}
@@ -622,7 +702,7 @@ export default function App() {
             {/* Mode Selector Pill */}
             {user && (
               <div className="flex items-center gap-1 bg-ink/5 p-1 rounded-full border border-ink/10">
-                <button 
+                <div 
                   onClick={() => {
                     setAppMode('learner');
                     setIsEditMode(false);
@@ -632,9 +712,12 @@ export default function App() {
                     if (!isAnyTextEditing) setHoveredMenu(null);
                   }}
                   className={cn(
-                    "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] lg:text-xs uppercase tracking-widest font-bold transition-all",
+                    "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] lg:text-xs uppercase tracking-widest font-bold transition-all cursor-pointer",
                     appMode === 'learner' ? "bg-paper text-ink shadow-sm" : "text-ink/50 hover:text-ink"
                   )}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setAppMode('learner'); setIsEditMode(false); if (view === 'admin' || view === 'image-gen') setView('landing'); } }}
                 >
                   <User size={14} />
                   <EditableText 
@@ -644,9 +727,9 @@ export default function App() {
                     language={language}
                     siteContent={siteContent}
                   />
-                </button>
+                </div>
                 {(isAdmin || siteContent['ai-studio-access']?.access === 'all' || (siteContent['ai-studio-access']?.access === 'premium' && userProfile?.role === 'premium') || (siteContent['ai-studio-access']?.access === 'member' && userProfile)) && (
-                  <button 
+                  <div 
                     onClick={() => {
                       if (appMode === 'admin') {
                         setIsEditMode(!isEditMode);
@@ -659,9 +742,22 @@ export default function App() {
                       if (!isAnyTextEditing) setHoveredMenu('admin');
                     }}
                     className={cn(
-                      "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] lg:text-xs uppercase tracking-widest font-bold transition-all",
+                      "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] lg:text-xs uppercase tracking-widest font-bold transition-all cursor-pointer",
                       appMode === 'admin' ? "bg-paper text-ink shadow-sm" : "text-ink/50 hover:text-ink"
                     )}
+                    role="button"
+                    tabIndex={0}
+                    onKeyDown={(e) => { 
+                      if (e.key === 'Enter' || e.key === ' ') { 
+                        e.preventDefault(); 
+                        if (appMode === 'admin') {
+                          setIsEditMode(!isEditMode);
+                        } else {
+                          setAppMode('admin');
+                          if (isAdmin) setIsEditMode(true);
+                        }
+                      } 
+                    }}
                   >
                     {(appMode === 'admin' && isEditMode) ? <Unlock size={14} /> : <Lock size={14} />}
                     <EditableText 
@@ -671,7 +767,7 @@ export default function App() {
                       language={language}
                       siteContent={siteContent}
                     />
-                  </button>
+                  </div>
                 )}
               </div>
             )}
@@ -679,15 +775,18 @@ export default function App() {
             {/* User Profile & Logout */}
             {user ? (
               <div className="flex items-center gap-4">
-                <button 
+                <div 
                   onClick={() => setView('mypage')}
                   onMouseEnter={() => {
                     if (!isAnyTextEditing) setHoveredMenu(null);
                   }}
                   className={cn(
-                    "flex items-center gap-1 text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
+                    "flex items-center gap-1 text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap cursor-pointer",
                     view === 'mypage' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
                   )}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setView('mypage'); } }}
                 >
                   <User size={14} /> 
                   <EditableText 
@@ -697,18 +796,26 @@ export default function App() {
                     language={language}
                     siteContent={siteContent}
                   />
-                </button>
+                </div>
                 <button onClick={handleLogout} className="text-ink/50 hover:text-ink transition-colors">
                   <LogOut size={18} />
                 </button>
               </div>
             ) : (
-              <button 
+              <div 
+                role="button"
+                tabIndex={0}
                 onClick={handleLogin}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    handleLogin();
+                  }
+                }}
                 onMouseEnter={() => {
                   if (!isAnyTextEditing) setHoveredMenu(null);
                 }}
-                className="px-6 py-2 border border-ink rounded-full text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-all whitespace-nowrap font-bold"
+                className="px-6 py-2 border border-ink rounded-full text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-all whitespace-nowrap font-bold cursor-pointer"
               >
                 <EditableText 
                   contentKey="global.nav.login"
@@ -717,7 +824,7 @@ export default function App() {
                   language={language}
                   siteContent={siteContent}
                 />
-              </button>
+              </div>
             )}
           </div>
         </div>
@@ -1432,10 +1539,18 @@ const QuickPostModal: FC<{
 
         <div className="grid grid-cols-1 gap-4">
           {options.length > 0 ? options.map(opt => (
-            <button 
+            <div 
               key={opt.id}
               onClick={opt.action}
-              className="flex items-center gap-6 p-6 rounded-[32px] border border-ink/5 hover:border-gold hover:bg-gold/5 transition-all group text-left"
+              className="flex items-center gap-6 p-6 rounded-[32px] border border-ink/5 hover:border-gold hover:bg-gold/5 transition-all group text-left cursor-pointer"
+              role="button"
+              tabIndex={0}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  opt.action();
+                }
+              }}
             >
               <div className="w-14 h-14 rounded-2xl bg-ink/5 flex items-center justify-center group-hover:bg-gold group-hover:text-ink transition-colors">
                 {opt.icon}
@@ -1445,7 +1560,7 @@ const QuickPostModal: FC<{
                 <p className="text-xs opacity-60 leading-relaxed">{opt.desc}</p>
               </div>
               <ChevronRight size={20} className="ml-auto opacity-20 group-hover:opacity-100 group-hover:translate-x-1 transition-all" />
-            </button>
+            </div>
           )) : (
             <div className="p-12 text-center space-y-4 bg-ink/5 rounded-[32px]">
               <AlertCircle size={40} className="mx-auto opacity-20" />
@@ -1607,7 +1722,7 @@ const DynamicContentArea: FC<{
                   className="max-w-3xl mx-auto text-center space-y-8"
                 >
                   <div className="text-4xl md:text-5xl font-serif font-light">
-                    <EditableText contentKey={`${contentKey}.item_${i}.title`} defaultValue="New Section Title" isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" />
+                    <EditableText contentKey={`${contentKey}.item_${i}.title`} defaultValue="New Section Title" isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
                   </div>
                   <div className="text-lg opacity-70 font-serif leading-relaxed">
                     <EditableText contentKey={`${contentKey}.item_${i}.content`} defaultValue="Add your content here. This is a dynamic text section that you can edit directly." isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
@@ -1642,10 +1757,10 @@ const DynamicContentArea: FC<{
                         <div className="absolute inset-0 bg-ink/20 pointer-events-none" />
                         <div className="relative z-10 space-y-4 max-w-2xl">
                           <div className="text-4xl md:text-6xl font-serif font-light text-white drop-shadow-2xl">
-                            <EditableText contentKey={`${contentKey}.item_${i}.overlayTitle`} defaultValue="Image Title" isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" />
+                            <EditableText contentKey={`${contentKey}.item_${i}.overlayTitle`} defaultValue="Image Title" isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
                           </div>
                           <div className="text-lg md:text-xl font-serif text-white/90 drop-shadow-xl">
-                            <EditableText contentKey={`${contentKey}.item_${i}.overlaySubtitle`} defaultValue="Image Subtitle or Description" isEditMode={isEditMode} language={language} siteContent={siteContent} as="p" />
+                            <EditableText contentKey={`${contentKey}.item_${i}.overlaySubtitle`} defaultValue="Image Subtitle or Description" isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
                           </div>
                         </div>
                       </div>
@@ -2335,6 +2450,8 @@ const EditableLink: FC<{
     if (lower.includes('instagram')) return <Instagram size={14} />;
     if (lower.includes('facebook')) return <Facebook size={14} />;
     if (lower.includes('youtube')) return <Youtube size={14} />;
+    if (lower.includes('twitter') || lower.includes('x.com')) return <Twitter size={14} />;
+    if (lower.includes('linkedin')) return <Linkedin size={14} />;
     if (lower.includes('blog') || lower.includes('naver')) return <BookOpen size={14} />;
     return <ExternalLink size={14} />;
   };
@@ -2398,7 +2515,10 @@ const EditableLink: FC<{
             onClick={() => setIsEditing(true)}
           >
             <div className="absolute -inset-1 border border-dashed border-gold/0 group-hover/item:border-gold/40 rounded transition-colors -z-10" />
-            <span className={cn(className, !text && "opacity-30 italic")}>{displayValue}</span>
+            <div className="flex items-center gap-1">
+              {getIcon(url)}
+              <span className={cn(className, !text && "opacity-30 italic")}>{displayValue}</span>
+            </div>
             <button 
               className="absolute -top-2 -right-2 w-5 h-5 bg-gold text-ink rounded-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity shadow-lg z-10"
             >
@@ -2410,8 +2530,31 @@ const EditableLink: FC<{
     );
   }
 
+  const formatUrl = (url: string) => {
+    if (!url || url === '#' || url.trim() === '') return '#';
+    const trimmed = url.trim();
+    if (/^(https?:\/\/|mailto:|tel:)/i.test(trimmed)) {
+      return trimmed;
+    }
+    return `https://${trimmed}`;
+  };
+
+  const finalUrl = formatUrl(url);
+  const isLinkActive = finalUrl !== '#';
+
   return (
-    <a href={url} target="_blank" rel="noopener noreferrer" className={className}>
+    <a 
+      href={finalUrl} 
+      target={isLinkActive ? "_blank" : undefined} 
+      rel="noopener noreferrer"
+      referrerPolicy="no-referrer"
+      className={cn(className, !isLinkActive && "cursor-default")}
+      onClick={(e) => {
+        if (!isLinkActive) {
+          e.preventDefault();
+        }
+      }}
+    >
       {getIcon(url)}
       {text}
     </a>
@@ -2883,6 +3026,31 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                   <EditableText contentKey="hero.students_count" defaultValue={language === 'ko' ? '500+ 수강생 참여' : '500+ Students Joined'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
                 </div>
               </div>
+
+              {/* Social Links in Hero */}
+              <div className="flex items-center gap-6 pt-8">
+                <Repeater 
+                  isEditMode={isEditMode}
+                  language={language}
+                  siteContent={siteContent}
+                  contentKey="hero.social_links"
+                  itemsPerPage={5}
+                  defaultCount={2}
+                  className="flex items-center gap-4"
+                  addButtonLabel={language === 'ko' ? '소셜 추가' : 'Add Social'}
+                  renderItem={(i) => (
+                    <EditableLink 
+                      contentKey={`hero.social_links.item_${i}`} 
+                      defaultText={i === 0 ? "Instagram" : i === 1 ? "Blog" : "Link"} 
+                      defaultUrl="#" 
+                      isEditMode={isEditMode} 
+                      language={language} 
+                      siteContent={siteContent} 
+                      className="text-ink/60 hover:text-gold transition-colors flex items-center gap-1 text-sm" 
+                    />
+                  )}
+                />
+              </div>
             </motion.div>
           </div>
         </div>
@@ -2896,7 +3064,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               <EditableText contentKey="curriculum.badge" defaultValue={t.curriculum.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
             </div>
             <div className="text-5xl font-serif font-light">
-              <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
+              <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
             </div>
           </div>
           <div className="max-w-xs text-sm opacity-60 font-serif italic">
@@ -2959,7 +3127,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
             <EditableText contentKey="gallery.badge" defaultValue="Gallery & Highlights" isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
           <div className="text-5xl font-serif font-light">
-            <EditableText contentKey="gallery.title" defaultValue={language === 'ko' ? '우리의 특별한 순간들' : 'Our Special Moments'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
+            <EditableText contentKey="gallery.title" defaultValue={language === 'ko' ? '우리의 특별한 순간들' : 'Our Special Moments'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
           </div>
         </div>
 
@@ -2993,7 +3161,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               </div>
               <div className="space-y-2 px-4">
                 <div className="text-lg font-serif">
-                  <EditableText contentKey={`gallery.item_${i}.title`} defaultValue={language === 'ko' ? `하이라이트 ${i + 1}` : `Highlight ${i + 1}`} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h4" />
+                  <EditableText contentKey={`gallery.item_${i}.title`} defaultValue={language === 'ko' ? `하이라이트 ${i + 1}` : `Highlight ${i + 1}`} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
                 </div>
                 <div className="text-xs opacity-60 leading-relaxed">
                   <EditableText contentKey={`gallery.item_${i}.desc`} defaultValue={language === 'ko' ? '특별한 학습 경험과 문화적 통찰력을 공유합니다.' : 'Sharing special learning experiences and cultural insights.'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="p" />
@@ -3042,7 +3210,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                 <EditableText contentKey="library.badge" defaultValue="Knowledge Library" isEditMode={isEditMode} language={language} siteContent={siteContent} />
               </div>
               <div className="text-5xl md:text-6xl font-serif font-light leading-tight">
-                <EditableText contentKey="library.title" defaultValue={language === 'ko' ? '"언어는 고립된 기호가 아니라, 역사가 숨 쉬는 생명체입니다."' : '"Language is not an isolated symbol, but a living organism where history breathes."'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
+                <EditableText contentKey="library.title" defaultValue={language === 'ko' ? '"언어는 고립된 기호가 아니라, 역사가 숨 쉬는 생명체입니다."' : '"Language is not an isolated symbol, but a living organism where history breathes."'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
               </div>
               <div className="text-lg opacity-70 font-serif leading-relaxed">
                 <EditableText contentKey="library.description" defaultValue={language === 'ko' ? 'L.C.L Knowledge Library는 중국 언어학 박사의 학문적 엄격함과 20년 현지 체류의 직관을 결합한 지식의 정수입니다. 단순한 학습 자료를 넘어, 언어의 구조적 원리와 문화적 맥락을 관통하는 통찰력을 제공합니다.' : 'The L.C.L Knowledge Library is the essence of knowledge that combines the academic rigor of a PhD in Chinese linguistics with the intuition of 20 years of local residence. Beyond simple learning materials, it provides insight into the structural principles and cultural context of language.'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
@@ -3079,7 +3247,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                     {group.id === 'group-c' && <Globe size={24} />}
                   </div>
                   <div>
-                    <h3 className="text-2xl font-serif">
+                    <div className="text-2xl font-serif">
                       <EditableText 
                         contentKey={`library.group.${group.id}.title`} 
                         defaultValue={group.name.split(':')[1]?.trim() || group.name} 
@@ -3088,8 +3256,8 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                         siteContent={siteContent} 
                         as="span" 
                       />
-                    </h3>
-                    <p className="text-[10px] uppercase tracking-widest text-gold font-bold">
+                    </div>
+                    <div className="text-[10px] uppercase tracking-widest text-gold font-bold">
                       <EditableText 
                         contentKey={`library.group.${group.id}.badge`} 
                         defaultValue={group.name.split(':')[0]} 
@@ -3098,7 +3266,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                         siteContent={siteContent} 
                         as="span" 
                       />
-                    </p>
+                    </div>
                   </div>
                   <div className="text-sm opacity-60 leading-relaxed">
                     <EditableText 
@@ -3114,16 +3282,25 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
 
                 <div className="space-y-3">
                   {group.categories.map((cat) => (
-                    <button 
+                    <div 
                       key={cat.id}
                       onClick={() => {
                         setInitialArchiveFilter({ groupId: group.id, categoryId: cat.id });
                         setView('archive');
                       }}
-                      className="w-full text-left p-4 rounded-2xl hover:bg-paper border border-transparent hover:border-ink/5 transition-all group/item"
+                      className="w-full text-left p-4 rounded-2xl hover:bg-paper border border-transparent hover:border-ink/5 transition-all group/item cursor-pointer"
+                      role="button"
+                      tabIndex={0}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          setInitialArchiveFilter({ groupId: group.id, categoryId: cat.id });
+                          setView('archive');
+                        }
+                      }}
                     >
                       <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">
+                        <div className="text-sm font-medium">
                           <EditableText 
                             contentKey={`library.group.${group.id}.category.${cat.id}.name`} 
                             defaultValue={cat.name} 
@@ -3132,7 +3309,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                             siteContent={siteContent} 
                             as="span" 
                           />
-                        </span>
+                        </div>
                         <ArrowRight size={14} className="opacity-0 group-hover/item:opacity-100 -translate-x-2 group-hover/item:translate-x-0 transition-all" />
                       </div>
                       <div className="text-[10px] opacity-40 mt-1">
@@ -3142,10 +3319,10 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                           isEditMode={isEditMode} 
                           language={language} 
                           siteContent={siteContent} 
-                          as="p" 
+                          as="div" 
                         />
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               </motion.div>
@@ -3153,12 +3330,20 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
           </div>
 
           <div className="text-center pt-8">
-            <button 
+            <div 
+              role="button"
+              tabIndex={0}
               onClick={() => setView('archive')}
-              className="px-12 py-5 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:bg-gold hover:text-ink transition-all shadow-lg hover:shadow-gold/20"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  setView('archive');
+                }
+              }}
+              className="inline-block px-12 py-5 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:bg-gold hover:text-ink transition-all shadow-lg hover:shadow-gold/20 cursor-pointer"
             >
               <EditableText contentKey="library.explore_btn" defaultValue={language === 'ko' ? '전체 라이브러리 탐색하기' : 'Explore Full Library'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-            </button>
+            </div>
           </div>
         </div>
       </section>
@@ -5642,7 +5827,7 @@ const ArchiveView: FC<{
           <EditableText contentKey="archive.title" defaultValue={t.archive.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="span" />
         </h2>
         <div className="max-w-3xl mx-auto opacity-60 font-serif italic leading-relaxed">
-          <EditableText contentKey="archive.subtitle" defaultValue={t.archive.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="p" />
+          <EditableText contentKey="archive.subtitle" defaultValue={t.archive.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
         </div>
       </div>
 
@@ -5694,7 +5879,7 @@ const ArchiveView: FC<{
                     as="span" 
                   />
                 </h3>
-                <p className="text-[10px] uppercase tracking-widest text-gold font-bold">
+                <div className="text-[10px] uppercase tracking-widest text-gold font-bold">
                   <EditableText 
                     contentKey={`library.group.${group.id}.badge`} 
                     defaultValue={group.name.split(':')[0]} 
@@ -5703,7 +5888,7 @@ const ArchiveView: FC<{
                     siteContent={siteContent} 
                     as="span" 
                   />
-                </p>
+                </div>
               </div>
               <div className="text-sm opacity-60 leading-relaxed">
                 <EditableText 
@@ -5719,14 +5904,23 @@ const ArchiveView: FC<{
 
             <div className="grid grid-cols-1 gap-2">
               {group.categories.map((cat: any) => (
-                <button 
+                <div 
                   key={cat.id}
+                  role="button"
+                  tabIndex={0}
                   onClick={() => {
                     setSelectedGroup(group.id);
                     setSelectedCategory(selectedCategory === cat.id ? null : cat.id);
                   }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setSelectedGroup(group.id);
+                      setSelectedCategory(selectedCategory === cat.id ? null : cat.id);
+                    }
+                  }}
                   className={cn(
-                    "w-full text-left p-4 rounded-2xl transition-all group/item",
+                    "w-full text-left p-4 rounded-2xl transition-all group/item cursor-pointer",
                     selectedCategory === cat.id
                       ? "bg-gold text-ink"
                       : selectedGroup === group.id
@@ -5760,10 +5954,10 @@ const ArchiveView: FC<{
                       isEditMode={isEditMode} 
                       language={language} 
                       siteContent={siteContent} 
-                      as="p" 
+                      as="div" 
                     />
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           </motion.div>
@@ -7211,10 +7405,10 @@ const InquiryView: FC<{
           <EditableText contentKey="inquiry.badge" defaultValue={t.inquiry.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
         </div>
         <div className="text-5xl font-serif font-light">
-          <EditableText contentKey="inquiry.title" defaultValue={t.inquiry.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
+          <EditableText contentKey="inquiry.title" defaultValue={t.inquiry.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
         </div>
         <div className="text-lg opacity-60 font-serif italic">
-          <EditableText contentKey="inquiry.subtitle" defaultValue={t.inquiry.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="p" />
+          <EditableText contentKey="inquiry.subtitle" defaultValue={t.inquiry.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
         </div>
       </div>
 
