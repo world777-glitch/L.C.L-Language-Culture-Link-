@@ -144,14 +144,7 @@ export default function App() {
     admin: [
       { id: 'admin-dashboard', label: t.nav.admin, action: () => setView('admin') },
       { id: 'ai-studio', label: t.nav.aiStudio, action: () => setView('image-gen') },
-      { 
-        id: 'manual', 
-        label: t.nav.manual, 
-        action: () => {}, 
-        children: [
-          { id: 'manual-edit', label: t.nav.edit, action: () => setIsEditMode(!isEditMode) }
-        ]
-      }
+      { id: 'edit-mode', label: t.nav.edit, action: () => setIsEditMode(!isEditMode) }
     ],
     curriculum: COURSES.map(course => ({
       id: course.id,
@@ -411,179 +404,209 @@ export default function App() {
                 ))}
               </div>
             </div>
-            <button 
-              onClick={() => setView('landing')} 
-              onMouseEnter={() => {
-                if (!isAnyTextEditing) setHoveredMenu(null);
-              }}
-              className={cn(
-                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
-                view === 'landing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
-              )}
-              style={navStyleL1}
-            >
-              <EditableText 
-                contentKey="global.nav.home"
-                defaultValue={language === 'ko' ? '홈' : 'Home'}
-                isEditMode={isEditMode}
-                language={language}
-                siteContent={siteContent}
-              />
-            </button>
-            <button 
-              onClick={() => {
-                if (view === 'landing') {
-                  document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' });
-                } else {
-                  setView('landing');
-                  setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100);
-                }
-              }} 
-              onMouseEnter={() => {
-                if (!isAnyTextEditing) setHoveredMenu('curriculum');
-              }}
-              className={cn(
-                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
-                view === 'curriculum' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
-              )}
-              style={navStyleL1}
-            >
-              <EditableText 
-                contentKey="global.nav.curriculum"
-                defaultValue={t.nav.curriculum}
-                isEditMode={isEditMode}
-                language={language}
-                siteContent={siteContent}
-              />
-            </button>
-            <button 
-              onClick={() => setView('pricing')} 
-              onMouseEnter={() => {
-                if (!isAnyTextEditing) setHoveredMenu('pricing');
-              }}
-              className={cn(
-                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
-                view === 'pricing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
-              )}
-              style={navStyleL1}
-            >
-              <EditableText 
-                contentKey="global.nav.pricing"
-                defaultValue={t.nav.pricing}
-                isEditMode={isEditMode}
-                language={language}
-                siteContent={siteContent}
-              />
-            </button>
-            <button 
-              onClick={() => {
-                if (view === 'landing') {
-                  document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' });
-                } else {
-                  setView('landing');
-                  setTimeout(() => document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' }), 100);
-                }
-              }} 
-              onMouseEnter={() => {
-                if (!isAnyTextEditing) setHoveredMenu('archive');
-              }}
-              className={cn(
-                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
-                view === 'archive' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
-              )}
-              style={navStyleL1}
-            >
-              <EditableText 
-                contentKey="global.nav.archive"
-                defaultValue={t.nav.archive}
-                isEditMode={isEditMode}
-                language={language}
-                siteContent={siteContent}
-              />
-            </button>
-            <button 
-              onClick={() => setView('community')} 
-              onMouseEnter={() => {
-                if (!isAnyTextEditing) setHoveredMenu('community');
-              }}
-              className={cn(
-                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
-                view === 'community' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
-              )}
-              style={navStyleL1}
-            >
-              <EditableText 
-                contentKey="global.nav.community"
-                defaultValue={t.nav.community}
-                isEditMode={isEditMode}
-                language={language}
-                siteContent={siteContent}
-              />
-            </button>
 
-            {appMode === 'admin' && (
+            {/* Home */}
+            <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu(null)}>
               <button 
-                onClick={() => setView('admin')}
-                onMouseEnter={() => {
-                  if (!isAnyTextEditing) setHoveredMenu('admin');
-                }}
+                onClick={() => setView('landing')} 
                 className={cn(
-                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors text-gold font-bold whitespace-nowrap",
-                  view === 'admin' ? "underline underline-offset-4" : "hover:opacity-80"
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4",
+                  view === 'landing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
                 )}
                 style={navStyleL1}
               >
-                <EditableText 
-                  contentKey="global.nav.admin"
-                  defaultValue={t.nav.admin}
-                  isEditMode={isEditMode}
-                  language={language}
-                  siteContent={siteContent}
-                />
+                <EditableText contentKey="global.nav.home" defaultValue={language === 'ko' ? '홈' : 'Home'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
               </button>
+            </div>
+
+            {/* Curriculum */}
+            <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('curriculum')} onMouseLeave={() => setHoveredMenu(null)}>
+              <button 
+                onClick={() => scrollToSection('curriculum')} 
+                className={cn(
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4",
+                  view === 'curriculum' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
+                )}
+                style={navStyleL1}
+              >
+                <EditableText contentKey="global.nav.curriculum" defaultValue={t.nav.curriculum} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+              </button>
+              <AnimatePresence>
+                {hoveredMenu === 'curriculum' && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 bg-paper border border-ink/10 rounded-xl shadow-xl z-[60] py-2 min-w-[240px] max-w-[400px]">
+                    {navSubMenus.curriculum.map(item => (
+                      <div key={item.id} className="relative group/sub px-2">
+                        <button onClick={() => { item.action(); setHoveredMenu(null); }} className="w-full text-left px-4 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors rounded-lg">
+                          <EditableText contentKey={`menu.submenu.curriculum.${item.id}.label`} defaultValue={item.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                        </button>
+                        {item.children && (
+                          <div className="pl-4 border-l border-ink/5 ml-4 my-1 flex flex-wrap gap-x-3 gap-y-1">
+                            {item.children.map(child => (
+                              <button key={child.id} onClick={() => { child.action(); setHoveredMenu(null); }} className="text-left py-1 text-[9px] lg:text-[10px] uppercase tracking-[0.2em] opacity-50 hover:opacity-100 hover:text-gold transition-all whitespace-nowrap">
+                                <EditableText contentKey={`menu.submenu.curriculum.${item.id}.child.${child.id}.label`} defaultValue={child.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Pricing */}
+            <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('pricing')} onMouseLeave={() => setHoveredMenu(null)}>
+              <button 
+                onClick={() => setView('pricing')} 
+                className={cn(
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4",
+                  view === 'pricing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
+                )}
+                style={navStyleL1}
+              >
+                <EditableText contentKey="global.nav.pricing" defaultValue={t.nav.pricing} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+              </button>
+              <AnimatePresence>
+                {hoveredMenu === 'pricing' && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 bg-paper border border-ink/10 rounded-xl shadow-xl z-[60] py-2 min-w-[160px]">
+                    {navSubMenus.pricing.map(item => (
+                      <button key={item.id} onClick={() => { item.action(); setHoveredMenu(null); }} className="w-full text-left px-6 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors">
+                        <EditableText contentKey={`menu.submenu.pricing.${item.id}.label`} defaultValue={item.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Archive */}
+            <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('archive')} onMouseLeave={() => setHoveredMenu(null)}>
+              <button 
+                onClick={() => scrollToSection('library')} 
+                className={cn(
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4",
+                  view === 'archive' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
+                )}
+                style={navStyleL1}
+              >
+                <EditableText contentKey="global.nav.archive" defaultValue={t.nav.archive} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+              </button>
+              <AnimatePresence>
+                {hoveredMenu === 'archive' && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 bg-paper border border-ink/10 rounded-xl shadow-xl z-[60] py-2 min-w-[240px] max-w-[400px]">
+                    {navSubMenus.archive.map(item => (
+                      <div key={item.id} className="relative group/sub px-2">
+                        <button onClick={() => { item.action(); setHoveredMenu(null); }} className="w-full text-left px-4 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors rounded-lg">
+                          <EditableText contentKey={`menu.submenu.archive.${item.id}.label`} defaultValue={item.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                        </button>
+                        {item.children && (
+                          <div className="pl-4 border-l border-ink/5 ml-4 my-1 flex flex-wrap gap-x-3 gap-y-1">
+                            {item.children.map(child => (
+                              <button key={child.id} onClick={() => { child.action(); setHoveredMenu(null); }} className="text-left py-1 text-[9px] lg:text-[10px] uppercase tracking-[0.2em] opacity-50 hover:opacity-100 hover:text-gold transition-all whitespace-nowrap">
+                                <EditableText contentKey={`menu.submenu.archive.${item.id}.child.${child.id}.label`} defaultValue={child.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Community */}
+            <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('community')} onMouseLeave={() => setHoveredMenu(null)}>
+              <button 
+                onClick={() => setView('community')} 
+                className={cn(
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap py-4",
+                  view === 'community' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
+                )}
+                style={navStyleL1}
+              >
+                <EditableText contentKey="global.nav.community" defaultValue={t.nav.community} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+              </button>
+              <AnimatePresence>
+                {hoveredMenu === 'community' && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 bg-paper border border-ink/10 rounded-xl shadow-xl z-[60] py-2 min-w-[160px]">
+                    {navSubMenus.community.map(item => (
+                      <button key={item.id} onClick={() => { item.action(); setHoveredMenu(null); }} className="w-full text-left px-6 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors">
+                        <EditableText contentKey={`menu.submenu.community.${item.id}.label`} defaultValue={item.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* Admin */}
+            {appMode === 'admin' && (
+              <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('admin')} onMouseLeave={() => setHoveredMenu(null)}>
+                <button 
+                  onClick={() => setView('admin')}
+                  className={cn(
+                    "text-[10px] lg:text-xs uppercase tracking-widest transition-colors text-gold font-bold whitespace-nowrap py-4",
+                    view === 'admin' ? "underline underline-offset-4" : "hover:opacity-80"
+                  )}
+                  style={navStyleL1}
+                >
+                  <EditableText contentKey="global.nav.admin" defaultValue={t.nav.admin} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                </button>
+                <AnimatePresence>
+                  {hoveredMenu === 'admin' && (
+                    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 bg-paper border border-ink/10 rounded-xl shadow-xl z-[60] py-2 min-w-[160px]">
+                      {navSubMenus.admin.map(item => (
+                        <button key={item.id} onClick={() => { item.action(); setHoveredMenu(null); }} className="w-full text-left px-6 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors">
+                          <EditableText contentKey={`menu.submenu.admin.${item.id}.label`} defaultValue={item.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             )}
 
-            <button 
-              onClick={() => setView('inquiry')} 
-              onMouseEnter={() => {
-                if (!isAnyTextEditing) {
-                  setHoveredMenu(null);
-                  setSelectedLevel(null);
-                }
-              }}
-              className={cn(
-                "text-[10px] lg:text-xs uppercase tracking-widest transition-colors font-bold whitespace-nowrap",
-                view === 'inquiry' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
-              )}
-              style={{ ...navStyleL1, color: siteContent['global.style.navL1FontColor']?.value || '#c5a059' }}
-            >
-              <EditableText 
-                contentKey="global.nav.inquiry"
-                defaultValue={t.nav.inquiry}
-                isEditMode={isEditMode}
-                language={language}
-                siteContent={siteContent}
-              />
-            </button>
-            <button 
-              onClick={() => setView('level-test')} 
-              onMouseEnter={() => {
-                if (!isAnyTextEditing) setHoveredMenu('level-test');
-              }}
-              className={cn(
-                "text-[10px] lg:text-xs uppercase tracking-widest transition-all font-bold whitespace-nowrap",
-                view === 'level-test' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
-              )}
-              style={{ ...navStyleL1, color: siteContent['global.style.navL1FontColor']?.value || '#c5a059' }}
-            >
-              <EditableText 
-                contentKey="global.nav.levelTest"
-                defaultValue={t.nav.levelTest}
-                isEditMode={isEditMode}
-                language={language}
-                siteContent={siteContent}
-              />
-            </button>
+            {/* Inquiry */}
+            <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu(null)}>
+              <button 
+                onClick={() => setView('inquiry')} 
+                className={cn(
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors font-bold whitespace-nowrap py-4",
+                  view === 'inquiry' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
+                )}
+                style={{ ...navStyleL1, color: siteContent['global.style.navL1FontColor']?.value || '#c5a059' }}
+              >
+                <EditableText contentKey="global.nav.inquiry" defaultValue={t.nav.inquiry} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+              </button>
+            </div>
+
+            {/* Level Test */}
+            <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('level-test')} onMouseLeave={() => setHoveredMenu(null)}>
+              <button 
+                onClick={() => setView('level-test')} 
+                className={cn(
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-all font-bold whitespace-nowrap py-4",
+                  view === 'level-test' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
+                )}
+                style={{ ...navStyleL1, color: siteContent['global.style.navL1FontColor']?.value || '#c5a059' }}
+              >
+                <EditableText contentKey="global.nav.levelTest" defaultValue={t.nav.levelTest} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+              </button>
+              <AnimatePresence>
+                {hoveredMenu === 'level-test' && (
+                  <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: 10 }} className="absolute top-full left-0 bg-paper border border-ink/10 rounded-xl shadow-xl z-[60] py-2 min-w-[160px]">
+                    {navSubMenus['level-test'].map(item => (
+                      <button key={item.id} onClick={() => { item.action(); setHoveredMenu(null); }} className="w-full text-left px-6 py-2 text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink/5 hover:text-gold transition-colors">
+                        <EditableText contentKey={`menu.submenu.level-test.${item.id}.label`} defaultValue={item.label} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                      </button>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+
           <div className="flex items-center gap-3 lg:gap-6">
             {/* Theme Toggle */}
             <button 
@@ -625,8 +648,12 @@ export default function App() {
                 {(isAdmin || siteContent['ai-studio-access']?.access === 'all' || (siteContent['ai-studio-access']?.access === 'premium' && userProfile?.role === 'premium') || (siteContent['ai-studio-access']?.access === 'member' && userProfile)) && (
                   <button 
                     onClick={() => {
-                      setAppMode('admin');
-                      if (isAdmin) setIsEditMode(true);
+                      if (appMode === 'admin') {
+                        setIsEditMode(!isEditMode);
+                      } else {
+                        setAppMode('admin');
+                        if (isAdmin) setIsEditMode(true);
+                      }
                     }}
                     onMouseEnter={() => {
                       if (!isAnyTextEditing) setHoveredMenu('admin');
@@ -636,7 +663,7 @@ export default function App() {
                       appMode === 'admin' ? "bg-paper text-ink shadow-sm" : "text-ink/50 hover:text-ink"
                     )}
                   >
-                    {appMode === 'admin' ? <Unlock size={14} /> : <Lock size={14} />}
+                    {(appMode === 'admin' && isEditMode) ? <Unlock size={14} /> : <Lock size={14} />}
                     <EditableText 
                       contentKey="global.nav.adminMode"
                       defaultValue={t.nav.adminMode}
@@ -696,85 +723,7 @@ export default function App() {
         </div>
       </div>
 
-      {/* Mega Menu Bar */}
-        <AnimatePresence>
-          {hoveredMenu && navSubMenus[hoveredMenu] && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: 'auto', opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              className={cn(
-                "bg-ink/5 border-t border-ink/5",
-                isEditMode ? "overflow-visible" : "overflow-hidden"
-              )}
-              onMouseLeave={() => setHoveredSubItem(null)}
-            >
-              <div className="max-w-[1600px] mx-auto px-6 py-6 flex items-start justify-center gap-12 flex-wrap">
-                {navSubMenus[hoveredMenu].map(item => (
-                  <div 
-                    key={item.id} 
-                    className="flex flex-col items-center gap-3 min-w-[120px]"
-                    onMouseEnter={() => setHoveredSubItem(item.id)}
-                  >
-                    <button
-                      onClick={() => {
-                        item.action();
-                        setHoveredMenu(null);
-                      }}
-                      className={cn(
-                        "text-[10px] lg:text-xs uppercase tracking-widest transition-all font-medium whitespace-nowrap",
-                        hoveredSubItem === item.id ? "text-gold opacity-100" : "opacity-60 hover:opacity-100 hover:text-gold"
-                      )}
-                      style={navStyleL2}
-                    >
-                      <EditableText 
-                        contentKey={`menu.submenu.${hoveredMenu}.${item.id}.label`}
-                        defaultValue={item.label}
-                        isEditMode={isEditMode}
-                        language={language}
-                        siteContent={siteContent}
-                      />
-                    </button>
-
-                    <div className="min-h-[20px] flex items-center justify-center">
-                      <AnimatePresence>
-                        {hoveredSubItem === item.id && item.children && (
-                          <motion.div
-                            initial={{ opacity: 0, y: -5 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            exit={{ opacity: 0, y: -5 }}
-                            className="flex items-center justify-center gap-4"
-                          >
-                            {item.children.map(child => (
-                              <button
-                                key={child.id}
-                                onClick={() => {
-                                  child.action();
-                                  setHoveredMenu(null);
-                                  setHoveredSubItem(null);
-                                }}
-                                className="text-[9px] lg:text-[10px] uppercase tracking-[0.2em] opacity-50 hover:opacity-100 hover:text-gold transition-all whitespace-nowrap"
-                                style={navStyleL3}
-                              >
-                                <EditableText 
-                                  contentKey={`menu.submenu.${hoveredMenu}.${item.id}.child.${child.id}.label`}
-                                  defaultValue={child.label}
-                                  isEditMode={isEditMode}
-                                  language={language}
-                                  siteContent={siteContent}
-                                />
-                              </button>
-                            ))}
-                          </motion.div>
-                        )}
-                      </AnimatePresence>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+      {/* Dropdown Menus handled inline now */}
       </nav>
 
       <main className="flex-grow">
