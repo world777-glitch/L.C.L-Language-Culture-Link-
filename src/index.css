@@ -32,6 +32,12 @@
   }
 }
 
+.dark {
+  --color-paper: #1a1a1a;
+  --color-ink: #f5f2ed;
+  --color-gold: #d4af37;
+}
+
 .oval-mask {
   mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%);
   mask-size: contain;

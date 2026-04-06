@@ -54,6 +54,10 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       post: '게시',
       myPage: '마이페이지',
       login: '로그인',
+      learnerMode: '학습자 모드',
+      adminMode: '관리자 모드',
+      manual: '메뉴얼',
+      edit: '편집',
     },
     footer: {
       quote: '"박사의 깊이를 더한 프리미엄 중국어, 이제 커피 한 잔 값으로 시작하세요."',
@@ -310,6 +314,10 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       post: 'Post',
       myPage: 'My Page',
       login: 'Login',
+      learnerMode: 'Learner Mode',
+      adminMode: 'Admin Mode',
+      manual: 'Manual',
+      edit: 'Edit',
     },
     inquiry: {
       title: '[L.C.L] Course Inquiry & Level Diagnosis',
@@ -563,6 +571,10 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       admin: '管理员',
       myPage: '个人中心',
       login: '登录',
+      learnerMode: '学习者模式',
+      adminMode: '管理员模式',
+      manual: '手册',
+      edit: '编辑',
     },
     inquiry: {
       title: '[L.C.L] 课程咨询与水平诊断申请表',
@@ -772,6 +784,10 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       admin: '管理者',
       myPage: 'マイページ',
       login: 'ログイン',
+      learnerMode: '学習者モード',
+      adminMode: '管理者モード',
+      manual: 'マニュアル',
+      edit: '編集',
     },
     inquiry: {
       title: '[L.C.L] 受講相談およびレベル診断申請書',

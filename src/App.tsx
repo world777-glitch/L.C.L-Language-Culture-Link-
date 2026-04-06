@@ -27,6 +27,10 @@ import {
   PlusCircle,
   Check,
   ShieldCheck,
+  Sun,
+  Moon,
+  Lock,
+  Unlock,
   FileText,
   Music,
   Trash2,
@@ -108,6 +112,22 @@ export default function App() {
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [isPostModalOpen, setIsPostModalOpen] = useState(false);
   const [view, setView] = useState<'landing' | 'booking' | 'mypage' | 'admin' | 'image-gen' | 'archive' | 'community' | 'inquiry' | 'curriculum' | 'pricing' | 'level-test'>('landing');
+  const [isDarkMode, setIsDarkMode] = useState(false);
+  const [appMode, setAppMode] = useState<'learner' | 'admin'>('learner');
+  const [isAnyTextEditing, setIsAnyTextEditing] = useState(false);
+
+  useEffect(() => {
+    const handleFocus = () => {
+      const isEditing = document.activeElement?.getAttribute('contenteditable') === 'true';
+      setIsAnyTextEditing(isEditing);
+    };
+    document.addEventListener('focusin', handleFocus);
+    document.addEventListener('focusout', handleFocus);
+    return () => {
+      document.removeEventListener('focusin', handleFocus);
+      document.removeEventListener('focusout', handleFocus);
+    };
+  }, []);
   const [selectedCourse, setSelectedCourse] = useState(COURSES[0]);
   const [selectedLevel, setSelectedLevel] = useState<string | null>(null);
   const [initialArchiveFilter, setInitialArchiveFilter] = useState<{ groupId: string | null, categoryId: string | null }>({ groupId: null, categoryId: null });
@@ -121,6 +141,18 @@ export default function App() {
   const [hoveredSubItem, setHoveredSubItem] = useState<string | null>(null);
 
   const navSubMenus: Record<string, { id: string, label: string, action: () => void, children?: { id: string, label: string, action: () => void }[] }[]> = {
+    admin: [
+      { id: 'admin-dashboard', label: t.nav.admin, action: () => setView('admin') },
+      { id: 'ai-studio', label: t.nav.aiStudio, action: () => setView('image-gen') },
+      { 
+        id: 'manual', 
+        label: t.nav.manual, 
+        action: () => {}, 
+        children: [
+          { id: 'manual-edit', label: t.nav.edit, action: () => setIsEditMode(!isEditMode) }
+        ]
+      }
+    ],
     curriculum: COURSES.map(course => ({
       id: course.id,
       label: course.title,
@@ -294,12 +326,12 @@ export default function App() {
   }), [siteContent]);
 
   return (
-    <div className="min-h-screen flex flex-col bg-paper text-ink font-sans selection:bg-gold selection:text-ink overflow-x-hidden">
+    <div className={cn("min-h-screen flex flex-col bg-paper text-ink font-sans selection:bg-gold selection:text-ink overflow-x-hidden transition-colors duration-300", isDarkMode && "dark")}>
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
-          --color-paper: ${styles.paper};
-          --color-ink: ${styles.ink};
-          --color-gold: ${styles.gold};
+          --color-paper: ${isDarkMode ? '#1a1a1a' : styles.paper};
+          --color-ink: ${isDarkMode ? '#f5f2ed' : styles.ink};
+          --color-gold: ${isDarkMode ? '#d4af37' : styles.gold};
           --font-serif: ${styles.fontSerif};
           --font-sans: ${styles.fontSans};
         }
@@ -340,13 +372,17 @@ export default function App() {
       {/* Navigation */}
       <nav 
         className="sticky top-0 z-50 bg-paper/80 backdrop-blur-md border-b border-ink/10"
-        onMouseLeave={() => setHoveredMenu(null)}
+        onMouseLeave={() => {
+          if (!isAnyTextEditing) setHoveredMenu(null);
+        }}
       >
         <div className="max-w-[1600px] mx-auto px-0 h-20 flex items-center justify-between">
           <div 
             className="flex items-center gap-3 cursor-pointer group" 
             onClick={() => setView('landing')}
-            onMouseEnter={() => setHoveredMenu(null)}
+            onMouseEnter={() => {
+              if (!isAnyTextEditing) setHoveredMenu(null);
+            }}
           >
             <div className="flex flex-col items-start justify-center leading-none">
               <span className="font-serif text-2xl font-bold tracking-tighter group-hover:text-gold transition-colors">L.C.L</span>
@@ -377,14 +413,22 @@ export default function App() {
             </div>
             <button 
               onClick={() => setView('landing')} 
-              onMouseEnter={() => setHoveredMenu(null)}
+              onMouseEnter={() => {
+                if (!isAnyTextEditing) setHoveredMenu(null);
+              }}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'landing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
               style={navStyleL1}
             >
-              {language === 'ko' ? '홈' : 'Home'}
+              <EditableText 
+                contentKey="global.nav.home"
+                defaultValue={language === 'ko' ? '홈' : 'Home'}
+                isEditMode={isEditMode}
+                language={language}
+                siteContent={siteContent}
+              />
             </button>
             <button 
               onClick={() => {
@@ -395,25 +439,41 @@ export default function App() {
                   setTimeout(() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' }), 100);
                 }
               }} 
-              onMouseEnter={() => setHoveredMenu('curriculum')}
+              onMouseEnter={() => {
+                if (!isAnyTextEditing) setHoveredMenu('curriculum');
+              }}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'curriculum' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
               style={navStyleL1}
             >
-              {t.nav.curriculum}
+              <EditableText 
+                contentKey="global.nav.curriculum"
+                defaultValue={t.nav.curriculum}
+                isEditMode={isEditMode}
+                language={language}
+                siteContent={siteContent}
+              />
             </button>
             <button 
               onClick={() => setView('pricing')} 
-              onMouseEnter={() => setHoveredMenu('pricing')}
+              onMouseEnter={() => {
+                if (!isAnyTextEditing) setHoveredMenu('pricing');
+              }}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'pricing' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
               style={navStyleL1}
             >
-              {t.nav.pricing}
+              <EditableText 
+                contentKey="global.nav.pricing"
+                defaultValue={t.nav.pricing}
+                isEditMode={isEditMode}
+                language={language}
+                siteContent={siteContent}
+              />
             </button>
             <button 
               onClick={() => {
@@ -424,31 +484,72 @@ export default function App() {
                   setTimeout(() => document.getElementById('library')?.scrollIntoView({ behavior: 'smooth' }), 100);
                 }
               }} 
-              onMouseEnter={() => setHoveredMenu('archive')}
+              onMouseEnter={() => {
+                if (!isAnyTextEditing) setHoveredMenu('archive');
+              }}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'archive' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
               style={navStyleL1}
             >
-              {t.nav.archive}
+              <EditableText 
+                contentKey="global.nav.archive"
+                defaultValue={t.nav.archive}
+                isEditMode={isEditMode}
+                language={language}
+                siteContent={siteContent}
+              />
             </button>
             <button 
               onClick={() => setView('community')} 
-              onMouseEnter={() => setHoveredMenu('community')}
+              onMouseEnter={() => {
+                if (!isAnyTextEditing) setHoveredMenu('community');
+              }}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                 view === 'community' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
               )}
               style={navStyleL1}
             >
-              {t.nav.community}
+              <EditableText 
+                contentKey="global.nav.community"
+                defaultValue={t.nav.community}
+                isEditMode={isEditMode}
+                language={language}
+                siteContent={siteContent}
+              />
             </button>
+
+            {appMode === 'admin' && (
+              <button 
+                onClick={() => setView('admin')}
+                onMouseEnter={() => {
+                  if (!isAnyTextEditing) setHoveredMenu('admin');
+                }}
+                className={cn(
+                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors text-gold font-bold whitespace-nowrap",
+                  view === 'admin' ? "underline underline-offset-4" : "hover:opacity-80"
+                )}
+                style={navStyleL1}
+              >
+                <EditableText 
+                  contentKey="global.nav.admin"
+                  defaultValue={t.nav.admin}
+                  isEditMode={isEditMode}
+                  language={language}
+                  siteContent={siteContent}
+                />
+              </button>
+            )}
+
             <button 
               onClick={() => setView('inquiry')} 
               onMouseEnter={() => {
-                setHoveredMenu(null);
-                setSelectedLevel(null);
+                if (!isAnyTextEditing) {
+                  setHoveredMenu(null);
+                  setSelectedLevel(null);
+                }
               }}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-colors font-bold whitespace-nowrap",
@@ -456,91 +557,156 @@ export default function App() {
               )}
               style={{ ...navStyleL1, color: siteContent['global.style.navL1FontColor']?.value || '#c5a059' }}
             >
-              {t.nav.inquiry}
+              <EditableText 
+                contentKey="global.nav.inquiry"
+                defaultValue={t.nav.inquiry}
+                isEditMode={isEditMode}
+                language={language}
+                siteContent={siteContent}
+              />
             </button>
             <button 
               onClick={() => setView('level-test')} 
-              onMouseEnter={() => setHoveredMenu('level-test')}
+              onMouseEnter={() => {
+                if (!isAnyTextEditing) setHoveredMenu('level-test');
+              }}
               className={cn(
                 "text-[10px] lg:text-xs uppercase tracking-widest transition-all font-bold whitespace-nowrap",
                 view === 'level-test' ? "text-gold underline underline-offset-4" : "text-gold hover:opacity-80"
               )}
               style={{ ...navStyleL1, color: siteContent['global.style.navL1FontColor']?.value || '#c5a059' }}
             >
-              {t.nav.levelTest}
+              <EditableText 
+                contentKey="global.nav.levelTest"
+                defaultValue={t.nav.levelTest}
+                isEditMode={isEditMode}
+                language={language}
+                siteContent={siteContent}
+              />
             </button>
+          <div className="flex items-center gap-3 lg:gap-6">
+            {/* Theme Toggle */}
             <button 
-              onClick={() => setIsPostModalOpen(true)}
-              className="flex items-center gap-1.5 px-4 py-1.5 bg-gold text-ink rounded-full text-[10px] lg:text-xs uppercase tracking-widest font-bold hover:scale-105 transition-transform shadow-lg shadow-gold/20 whitespace-nowrap"
+              onClick={() => setIsDarkMode(!isDarkMode)}
+              className="p-2 hover:bg-ink/5 rounded-full transition-colors text-ink/70 hover:text-ink"
+              title={isDarkMode ? "Light Mode" : "Dark Mode"}
             >
-              <PlusCircle size={14} /> {t.nav.post}
+              {isDarkMode ? <Sun size={18} /> : <Moon size={18} />}
             </button>
-            {(isAdmin || siteContent['ai-studio-access']?.access === 'all' || (siteContent['ai-studio-access']?.access === 'premium' && userProfile?.role === 'premium') || (siteContent['ai-studio-access']?.access === 'member' && userProfile)) && (
-              <button 
-                onClick={() => setView('image-gen')} 
-                onMouseEnter={() => setHoveredMenu(null)}
-                className={cn(
-                  "text-[10px] lg:text-xs uppercase tracking-widest transition-colors flex items-center gap-1 whitespace-nowrap",
-                  view === 'image-gen' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
+
+            <div className="h-4 w-[1px] bg-ink/10" />
+
+            {/* Mode Selector Pill */}
+            {user && (
+              <div className="flex items-center gap-1 bg-ink/5 p-1 rounded-full border border-ink/10">
+                <button 
+                  onClick={() => {
+                    setAppMode('learner');
+                    setIsEditMode(false);
+                    if (view === 'admin' || view === 'image-gen') setView('landing');
+                  }}
+                  onMouseEnter={() => {
+                    if (!isAnyTextEditing) setHoveredMenu(null);
+                  }}
+                  className={cn(
+                    "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] lg:text-xs uppercase tracking-widest font-bold transition-all",
+                    appMode === 'learner' ? "bg-paper text-ink shadow-sm" : "text-ink/50 hover:text-ink"
+                  )}
+                >
+                  <User size={14} />
+                  <EditableText 
+                    contentKey="global.nav.learnerMode"
+                    defaultValue={t.nav.learnerMode}
+                    isEditMode={isEditMode}
+                    language={language}
+                    siteContent={siteContent}
+                  />
+                </button>
+                {(isAdmin || siteContent['ai-studio-access']?.access === 'all' || (siteContent['ai-studio-access']?.access === 'premium' && userProfile?.role === 'premium') || (siteContent['ai-studio-access']?.access === 'member' && userProfile)) && (
+                  <button 
+                    onClick={() => {
+                      setAppMode('admin');
+                      if (isAdmin) setIsEditMode(true);
+                    }}
+                    onMouseEnter={() => {
+                      if (!isAnyTextEditing) setHoveredMenu('admin');
+                    }}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-1.5 rounded-full text-[10px] lg:text-xs uppercase tracking-widest font-bold transition-all",
+                      appMode === 'admin' ? "bg-paper text-ink shadow-sm" : "text-ink/50 hover:text-ink"
+                    )}
+                  >
+                    {appMode === 'admin' ? <Unlock size={14} /> : <Lock size={14} />}
+                    <EditableText 
+                      contentKey="global.nav.adminMode"
+                      defaultValue={t.nav.adminMode}
+                      isEditMode={isEditMode}
+                      language={language}
+                      siteContent={siteContent}
+                    />
+                  </button>
                 )}
-              >
-                {t.nav.aiStudio}
-                {!isAdmin && <ShieldCheck size={10} className="text-gold/50" />}
-              </button>
+              </div>
             )}
+
+            {/* User Profile & Logout */}
             {user ? (
-              <div className="flex items-center gap-2 lg:gap-4">
-                {userProfile?.role === 'admin' && (
-                  <div className="flex items-center gap-2 lg:gap-4 border-r border-ink/10 pr-2 lg:pr-4">
-                    <button 
-                      onClick={() => setIsEditMode(!isEditMode)}
-                      className={cn(
-                        "flex items-center gap-1 text-[9px] uppercase tracking-[0.1em] px-2 py-0.5 rounded-full border transition-all whitespace-nowrap",
-                        isEditMode ? "bg-gold text-ink border-gold font-bold" : "border-ink/20 opacity-50 hover:opacity-100"
-                      )}
-                    >
-                      {isEditMode ? 'Edit ON' : 'Edit OFF'}
-                    </button>
-                    <button 
-                      onClick={() => setView('admin')}
-                      className="flex items-center gap-1 text-[10px] lg:text-xs uppercase tracking-widest text-gold font-bold hover:opacity-80 transition-colors whitespace-nowrap"
-                    >
-                      <LayoutDashboard size={14} /> {t.nav.admin}
-                    </button>
-                  </div>
-                )}
+              <div className="flex items-center gap-4">
                 <button 
                   onClick={() => setView('mypage')}
-                  onMouseEnter={() => setHoveredMenu(null)}
+                  onMouseEnter={() => {
+                    if (!isAnyTextEditing) setHoveredMenu(null);
+                  }}
                   className={cn(
                     "flex items-center gap-1 text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap",
                     view === 'mypage' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
                   )}
                 >
-                  <User size={14} /> {t.nav.myPage}
+                  <User size={14} /> 
+                  <EditableText 
+                    contentKey="global.nav.myPage"
+                    defaultValue={t.nav.myPage}
+                    isEditMode={isEditMode}
+                    language={language}
+                    siteContent={siteContent}
+                  />
                 </button>
-                <button onClick={handleLogout} className="text-[10px] lg:text-xs uppercase tracking-widest opacity-50 hover:opacity-100"><LogOut size={14} /></button>
+                <button onClick={handleLogout} className="text-ink/50 hover:text-ink transition-colors">
+                  <LogOut size={18} />
+                </button>
               </div>
             ) : (
               <button 
                 onClick={handleLogin}
-                onMouseEnter={() => setHoveredMenu(null)}
-                className="px-4 py-1.5 border border-ink rounded-full text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-all whitespace-nowrap"
+                onMouseEnter={() => {
+                  if (!isAnyTextEditing) setHoveredMenu(null);
+                }}
+                className="px-6 py-2 border border-ink rounded-full text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-all whitespace-nowrap font-bold"
               >
-                {t.nav.login}
+                <EditableText 
+                  contentKey="global.nav.login"
+                  defaultValue={t.nav.login}
+                  isEditMode={isEditMode}
+                  language={language}
+                  siteContent={siteContent}
+                />
               </button>
             )}
           </div>
         </div>
+      </div>
 
-        {/* Mega Menu Bar */}
+      {/* Mega Menu Bar */}
         <AnimatePresence>
           {hoveredMenu && navSubMenus[hoveredMenu] && (
             <motion.div
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="bg-ink/5 border-t border-ink/5 overflow-hidden"
+              className={cn(
+                "bg-ink/5 border-t border-ink/5",
+                isEditMode ? "overflow-visible" : "overflow-hidden"
+              )}
               onMouseLeave={() => setHoveredSubItem(null)}
             >
               <div className="max-w-[1600px] mx-auto px-6 py-6 flex items-start justify-center gap-12 flex-wrap">
@@ -561,7 +727,13 @@ export default function App() {
                       )}
                       style={navStyleL2}
                     >
-                      {item.label}
+                      <EditableText 
+                        contentKey={`menu.submenu.${hoveredMenu}.${item.id}.label`}
+                        defaultValue={item.label}
+                        isEditMode={isEditMode}
+                        language={language}
+                        siteContent={siteContent}
+                      />
                     </button>
 
                     <div className="min-h-[20px] flex items-center justify-center">
@@ -584,7 +756,13 @@ export default function App() {
                                 className="text-[9px] lg:text-[10px] uppercase tracking-[0.2em] opacity-50 hover:opacity-100 hover:text-gold transition-all whitespace-nowrap"
                                 style={navStyleL3}
                               >
-                                {child.label}
+                                <EditableText 
+                                  contentKey={`menu.submenu.${hoveredMenu}.${item.id}.child.${child.id}.label`}
+                                  defaultValue={child.label}
+                                  isEditMode={isEditMode}
+                                  language={language}
+                                  siteContent={siteContent}
+                                />
                               </button>
                             ))}
                           </motion.div>
@@ -848,6 +1026,26 @@ const EditableText: FC<{
           contentEditable
           suppressContentEditableWarning
           onFocus={() => setIsEditing(true)}
+          onKeyDown={(e: React.KeyboardEvent) => {
+            e.stopPropagation();
+            if (e.key === 'Enter' && e.shiftKey) {
+              e.preventDefault();
+              document.execCommand('insertLineBreak');
+            } else if (e.key === 'Enter') {
+              // Default behavior for Enter in contentEditable is fine, 
+              // but we can prevent it if we want single-line only.
+              // For now, let's allow multi-line.
+            }
+            // Ensure propagation for Shift and other selection keys
+          }}
+          onKeyUp={(e: React.KeyboardEvent) => {
+            e.stopPropagation();
+          }}
+          onBlur={() => {
+            // We don't set setIsEditing(false) here because we want the toolbar 
+            // to stay visible until Save or Cancel is clicked.
+            // But we can ensure focus remains if needed.
+          }}
           className={cn(
             "outline-none focus:ring-2 focus:ring-gold/30 rounded px-1 transition-all min-w-[1ch] inline-block",
             !value && "opacity-30 italic",
@@ -858,79 +1056,106 @@ const EditableText: FC<{
         />
         
         {isEditing && (
-          <div className="absolute bottom-full left-0 mb-4 p-4 bg-white border border-gold shadow-2xl rounded-2xl z-[150] flex flex-col gap-3 min-w-[320px]">
-            <div className="flex items-center justify-between border-b border-ink/5 pb-2">
-              <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">Text Editor</span>
-              <div className="flex gap-1">
-                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('bold')} className="p-1 hover:bg-gold/10 rounded border border-ink/5"><Bold size={12} /></button>
-                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('italic')} className="p-1 hover:bg-gold/10 rounded border border-ink/5"><Italic size={12} /></button>
-                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('underline')} className="p-1 hover:bg-gold/10 rounded border border-ink/5"><Underline size={12} /></button>
+          <div className={cn(
+            "absolute left-0 p-5 bg-white border-2 border-gold shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[24px] z-[300] flex flex-col gap-4 min-w-[340px]",
+            "animate-in fade-in zoom-in duration-200",
+            // Position below for nav/menu items to avoid being cut off by the top of the screen
+            contentKey.includes('nav') || contentKey.includes('menu') ? "top-full mt-4" : "bottom-full mb-4"
+          )}>
+            <div className="flex items-center justify-between border-b border-ink/10 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-2 h-2 bg-gold rounded-full animate-pulse" />
+                <span className="text-xs font-bold uppercase tracking-widest text-ink/60">Text Editor</span>
+              </div>
+              <div className="flex gap-1.5">
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('bold')} title="Bold" className="p-2 hover:bg-gold/20 rounded-lg border border-ink/5 transition-colors"><Bold size={14} /></button>
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('italic')} title="Italic" className="p-2 hover:bg-gold/20 rounded-lg border border-ink/5 transition-colors"><Italic size={14} /></button>
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('underline')} title="Underline" className="p-2 hover:bg-gold/20 rounded-lg border border-ink/5 transition-colors"><Underline size={14} /></button>
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-2">
-              <select 
-                value={fontFamily} 
-                onChange={(e) => setFontFamily(e.target.value)}
-                className="text-[10px] p-1 border border-ink/10 rounded bg-paper"
-              >
-                <option value="">Default Font</option>
-                {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
-              </select>
-              <select 
-                value={fontSize} 
-                onChange={(e) => setFontSize(e.target.value)}
-                className="text-[10px] p-1 border border-ink/10 rounded bg-paper"
-              >
-                <option value="">Default Size</option>
-                {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-              <select 
-                value={fontWeight} 
-                onChange={(e) => setFontWeight(e.target.value)}
-                className="text-[10px] p-1 border border-ink/10 rounded bg-paper"
-              >
-                <option value="">Default Weight</option>
-                {['100', '200', '300', '400', '500', '600', '700', '800', '900'].map(w => <option key={w} value={w}>{w}</option>)}
-              </select>
-              <div className="flex items-center gap-2 p-1 border border-ink/10 rounded bg-paper">
-                <div className="w-3 h-3 rounded-full border border-ink/10" style={{ backgroundColor: color || '#000000' }} />
-                <span className="text-[8px] font-mono uppercase">{color || 'Default'}</span>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase tracking-tighter opacity-40 font-bold">Font Family</label>
+                <select 
+                  value={fontFamily} 
+                  onChange={(e) => setFontFamily(e.target.value)}
+                  className="w-full text-xs p-2 border border-ink/10 rounded-xl bg-paper focus:ring-1 focus:ring-gold outline-none"
+                >
+                  <option value="">Default</option>
+                  {FONTS.map(f => <option key={f} value={f}>{f}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase tracking-tighter opacity-40 font-bold">Font Size</label>
+                <select 
+                  value={fontSize} 
+                  onChange={(e) => setFontSize(e.target.value)}
+                  className="w-full text-xs p-2 border border-ink/10 rounded-xl bg-paper focus:ring-1 focus:ring-gold outline-none"
+                >
+                  <option value="">Default</option>
+                  {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase tracking-tighter opacity-40 font-bold">Font Weight</label>
+                <select 
+                  value={fontWeight} 
+                  onChange={(e) => setFontWeight(e.target.value)}
+                  className="w-full text-xs p-2 border border-ink/10 rounded-xl bg-paper focus:ring-1 focus:ring-gold outline-none"
+                >
+                  <option value="">Default</option>
+                  {['100', '200', '300', '400', '500', '600', '700', '800', '900'].map(w => <option key={w} value={w}>{w}</option>)}
+                </select>
+              </div>
+              <div className="space-y-1">
+                <label className="text-[9px] uppercase tracking-tighter opacity-40 font-bold">Current Color</label>
+                <div className="flex items-center gap-3 p-2 border border-ink/10 rounded-xl bg-paper">
+                  <div className="w-4 h-4 rounded-full border border-ink/10 shadow-inner" style={{ backgroundColor: color || '#000000' }} />
+                  <span className="text-[10px] font-mono uppercase font-bold text-ink/60">{color || 'Default'}</span>
+                </div>
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto p-1 border border-ink/5 rounded bg-paper/50">
-              {COLORS.map(c => (
-                <button 
-                  key={c} 
-                  onMouseDown={(e) => e.preventDefault()}
-                  onClick={() => {
-                    const selection = window.getSelection();
-                    if (selection && selection.toString().length > 0) {
-                      applyCommand('foreColor', c);
-                    } else {
-                      setColor(c);
-                    }
-                  }}
-                  className={cn("w-4 h-4 rounded-full border border-ink/10 hover:scale-110 transition-transform", color === c && "ring-2 ring-gold")}
-                  style={{ backgroundColor: c }}
-                />
-              ))}
+            <div className="space-y-2">
+              <label className="text-[9px] uppercase tracking-tighter opacity-40 font-bold">Color Palette</label>
+              <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto p-2 border border-ink/5 rounded-xl bg-paper/50">
+                {COLORS.map(c => (
+                  <button 
+                    key={c} 
+                    onMouseDown={(e) => e.preventDefault()}
+                    onClick={() => {
+                      const selection = window.getSelection();
+                      if (selection && selection.toString().length > 0) {
+                        applyCommand('foreColor', c);
+                      } else {
+                        setColor(c);
+                      }
+                    }}
+                    className={cn(
+                      "w-5 h-5 rounded-full border border-ink/10 hover:scale-125 transition-all shadow-sm", 
+                      color === c && "ring-2 ring-gold ring-offset-1"
+                    )}
+                    style={{ backgroundColor: c }}
+                    title={c}
+                  />
+                ))}
+              </div>
             </div>
 
-            <div className="flex gap-2 justify-end pt-2 border-t border-ink/5">
+            <div className="flex gap-3 justify-end pt-4 border-t border-ink/10">
               <button 
                 onClick={() => {
                   setIsEditing(false);
                   if (editorRef.current) editorRef.current.innerHTML = value;
                 }} 
-                className="px-3 py-1 text-[10px] uppercase tracking-widest opacity-50 hover:opacity-100 transition-opacity"
+                className="px-5 py-2 text-xs uppercase tracking-widest font-bold text-ink/40 hover:text-ink transition-colors"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleSave} 
-                className="px-4 py-1 bg-gold text-ink rounded-full text-[10px] uppercase tracking-widest font-bold hover:scale-105 transition-transform shadow-lg shadow-gold/20"
+                className="px-6 py-2 bg-gold text-ink rounded-full text-xs uppercase tracking-widest font-black hover:scale-105 active:scale-95 transition-all shadow-[0_10px_20px_rgba(197,160,89,0.3)]"
               >
                 Save Changes
               </button>
