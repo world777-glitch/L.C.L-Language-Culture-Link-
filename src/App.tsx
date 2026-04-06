@@ -2531,8 +2531,16 @@ const EditableLink: FC<{
   }
 
   const formatUrl = (url: string) => {
-    if (!url || url === '#' || url.trim() === '') return '#';
-    const trimmed = url.trim();
+    if (!url || url.trim() === '') return '#';
+    let trimmed = url.trim();
+    
+    // Remove leading # if it's followed by http to fix common copy-paste errors
+    if (trimmed.startsWith('#') && trimmed.toLowerCase().includes('http')) {
+      trimmed = trimmed.substring(1).trim();
+    }
+    
+    if (trimmed === '#' || trimmed === '') return '#';
+    
     if (/^(https?:\/\/|mailto:|tel:)/i.test(trimmed)) {
       return trimmed;
     }
