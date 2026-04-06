@@ -53,6 +53,9 @@ import {
   Type as TypeIcon,
   Square,
   Circle,
+  Bold,
+  Italic,
+  Underline,
   Settings
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
@@ -339,7 +342,7 @@ export default function App() {
         className="sticky top-0 z-50 bg-paper/80 backdrop-blur-md border-b border-ink/10"
         onMouseLeave={() => setHoveredMenu(null)}
       >
-        <div className="max-w-[1600px] mx-auto px-2 h-20 flex items-center justify-between">
+        <div className="max-w-[1600px] mx-auto px-0 h-20 flex items-center justify-between">
           <div 
             className="flex items-center gap-3 cursor-pointer group" 
             onClick={() => setView('landing')}
@@ -605,7 +608,7 @@ export default function App() {
           {view === 'mypage' && <MyPageView key="mypage" />}
           {view === 'admin' && <AdminView key="admin" language={language} siteContent={siteContent} initialTab={adminTab} />}
           {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} siteContent={siteContent} />}
-          {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} />}
+          {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} isEditMode={isEditMode} siteContent={siteContent} />}
           {view === 'community' && <CommunityView key="community" language={language} initialFilter={initialCommunityFilter} onClearFilter={() => setInitialCommunityFilter('all')} />}
           {view === 'level-test' && <LevelTestView key="level-test" language={language} isAdmin={isAdmin} isEditMode={isEditMode} siteContent={siteContent} />}
           {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} isEventPeriod={isEventPeriod} siteContent={siteContent} isEditMode={isEditMode} isAdmin={isAdmin} initialCourse={selectedCourse} initialLevel={selectedLevel || undefined} />}
@@ -753,42 +756,69 @@ const EditableText: FC<{
   const [fontFamily, setFontFamily] = useState(content.fontFamily || "");
   const [fontSize, setFontSize] = useState(content.fontSize || "");
   const [color, setColor] = useState(content.color || "");
+  const [fontWeight, setFontWeight] = useState(content.fontWeight || "");
+  const editorRef = useRef<any>(null);
 
   const displayValue = value || (isEditMode ? `[+ ${contentKey}]` : "");
 
   useEffect(() => {
-    if (content.value !== undefined) {
-      setValue(content.value);
-    } else {
-      setValue(defaultValue);
+    if (!isEditing) {
+      if (content.value !== undefined) {
+        setValue(content.value);
+      } else {
+        setValue(defaultValue);
+      }
     }
     setFontFamily(content.fontFamily || "");
     setFontSize(content.fontSize || "");
     setColor(content.color || "");
-  }, [content.value, content.fontFamily, content.fontSize, content.color, defaultValue]);
+    setFontWeight(content.fontWeight || "");
+  }, [content.value, content.fontFamily, content.fontSize, content.color, content.fontWeight, defaultValue, isEditing]);
+
+  useEffect(() => {
+    if (isEditing && editorRef.current) {
+      const currentHTML = editorRef.current.innerHTML;
+      const targetHTML = value || defaultValue;
+      if (currentHTML !== targetHTML && (!currentHTML || currentHTML === defaultValue)) {
+        editorRef.current.innerHTML = targetHTML;
+      }
+    }
+  }, [isEditing, value, defaultValue]);
 
   const handleSave = async () => {
+    const finalValue = editorRef.current ? editorRef.current.innerHTML : value;
     const docId = `${language}_${contentKey.replace(/\./g, '_')}`;
     try {
       await setDoc(doc(db, 'siteContent', docId), {
         key: contentKey,
         language,
-        value,
+        value: finalValue,
         fontFamily,
         fontSize,
         color,
+        fontWeight,
         updatedAt: serverTimestamp()
       });
+      setValue(finalValue);
       setIsEditing(false);
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
     }
   };
 
+  const applyCommand = (cmd: string, val?: string) => {
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
+    document.execCommand('styleWithCSS', false, "true");
+    document.execCommand(cmd, false, val);
+  };
+
   const currentStyles = {
     fontFamily: fontFamily || undefined,
     fontSize: fontSize || undefined,
-    color: color || undefined
+    color: color || undefined,
+    fontWeight: fontWeight || undefined
   };
 
   const renderContent = () => {
@@ -802,24 +832,42 @@ const EditableText: FC<{
         </>
       );
     }
-    return displayValue;
+    return <span dangerouslySetInnerHTML={{ __html: displayValue }} />;
   };
 
   if (!isEditMode && !value) return null;
 
   if (isEditMode) {
     return (
-      <div className={cn("relative group", className)}>
-        {isEditing ? (
-          <div className="flex flex-col gap-3 w-full min-w-[300px] bg-white p-4 rounded-xl border border-gold shadow-2xl z-[100] absolute top-0 left-0">
-            <textarea 
-              value={value} 
-              onChange={(e) => setValue(e.target.value)}
-              className="w-full p-2 bg-paper border border-ink/10 rounded-lg text-ink font-serif text-sm focus:outline-none focus:ring-1 focus:ring-gold"
-              rows={3}
-              autoFocus
-              placeholder="Enter text..."
-            />
+      <div 
+        className={cn("relative group inline-block", className)}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <Component
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onFocus={() => setIsEditing(true)}
+          className={cn(
+            "outline-none focus:ring-2 focus:ring-gold/30 rounded px-1 transition-all min-w-[1ch] inline-block",
+            !value && "opacity-30 italic",
+            isEditing && "bg-white/50"
+          )}
+          style={currentStyles}
+          dangerouslySetInnerHTML={!isEditing ? { __html: value || defaultValue } : undefined}
+        />
+        
+        {isEditing && (
+          <div className="absolute bottom-full left-0 mb-4 p-4 bg-white border border-gold shadow-2xl rounded-2xl z-[150] flex flex-col gap-3 min-w-[320px]">
+            <div className="flex items-center justify-between border-b border-ink/5 pb-2">
+              <span className="text-[10px] font-bold uppercase tracking-widest opacity-40">Text Editor</span>
+              <div className="flex gap-1">
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('bold')} className="p-1 hover:bg-gold/10 rounded border border-ink/5"><Bold size={12} /></button>
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('italic')} className="p-1 hover:bg-gold/10 rounded border border-ink/5"><Italic size={12} /></button>
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('underline')} className="p-1 hover:bg-gold/10 rounded border border-ink/5"><Underline size={12} /></button>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-2">
               <select 
                 value={fontFamily} 
@@ -837,34 +885,56 @@ const EditableText: FC<{
                 <option value="">Default Size</option>
                 {SIZES.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
+              <select 
+                value={fontWeight} 
+                onChange={(e) => setFontWeight(e.target.value)}
+                className="text-[10px] p-1 border border-ink/10 rounded bg-paper"
+              >
+                <option value="">Default Weight</option>
+                {['100', '200', '300', '400', '500', '600', '700', '800', '900'].map(w => <option key={w} value={w}>{w}</option>)}
+              </select>
+              <div className="flex items-center gap-2 p-1 border border-ink/10 rounded bg-paper">
+                <div className="w-3 h-3 rounded-full border border-ink/10" style={{ backgroundColor: color || '#000000' }} />
+                <span className="text-[8px] font-mono uppercase">{color || 'Default'}</span>
+              </div>
             </div>
-            <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto p-1 border border-ink/5 rounded">
+
+            <div className="flex flex-wrap gap-1 max-h-20 overflow-y-auto p-1 border border-ink/5 rounded bg-paper/50">
               {COLORS.map(c => (
                 <button 
                   key={c} 
-                  onClick={() => setColor(c)}
-                  className={cn("w-4 h-4 rounded-full border border-ink/10", color === c && "ring-2 ring-gold")}
+                  onMouseDown={(e) => e.preventDefault()}
+                  onClick={() => {
+                    const selection = window.getSelection();
+                    if (selection && selection.toString().length > 0) {
+                      applyCommand('foreColor', c);
+                    } else {
+                      setColor(c);
+                    }
+                  }}
+                  className={cn("w-4 h-4 rounded-full border border-ink/10 hover:scale-110 transition-transform", color === c && "ring-2 ring-gold")}
                   style={{ backgroundColor: c }}
                 />
               ))}
             </div>
-            <div className="flex gap-2 justify-end">
-              <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-[10px] uppercase tracking-widest opacity-50 hover:opacity-100 transition-opacity">Cancel</button>
-              <button onClick={handleSave} className="px-3 py-1 bg-gold text-ink rounded-full text-[10px] uppercase tracking-widest font-bold hover:scale-105 transition-transform">Save</button>
+
+            <div className="flex gap-2 justify-end pt-2 border-t border-ink/5">
+              <button 
+                onClick={() => {
+                  setIsEditing(false);
+                  if (editorRef.current) editorRef.current.innerHTML = value;
+                }} 
+                className="px-3 py-1 text-[10px] uppercase tracking-widest opacity-50 hover:opacity-100 transition-opacity"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleSave} 
+                className="px-4 py-1 bg-gold text-ink rounded-full text-[10px] uppercase tracking-widest font-bold hover:scale-105 transition-transform shadow-lg shadow-gold/20"
+              >
+                Save Changes
+              </button>
             </div>
-          </div>
-        ) : (
-          <div 
-            className="relative cursor-pointer group/item"
-            onClick={() => setIsEditing(true)}
-          >
-            <div className="absolute -inset-2 border border-dashed border-gold/0 group-hover/item:border-gold/40 rounded-lg transition-colors -z-10" />
-            <Component className={cn(className, !value && "opacity-30 italic")} style={currentStyles}>{renderContent()}</Component>
-            <button 
-              className="absolute -top-2 -right-2 w-6 h-6 bg-gold text-ink rounded-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity shadow-lg z-10"
-            >
-              <Edit size={12} />
-            </button>
           </div>
         )}
       </div>
@@ -1338,9 +1408,11 @@ const DynamicContentArea: FC<{
     }
   };
 
+  if (count === 0 && !isEditMode) return null;
+
   return (
-    <div className="space-y-32">
-      <div className="space-y-32">
+    <div className="space-y-20">
+      <div className="space-y-20">
         {visibleIndices.map((i) => {
           const typeKey = `${contentKey}.item_${i}.type`;
           const type = siteContent[typeKey]?.value || 'text';
@@ -1348,6 +1420,8 @@ const DynamicContentArea: FC<{
           const aspect = siteContent[`${contentKey}.item_${i}.aspect`]?.value || 'aspect-video';
           const fit = siteContent[`${contentKey}.item_${i}.fit`]?.value || 'object-cover';
           const width = siteContent[`${contentKey}.item_${i}.width`]?.value || 'max-w-5xl';
+          const hasOverlay = siteContent[`${contentKey}.item_${i}.hasOverlay`]?.value === 'true';
+          const overlayPos = siteContent[`${contentKey}.item_${i}.overlayPos`]?.value || 'center';
           
           return (
             <div key={i} className="relative group/dynamic-block">
@@ -1383,7 +1457,26 @@ const DynamicContentArea: FC<{
                     siteContent={siteContent}
                     rounded="rounded-[40px]"
                     className={cn("w-full h-full", fit)}
-                  />
+                  >
+                    {hasOverlay && (
+                      <div className={cn(
+                        "absolute inset-0 flex flex-col p-12 z-10",
+                        overlayPos === 'top' ? 'justify-start items-center text-center' :
+                        overlayPos === 'bottom' ? 'justify-end items-center text-center' :
+                        'justify-center items-center text-center'
+                      )}>
+                        <div className="absolute inset-0 bg-ink/20 pointer-events-none" />
+                        <div className="relative z-10 space-y-4 max-w-2xl">
+                          <div className="text-4xl md:text-6xl font-serif font-light text-white drop-shadow-2xl">
+                            <EditableText contentKey={`${contentKey}.item_${i}.overlayTitle`} defaultValue="Image Title" isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" />
+                          </div>
+                          <div className="text-lg md:text-xl font-serif text-white/90 drop-shadow-xl">
+                            <EditableText contentKey={`${contentKey}.item_${i}.overlaySubtitle`} defaultValue="Image Subtitle or Description" isEditMode={isEditMode} language={language} siteContent={siteContent} as="p" />
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </EditableImage>
                 </motion.div>
               )}
               {type === 'media' && (
@@ -1450,6 +1543,40 @@ const DynamicContentArea: FC<{
                   
                   {(type === 'image' || type === 'media') && (
                     <div className="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-2xl border border-gold/20 flex flex-col gap-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-[8px] uppercase tracking-widest opacity-50 font-bold">Text Overlay</span>
+                        <div className="flex gap-1">
+                          <button 
+                            onClick={() => updateBlockSetting(i, 'hasOverlay', hasOverlay ? 'false' : 'true')}
+                            className={cn(
+                              "px-2 py-1 text-[8px] rounded-md border transition-all",
+                              hasOverlay ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
+                            )}
+                          >
+                            {hasOverlay ? 'Enabled' : 'Disabled'}
+                          </button>
+                          {hasOverlay && (
+                            <div className="flex gap-1">
+                              {[
+                                { label: 'Top', val: 'top' },
+                                { label: 'Center', val: 'center' },
+                                { label: 'Bottom', val: 'bottom' }
+                              ].map(opt => (
+                                <button 
+                                  key={opt.val}
+                                  onClick={() => updateBlockSetting(i, 'overlayPos', opt.val)}
+                                  className={cn(
+                                    "px-2 py-1 text-[8px] rounded-md border transition-all",
+                                    overlayPos === opt.val ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
+                                  )}
+                                >
+                                  {opt.label}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </div>
                       <div className="flex flex-col gap-1">
                         <span className="text-[8px] uppercase tracking-widest opacity-50 font-bold">Aspect Ratio</span>
                         <div className="flex gap-1">
@@ -2472,7 +2599,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }} 
       exit={{ opacity: 0 }}
-      className="space-y-32"
+      className="space-y-20"
     >
       <DynamicContentArea contentKey="landing.top" isEditMode={isEditMode} isAdmin={isAdmin} language={language} siteContent={siteContent} />
 
@@ -2500,7 +2627,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
           </div>
         </div>
 
-        <div className="max-w-[1600px] mx-auto w-full grid grid-cols-1 md:grid-cols-2 relative z-10 pointer-events-none">
+        <div className="max-w-[1600px] mx-auto w-full grid grid-cols-1 md:grid-cols-2 relative z-10 pointer-events-none px-0">
           <div className="space-y-8 pointer-events-auto">
             <motion.div 
               initial={{ x: -50, opacity: 0 }}
@@ -2588,7 +2715,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       </section>
 
       {/* Curriculum Section */}
-      <section id="curriculum" className="max-w-[1600px] mx-auto px-4 py-20">
+      <section id="curriculum" className="max-w-[1600px] mx-auto px-0 py-16">
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
           <div className="space-y-4">
             <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
@@ -2652,7 +2779,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       </section>
 
       {/* Dynamic Gallery Section */}
-      <section className="max-w-[1600px] mx-auto px-4 py-20">
+      <section className="max-w-[1600px] mx-auto px-0 py-16">
         <div className="text-center space-y-4 mb-20">
           <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
             <EditableText contentKey="gallery.badge" defaultValue="Gallery & Highlights" isEditMode={isEditMode} language={language} siteContent={siteContent} />
@@ -2704,18 +2831,20 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       </section>
 
       {/* Dynamic Content Sections */}
-      <section id="landing-dynamic-area" className="max-w-[1600px] mx-auto px-4 py-20">
-        <DynamicContentArea 
-          contentKey="landing.dynamic"
-          isEditMode={isEditMode}
-          isAdmin={isAdmin}
-          language={language}
-          siteContent={siteContent}
-        />
-      </section>
+      {(isEditMode || Number(siteContent['landing.dynamic.count']?.value || 0) > 0) && (
+        <section id="landing-dynamic-area" className="max-w-[1600px] mx-auto px-0 py-16">
+          <DynamicContentArea 
+            contentKey="landing.dynamic"
+            isEditMode={isEditMode}
+            isAdmin={isAdmin}
+            language={language}
+            siteContent={siteContent}
+          />
+        </section>
+      )}
 
       {/* Testimonials / Quote */}
-      <section className="max-w-4xl mx-auto px-6 py-32 text-center space-y-12">
+      <section className="max-w-4xl mx-auto px-6 py-20 text-center space-y-12">
         <div className="w-12 h-12 mx-auto border border-ink/10 rounded-full flex items-center justify-center opacity-20">"</div>
         <div className="text-4xl md:text-5xl font-serif font-light italic leading-tight">
           <EditableText contentKey="testimonial.quote" defaultValue={t.testimonial.quote} isEditMode={isEditMode} language={language} siteContent={siteContent} />
@@ -2731,7 +2860,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       </section>
 
       {/* Resource Marketing Section - Redesigned with Categories */}
-      <section id="library" className="bg-paper py-32 px-6 border-y border-ink/5">
+      <section id="library" className="bg-paper py-20 px-6 border-y border-ink/5">
         <div className="max-w-[1600px] mx-auto space-y-20">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
             <div className="space-y-8">
@@ -2776,10 +2905,37 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                     {group.id === 'group-c' && <Globe size={24} />}
                   </div>
                   <div>
-                    <h3 className="text-2xl font-serif">{group.name.split(':')[1]?.trim() || group.name}</h3>
-                    <p className="text-[10px] uppercase tracking-widest text-gold font-bold">{group.name.split(':')[0]}</p>
+                    <h3 className="text-2xl font-serif">
+                      <EditableText 
+                        contentKey={`library.group.${group.id}.title`} 
+                        defaultValue={group.name.split(':')[1]?.trim() || group.name} 
+                        isEditMode={isEditMode} 
+                        language={language} 
+                        siteContent={siteContent} 
+                        as="span" 
+                      />
+                    </h3>
+                    <p className="text-[10px] uppercase tracking-widest text-gold font-bold">
+                      <EditableText 
+                        contentKey={`library.group.${group.id}.badge`} 
+                        defaultValue={group.name.split(':')[0]} 
+                        isEditMode={isEditMode} 
+                        language={language} 
+                        siteContent={siteContent} 
+                        as="span" 
+                      />
+                    </p>
                   </div>
-                  <p className="text-sm opacity-60 leading-relaxed">{group.description}</p>
+                  <div className="text-sm opacity-60 leading-relaxed">
+                    <EditableText 
+                      contentKey={`library.group.${group.id}.description`} 
+                      defaultValue={group.description} 
+                      isEditMode={isEditMode} 
+                      language={language} 
+                      siteContent={siteContent} 
+                      as="p" 
+                    />
+                  </div>
                 </div>
 
                 <div className="space-y-3">
@@ -2793,10 +2949,28 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                       className="w-full text-left p-4 rounded-2xl hover:bg-paper border border-transparent hover:border-ink/5 transition-all group/item"
                     >
                       <div className="flex justify-between items-center">
-                        <span className="text-sm font-medium">{cat.name}</span>
+                        <span className="text-sm font-medium">
+                          <EditableText 
+                            contentKey={`library.group.${group.id}.category.${cat.id}.name`} 
+                            defaultValue={cat.name} 
+                            isEditMode={isEditMode} 
+                            language={language} 
+                            siteContent={siteContent} 
+                            as="span" 
+                          />
+                        </span>
                         <ArrowRight size={14} className="opacity-0 group-hover/item:opacity-100 -translate-x-2 group-hover/item:translate-x-0 transition-all" />
                       </div>
-                      <p className="text-[10px] opacity-40 mt-1">{cat.description}</p>
+                      <div className="text-[10px] opacity-40 mt-1">
+                        <EditableText 
+                          contentKey={`library.group.${group.id}.category.${cat.id}.description`} 
+                          defaultValue={cat.description} 
+                          isEditMode={isEditMode} 
+                          language={language} 
+                          siteContent={siteContent} 
+                          as="p" 
+                        />
+                      </div>
                     </button>
                   ))}
                 </div>
@@ -2809,7 +2983,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               onClick={() => setView('archive')}
               className="px-12 py-5 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:bg-gold hover:text-ink transition-all shadow-lg hover:shadow-gold/20"
             >
-              전체 라이브러리 탐색하기
+              <EditableText contentKey="library.explore_btn" defaultValue={language === 'ko' ? '전체 라이브러리 탐색하기' : 'Explore Full Library'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
             </button>
           </div>
         </div>
@@ -3127,7 +3301,9 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
     fontFamily: 'serif',
     fontSize: 16,
     fontColor: '#000000',
-    fontWeight: '400'
+    fontWeight: '400',
+    hasOverlay: false,
+    overlayPos: 'center' as 'top' | 'center' | 'bottom'
   });
 
   useEffect(() => {
@@ -3277,7 +3453,9 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
         fontFamily: 'serif',
         fontSize: 16,
         fontColor: '#000000',
-        fontWeight: '400'
+        fontWeight: '400',
+        hasOverlay: false,
+        overlayPos: 'center'
       });
       alert(language === 'ko' ? '처리가 완료되었습니다.' : 'Operation completed.');
     } catch (error) {
@@ -3430,7 +3608,9 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
       fontFamily: res.fontFamily || 'serif',
       fontSize: res.fontSize || 16,
       fontColor: res.fontColor || '#000000',
-      fontWeight: res.fontWeight || '400'
+      fontWeight: res.fontWeight || '400',
+      hasOverlay: res.hasOverlay || false,
+      overlayPos: res.overlayPos || 'center'
     });
     // Scroll to form
     window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -3632,7 +3812,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
       {/* Quick Actions Bar */}
       <div className="flex flex-wrap gap-4 p-6 bg-gold/5 border border-gold/10 rounded-3xl">
         <button 
-          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', fileUrls: [], textContent: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '', color: '#F27D26', fontFamily: 'serif', fontSize: 16, fontColor: '#000000', fontWeight: '400' }); }}
+          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', fileUrls: [], textContent: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '', color: '#F27D26', fontFamily: 'serif', fontSize: 16, fontColor: '#000000', fontWeight: '400', hasOverlay: false, overlayPos: 'center' }); }}
           className="flex items-center gap-2 px-6 py-3 bg-ink text-paper rounded-xl text-[10px] uppercase tracking-widest font-bold hover:bg-gold transition-all"
         >
           <Upload size={14} />
@@ -3886,7 +4066,9 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
                       fontFamily: 'serif',
                       fontSize: 16,
                       fontColor: '#000000',
-                      fontWeight: '400'
+                      fontWeight: '400',
+                      hasOverlay: false,
+                      overlayPos: 'center'
                     });
                   }}
                   className="text-xs text-gold underline"
@@ -4092,6 +4274,41 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
                     />
                   </div>
                 </div>
+                {newResource.fileType === 'image' && (
+                  <div className="space-y-2 p-4 bg-gold/5 border border-gold/20 rounded-2xl">
+                    <label className="text-[10px] uppercase tracking-widest font-bold text-gold">Image Text Overlay</label>
+                    <div className="flex items-center gap-4">
+                      <button 
+                        type="button"
+                        onClick={() => setNewResource(prev => ({ ...prev, hasOverlay: !prev.hasOverlay }))}
+                        className={cn(
+                          "px-4 py-2 rounded-full text-[10px] uppercase tracking-widest font-bold transition-all",
+                          newResource.hasOverlay ? "bg-gold text-ink" : "bg-ink/5 text-ink/40"
+                        )}
+                      >
+                        {newResource.hasOverlay ? 'Overlay Enabled' : 'Overlay Disabled'}
+                      </button>
+                      {newResource.hasOverlay && (
+                        <div className="flex gap-2">
+                          {['top', 'center', 'bottom'].map(pos => (
+                            <button
+                              key={pos}
+                              type="button"
+                              onClick={() => setNewResource(prev => ({ ...prev, overlayPos: pos as any }))}
+                              className={cn(
+                                "px-3 py-1 rounded-lg text-[10px] uppercase tracking-widest transition-all",
+                                newResource.overlayPos === pos ? "bg-gold/20 text-gold border border-gold/30" : "bg-ink/5 text-ink/40 border border-transparent"
+                              )}
+                            >
+                              {pos}
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[8px] opacity-40 mt-1 italic">* When enabled, the "Text Content" above will be overlaid on the image.</p>
+                  </div>
+                )}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <label className="text-[10px] uppercase tracking-widest opacity-50">File URL</label>
@@ -4795,7 +5012,14 @@ const MyPageView: FC = () => {
   );
 }
 
-const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: string | null }, onClearFilter?: () => void, language: LanguageCode, isAdmin: boolean }> = ({ initialFilter, onClearFilter, language, isAdmin }) => {
+const ArchiveView: FC<{ 
+  initialFilter?: { groupId: string | null, categoryId: string | null }, 
+  onClearFilter?: () => void, 
+  language: LanguageCode, 
+  isAdmin: boolean,
+  isEditMode: boolean,
+  siteContent: any
+}> = ({ initialFilter, onClearFilter, language, isAdmin, isEditMode, siteContent }) => {
   const t = TRANSLATIONS[language];
   const [resources, setResources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -4827,7 +5051,9 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
     fontFamily: 'serif',
     fontSize: 16,
     fontColor: '#000000',
-    fontWeight: '400'
+    fontWeight: '400',
+    hasOverlay: false,
+    overlayPos: 'center' as 'top' | 'center' | 'bottom'
   });
 
   const [isFullScreen, setIsFullScreen] = useState(false);
@@ -5048,7 +5274,9 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
         fontFamily: 'serif',
         fontSize: 16,
         fontColor: '#000000',
-        fontWeight: '400'
+        fontWeight: '400',
+        hasOverlay: false,
+        overlayPos: 'center'
       });
       setIsManaging(false);
       alert(language === 'ko' ? '처리가 완료되었습니다.' : 'Operation completed.');
@@ -5202,7 +5430,9 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
       fontFamily: res.fontFamily || 'serif',
       fontSize: res.fontSize || 16,
       fontColor: res.fontColor || '#000000',
-      fontWeight: res.fontWeight || '400'
+      fontWeight: res.fontWeight || '400',
+      hasOverlay: res.hasOverlay || false,
+      overlayPos: res.overlayPos || 'center'
     });
     setIsManaging(true);
   };
@@ -5231,11 +5461,15 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
       className="max-w-[1600px] mx-auto px-6 py-20 space-y-16"
     >
       <div className="text-center space-y-4">
-        <span className="text-gold text-[10px] uppercase tracking-[0.4em]">L.C.L Archive</span>
-        <h2 className="text-5xl font-serif font-light">{t.archive.title}</h2>
-        <p className="max-w-3xl mx-auto opacity-60 font-serif italic leading-relaxed">
-          {t.archive.subtitle}
-        </p>
+        <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
+          <EditableText contentKey="archive.badge" defaultValue="L.C.L Archive" isEditMode={isEditMode} language={language} siteContent={siteContent} as="span" />
+        </span>
+        <h2 className="text-5xl font-serif font-light">
+          <EditableText contentKey="archive.title" defaultValue={t.archive.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="span" />
+        </h2>
+        <div className="max-w-3xl mx-auto opacity-60 font-serif italic leading-relaxed">
+          <EditableText contentKey="archive.subtitle" defaultValue={t.archive.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="p" />
+        </div>
       </div>
 
       {/* Category Hub */}
@@ -5276,9 +5510,37 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                 </button>
               </div>
               <div>
-                <h3 className="text-2xl font-serif">{group.name}</h3>
+                <h3 className="text-2xl font-serif">
+                  <EditableText 
+                    contentKey={`library.group.${group.id}.title`} 
+                    defaultValue={group.name.split(':')[1]?.trim() || group.name} 
+                    isEditMode={isEditMode} 
+                    language={language} 
+                    siteContent={siteContent} 
+                    as="span" 
+                  />
+                </h3>
+                <p className="text-[10px] uppercase tracking-widest text-gold font-bold">
+                  <EditableText 
+                    contentKey={`library.group.${group.id}.badge`} 
+                    defaultValue={group.name.split(':')[0]} 
+                    isEditMode={isEditMode} 
+                    language={language} 
+                    siteContent={siteContent} 
+                    as="span" 
+                  />
+                </p>
               </div>
-              <p className="text-sm opacity-60 leading-relaxed">{group.description}</p>
+              <div className="text-sm opacity-60 leading-relaxed">
+                <EditableText 
+                  contentKey={`library.group.${group.id}.description`} 
+                  defaultValue={group.description} 
+                  isEditMode={isEditMode} 
+                  language={language} 
+                  siteContent={siteContent} 
+                  as="p" 
+                />
+              </div>
             </div>
 
             <div className="grid grid-cols-1 gap-2">
@@ -5299,16 +5561,34 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                   )}
                 >
                   <div className="flex justify-between items-center">
-                    <span className="text-sm font-medium">{cat.name}</span>
+                    <span className="text-sm font-medium">
+                      <EditableText 
+                        contentKey={`library.group.${group.id}.category.${cat.id}.name`} 
+                        defaultValue={cat.name} 
+                        isEditMode={isEditMode} 
+                        language={language} 
+                        siteContent={siteContent} 
+                        as="span" 
+                      />
+                    </span>
                     <ArrowRight size={14} className={cn(
                       "transition-all",
                       selectedCategory === cat.id ? "opacity-100" : "opacity-0 group-hover/item:opacity-100 -translate-x-2 group-hover/item:translate-x-0"
                     )} />
                   </div>
-                  <p className={cn(
+                  <div className={cn(
                     "text-[10px] mt-1",
                     selectedCategory === cat.id ? "text-ink/60" : "opacity-40"
-                  )}>{cat.description}</p>
+                  )}>
+                    <EditableText 
+                      contentKey={`library.group.${group.id}.category.${cat.id}.description`} 
+                      defaultValue={cat.description} 
+                      isEditMode={isEditMode} 
+                      language={language} 
+                      siteContent={siteContent} 
+                      as="p" 
+                    />
+                  </div>
                 </button>
               ))}
             </div>
@@ -5583,6 +5863,41 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                         />
                       </div>
                     </div>
+                    {newResource.fileType === 'image' && (
+                      <div className="space-y-2 p-4 bg-gold/5 border border-gold/20 rounded-2xl">
+                        <label className="text-[10px] uppercase tracking-widest font-bold text-gold">Image Text Overlay</label>
+                        <div className="flex items-center gap-4">
+                          <button 
+                            type="button"
+                            onClick={() => setNewResource(prev => ({ ...prev, hasOverlay: !prev.hasOverlay }))}
+                            className={cn(
+                              "px-4 py-2 rounded-full text-[10px] uppercase tracking-widest font-bold transition-all",
+                              newResource.hasOverlay ? "bg-gold text-ink" : "bg-ink/5 text-ink/40"
+                            )}
+                          >
+                            {newResource.hasOverlay ? 'Overlay Enabled' : 'Overlay Disabled'}
+                          </button>
+                          {newResource.hasOverlay && (
+                            <div className="flex gap-2">
+                              {['top', 'center', 'bottom'].map(pos => (
+                                <button
+                                  key={pos}
+                                  type="button"
+                                  onClick={() => setNewResource(prev => ({ ...prev, overlayPos: pos as any }))}
+                                  className={cn(
+                                    "px-3 py-1 rounded-lg text-[10px] uppercase tracking-widest transition-all",
+                                    newResource.overlayPos === pos ? "bg-gold/20 text-gold border border-gold/30" : "bg-ink/5 text-ink/40 border border-transparent"
+                                  )}
+                                >
+                                  {pos}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <p className="text-[8px] opacity-40 mt-1 italic">* When enabled, the "Text Content" below will be overlaid on the image.</p>
+                      </div>
+                    )}
                     <div className="space-y-2">
                       <label className="text-[10px] uppercase tracking-widest opacity-50">Text Content (Rich Editor)</label>
                       <div className="bg-white border border-ink/10 rounded-2xl overflow-hidden">
@@ -5838,13 +6153,35 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                     {selectedResource.fileUrls.map((url: string, idx: number) => (
                       <div key={idx} className="rounded-3xl overflow-hidden border border-ink/10 bg-ink/5 relative group/img">
                         {selectedResource.fileType === 'image' ? (
-                          <img 
-                            src={url} 
-                            alt={`${selectedResource.title} ${idx + 1}`} 
-                            className="w-full h-auto max-h-[400px] object-contain cursor-pointer hover:scale-[1.02] transition-transform"
-                            referrerPolicy="no-referrer"
-                            onClick={() => window.open(url, '_blank')}
-                          />
+                          <div className="relative w-full h-full">
+                            <img 
+                              src={url} 
+                              alt={`${selectedResource.title} ${idx + 1}`} 
+                              className="w-full h-auto max-h-[400px] object-contain cursor-pointer hover:scale-[1.02] transition-transform"
+                              referrerPolicy="no-referrer"
+                              onClick={() => window.open(url, '_blank')}
+                            />
+                            {selectedResource.hasOverlay && selectedResource.textContent && (
+                              <div className={cn(
+                                "absolute inset-0 flex flex-col p-6 pointer-events-none z-10",
+                                selectedResource.overlayPos === 'top' ? 'justify-start items-center text-center' :
+                                selectedResource.overlayPos === 'bottom' ? 'justify-end items-center text-center' :
+                                'justify-center items-center text-center'
+                              )}>
+                                <div className="absolute inset-0 bg-ink/20" />
+                                <div 
+                                  className="relative z-10 w-full drop-shadow-2xl text-white"
+                                  style={{ 
+                                    fontFamily: selectedResource.fontFamily === 'serif' ? 'Playfair Display, serif' : 'Inter, sans-serif',
+                                    fontSize: `${selectedResource.fontSize || 16}px`,
+                                    color: 'white', // Force white for overlay readability
+                                    fontWeight: selectedResource.fontWeight || '400'
+                                  }}
+                                  dangerouslySetInnerHTML={{ __html: selectedResource.textContent }}
+                                />
+                              </div>
+                            )}
+                          </div>
                         ) : selectedResource.fileType === 'video' ? (
                           <video 
                             src={url} 
@@ -5856,14 +6193,36 @@ const ArchiveView: FC<{ initialFilter?: { groupId: string | null, categoryId: st
                     ))}
                   </div>
                 ) : selectedResource.fileUrl && (
-                  <div className="rounded-3xl overflow-hidden border border-ink/10 bg-ink/5">
+                  <div className="rounded-3xl overflow-hidden border border-ink/10 bg-ink/5 relative">
                     {selectedResource.fileType === 'image' ? (
-                      <img 
-                        src={selectedResource.fileUrl} 
-                        alt={selectedResource.title} 
-                        className="w-full h-auto max-h-[400px] object-contain"
-                        referrerPolicy="no-referrer"
-                      />
+                      <div className="relative w-full h-full">
+                        <img 
+                          src={selectedResource.fileUrl} 
+                          alt={selectedResource.title} 
+                          className="w-full h-auto max-h-[400px] object-contain"
+                          referrerPolicy="no-referrer"
+                        />
+                        {selectedResource.hasOverlay && selectedResource.textContent && (
+                          <div className={cn(
+                            "absolute inset-0 flex flex-col p-8 pointer-events-none z-10",
+                            selectedResource.overlayPos === 'top' ? 'justify-start items-center text-center' :
+                            selectedResource.overlayPos === 'bottom' ? 'justify-end items-center text-center' :
+                            'justify-center items-center text-center'
+                          )}>
+                            <div className="absolute inset-0 bg-ink/20" />
+                            <div 
+                              className="relative z-10 w-full drop-shadow-2xl text-white"
+                              style={{ 
+                                fontFamily: selectedResource.fontFamily === 'serif' ? 'Playfair Display, serif' : 'Inter, sans-serif',
+                                fontSize: `${selectedResource.fontSize || 16}px`,
+                                color: 'white',
+                                fontWeight: selectedResource.fontWeight || '400'
+                              }}
+                              dangerouslySetInnerHTML={{ __html: selectedResource.textContent }}
+                            />
+                          </div>
+                        )}
+                      </div>
                     ) : selectedResource.fileType === 'video' ? (
                       <video 
                         src={selectedResource.fileUrl} 
