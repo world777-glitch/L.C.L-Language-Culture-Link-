@@ -124,6 +124,23 @@ export default function App() {
   const [isAnyTextEditing, setIsAnyTextEditing] = useState(false);
 
   useEffect(() => {
+    const handleResize = () => {
+      // Only auto-detect if the user hasn't manually overridden it in this session?
+      // For now, let's always auto-detect on mount and resize.
+      if (window.innerWidth < 640) {
+        setDeviceMode('mobile');
+      } else if (window.innerWidth < 1024) {
+        setDeviceMode('pad');
+      } else {
+        setDeviceMode('pc');
+      }
+    };
+    handleResize();
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  useEffect(() => {
     const handleFocus = () => {
       const isEditing = document.activeElement?.getAttribute('contenteditable') === 'true';
       setIsAnyTextEditing(isEditing);
@@ -407,7 +424,7 @@ export default function App() {
 
           <div className={cn(
             "items-center transition-all",
-            deviceMode === 'mobile' ? "hidden" : "flex gap-3 lg:gap-4 xl:gap-6"
+            deviceMode === 'mobile' ? "hidden" : "flex gap-2 lg:gap-4 xl:gap-6"
           )}>
             {/* Home */}
             <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu(null)}>
@@ -905,6 +922,7 @@ export default function App() {
               </div>
             )}
           </div>
+        </div>
 
           {/* Mobile Menu Button */}
           {deviceMode === 'mobile' && (
@@ -932,43 +950,105 @@ export default function App() {
               initial={{ height: 0, opacity: 0 }}
               animate={{ height: 'auto', opacity: 1 }}
               exit={{ height: 0, opacity: 0 }}
-              className="bg-paper border-t border-ink/10 overflow-hidden"
+              className="bg-paper border-t border-ink/10 overflow-hidden shadow-2xl"
             >
-              <div className="p-4 space-y-4">
-                <div onClick={() => { setView('landing'); setHoveredMenu(null); }} className="text-[10px] uppercase tracking-widest font-bold">Home</div>
-                <div onClick={() => { scrollToSection('curriculum'); setHoveredMenu(null); }} className="text-[10px] uppercase tracking-widest font-bold">Curriculum</div>
-                <div onClick={() => { setView('pricing'); setHoveredMenu(null); }} className="text-[10px] uppercase tracking-widest font-bold">Pricing</div>
-                <div onClick={() => { scrollToSection('library'); setHoveredMenu(null); }} className="text-[10px] uppercase tracking-widest font-bold">Archive</div>
-                <div onClick={() => { setView('community'); setHoveredMenu(null); }} className="text-[10px] uppercase tracking-widest font-bold">Community</div>
-                <div onClick={() => { setView('inquiry'); setHoveredMenu(null); }} className="text-[10px] uppercase tracking-widest font-bold text-gold">Inquiry</div>
-                
-                <div className="pt-4 border-t border-ink/10 flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Globe size={14} />
-                    <span className="text-[10px] uppercase tracking-widest">{LANGUAGES.find(l => l.code === language)?.name}</span>
+              <div className="p-6 space-y-6">
+                <div className="flex justify-between items-center mb-2">
+                  <span className="text-[10px] uppercase tracking-[0.3em] opacity-40 font-bold">Menu</span>
+                  <button 
+                    onClick={() => setHoveredMenu(null)}
+                    className="p-2 hover:bg-ink/5 rounded-full transition-colors text-ink/70"
+                  >
+                    <X size={20} />
+                  </button>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <button onClick={() => { setView('landing'); setHoveredMenu(null); }} className="flex flex-col items-start p-4 bg-ink/5 rounded-2xl">
+                    <span className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Start</span>
+                    <span className="text-xs font-bold">Home</span>
+                  </button>
+                  <button onClick={() => { scrollToSection('curriculum'); setHoveredMenu(null); }} className="flex flex-col items-start p-4 bg-ink/5 rounded-2xl">
+                    <span className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Learn</span>
+                    <span className="text-xs font-bold">Curriculum</span>
+                  </button>
+                  <button onClick={() => { setView('pricing'); setHoveredMenu(null); }} className="flex flex-col items-start p-4 bg-ink/5 rounded-2xl">
+                    <span className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Plans</span>
+                    <span className="text-xs font-bold">Pricing</span>
+                  </button>
+                  <button onClick={() => { scrollToSection('library'); setHoveredMenu(null); }} className="flex flex-col items-start p-4 bg-ink/5 rounded-2xl">
+                    <span className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Resources</span>
+                    <span className="text-xs font-bold">Archive</span>
+                  </button>
+                  <button onClick={() => { setView('community'); setHoveredMenu(null); }} className="flex flex-col items-start p-4 bg-ink/5 rounded-2xl">
+                    <span className="text-[10px] uppercase tracking-widest opacity-50 mb-1">Social</span>
+                    <span className="text-xs font-bold">Community</span>
+                  </button>
+                  <button onClick={() => { setView('inquiry'); setHoveredMenu(null); }} className="flex flex-col items-start p-4 bg-gold/10 rounded-2xl border border-gold/20">
+                    <span className="text-[10px] uppercase tracking-widest text-gold mb-1">Contact</span>
+                    <span className="text-xs font-bold text-gold">Inquiry</span>
+                  </button>
+                </div>
+
+                <div className="pt-6 border-t border-ink/10 flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-ink/5 flex items-center justify-center">
+                      <Globe size={14} />
+                    </div>
+                    <div className="flex flex-col">
+                      <span className="text-[8px] uppercase tracking-widest opacity-50">Language</span>
+                      <div className="flex gap-2">
+                        {LANGUAGES.map(lang => (
+                          <button 
+                            key={lang.code}
+                            onClick={() => setLanguage(lang.code as LanguageCode)}
+                            className={cn(
+                              "text-[10px] font-bold uppercase tracking-widest",
+                              language === lang.code ? "text-gold" : "opacity-40"
+                            )}
+                          >
+                            {lang.code}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    {LANGUAGES.map(lang => (
-                      <button 
-                        key={lang.code}
-                        onClick={() => setLanguage(lang.code as LanguageCode)}
-                        className={cn(
-                          "text-[8px] uppercase tracking-widest px-2 py-1 rounded border",
-                          language === lang.code ? "bg-ink text-paper border-ink" : "border-ink/10"
-                        )}
-                      >
-                        {lang.code}
+                  
+                  {user ? (
+                    <div className="flex items-center gap-3">
+                      <button onClick={() => { setView('mypage'); setHoveredMenu(null); }} className="flex items-center gap-2 px-4 py-2 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold">
+                        <User size={12} /> My Page
                       </button>
-                    ))}
+                      <button onClick={handleLogout} className="p-2 text-ink/40"><LogOut size={16} /></button>
+                    </div>
+                  ) : (
+                    <button onClick={handleLogin} className="px-6 py-2 border border-ink rounded-full text-[10px] uppercase tracking-widest font-bold">Login</button>
+                  )}
+                </div>
+
+                {/* Device Mode Selector in Mobile Menu */}
+                <div className="pt-6 border-t border-ink/10">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[8px] uppercase tracking-widest opacity-50 font-bold">View Mode</span>
+                    <div className="flex bg-ink/5 p-1 rounded-full">
+                      {(['pc', 'pad', 'mobile'] as const).map((mode) => (
+                        <button
+                          key={mode}
+                          onClick={() => { setDeviceMode(mode); setHoveredMenu(null); }}
+                          className={cn(
+                            "px-3 py-1 rounded-full text-[8px] uppercase tracking-widest font-bold transition-all",
+                            deviceMode === mode ? "bg-white text-ink shadow-sm" : "text-ink/40 hover:text-ink"
+                          )}
+                        >
+                          {mode}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
             </motion.div>
           )}
         </AnimatePresence>
-      </div>
-
-      {/* Dropdown Menus handled inline now */}
       </nav>
 
       <div 
@@ -1091,7 +1171,10 @@ export default function App() {
             </div>
           </div>
         </div>
-        <div className="max-w-[1600px] mx-auto mt-20 pt-8 border-t border-paper/10 flex justify-between items-center">
+        <div className={cn(
+          "max-w-[1600px] mx-auto mt-20 pt-8 border-t border-paper/10 flex justify-between items-center transition-all",
+          deviceMode === 'mobile' ? "flex-col gap-4 text-center" : "flex-row"
+        )}>
           <p className="text-[10px] uppercase tracking-widest opacity-40">{t.footer.rights}</p>
           <div className="text-[10px] uppercase tracking-widest opacity-40">
             <EditableText contentKey="footer.tagline" defaultValue={t.footer.tagline} isEditMode={isEditMode} language={language} siteContent={siteContent} />
@@ -3078,17 +3161,17 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
 
       {/* Hero Section */}
       <section className={cn(
-        "relative flex items-center overflow-hidden px-4 landing-hero-bg",
-        deviceMode === 'mobile' ? "h-[60vh]" : deviceMode === 'pad' ? "h-[75vh]" : "h-[90vh]"
+        "relative flex items-center overflow-hidden px-4 landing-hero-bg transition-all",
+        deviceMode === 'mobile' ? "h-[80vh] pt-20" : deviceMode === 'pad' ? "h-[70vh]" : "h-[85vh]"
       )}>
         <div className="absolute inset-0 landing-hero-overlay pointer-events-none" />
         <div className={cn(
           "absolute right-0 top-0 h-full bg-ink/5 z-0 flex items-center justify-center transition-all",
-          deviceMode === 'mobile' ? "w-full opacity-20" : "w-1/2"
+          deviceMode === 'mobile' ? "w-full opacity-30" : "w-1/2"
         )}>
           <div className={cn(
-            "aspect-[3/4] bg-ink/10 rounded-[200px] overflow-hidden relative transition-all",
-            deviceMode === 'mobile' ? "w-[60%]" : "w-[80%]"
+            "aspect-[3/4] bg-ink/10 rounded-[160px] overflow-hidden relative transition-all",
+            deviceMode === 'mobile' ? "w-[45%]" : deviceMode === 'pad' ? "w-[55%]" : "w-[60%]"
           )}>
             <EditableImage 
               contentKey="hero.image"
@@ -3099,7 +3182,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               isAdmin={isAdmin}
               language={language}
               siteContent={siteContent}
-              rounded="rounded-[200px]"
+              rounded="rounded-[160px]"
             >
               <div className="absolute inset-0 bg-gradient-to-t from-paper/40 to-transparent pointer-events-none" />
             </EditableImage>
@@ -3109,8 +3192,14 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
           </div>
         </div>
 
-        <div className="max-w-[1600px] mx-auto w-full grid grid-cols-1 md:grid-cols-2 relative z-10 pointer-events-none px-0">
-          <div className="space-y-8 pointer-events-auto">
+        <div className={cn(
+          "max-w-[1600px] mx-auto w-full grid relative z-10 pointer-events-none px-0 transition-all",
+          deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
+        )}>
+          <div className={cn(
+            "space-y-8 pointer-events-auto transition-all",
+            deviceMode === 'mobile' ? "text-center flex flex-col items-center" : ""
+          )}>
             <motion.div 
               initial={{ x: -50, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
@@ -3124,8 +3213,8 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.4 }}
               className={cn(
-                "font-serif font-light leading-[0.9] tracking-tighter transition-all",
-                deviceMode === 'mobile' ? "text-4xl" : deviceMode === 'pad' ? "text-6xl" : "text-7xl md:text-8xl"
+                "font-serif font-light tracking-tighter transition-all",
+                deviceMode === 'mobile' ? "text-3xl leading-[1.2]" : deviceMode === 'pad' ? "text-6xl leading-[0.9]" : "text-7xl md:text-8xl leading-[0.9]"
               )}
             >
               <EditableText 
@@ -3145,7 +3234,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               transition={{ delay: 0.6 }}
               className={cn(
                 "font-serif opacity-70 leading-relaxed transition-all",
-                deviceMode === 'mobile' ? "text-sm max-w-xs" : "text-lg max-w-md"
+                deviceMode === 'mobile' ? "text-sm max-w-xs mx-auto" : "text-lg max-w-md"
               )}
             >
               <EditableText contentKey="hero.subtitle" defaultValue={t.hero.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
@@ -3156,7 +3245,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               transition={{ delay: 0.8 }}
               className={cn(
                 "flex flex-wrap items-center transition-all",
-                deviceMode === 'mobile' ? "gap-3" : "gap-6"
+                deviceMode === 'mobile' ? "gap-3 justify-center" : "gap-6"
               )}
             >
               <button 
@@ -3208,7 +3297,10 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               </div>
 
               {/* Social Links in Hero */}
-              <div className="flex items-center gap-6 pt-8">
+              <div className={cn(
+                "flex items-center pt-8 transition-all",
+                deviceMode === 'mobile' ? "justify-center gap-4" : "gap-6"
+              )}>
                 <Repeater 
                   isEditMode={isEditMode}
                   language={language}
@@ -3365,10 +3457,15 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
         </section>
       )}
 
-      {/* Testimonials / Quote */}
-      <section className="max-w-4xl mx-auto px-6 py-20 text-center space-y-12">
+      <section className={cn(
+        "max-w-4xl mx-auto text-center space-y-12 transition-all",
+        deviceMode === 'mobile' ? "px-4 py-12" : "px-6 py-20"
+      )}>
         <div className="w-12 h-12 mx-auto border border-ink/10 rounded-full flex items-center justify-center opacity-20">"</div>
-        <div className="text-4xl md:text-5xl font-serif font-light italic leading-tight">
+        <div className={cn(
+          "font-serif font-light italic leading-tight transition-all",
+          deviceMode === 'mobile' ? "text-2xl" : "text-4xl md:text-5xl"
+        )}>
           <EditableText contentKey="testimonial.quote" defaultValue={t.testimonial.quote} isEditMode={isEditMode} language={language} siteContent={siteContent} />
         </div>
         <div className="space-y-2">
@@ -3381,18 +3478,29 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
         </div>
       </section>
 
-      {/* Resource Marketing Section - Redesigned with Categories */}
-      <section id="library" className="bg-paper py-20 px-6 border-y border-ink/5">
+      <section id="library" className={cn(
+        "bg-paper border-y border-ink/5 transition-all",
+        deviceMode === 'mobile' ? "py-12 px-4" : "py-20 px-6"
+      )}>
         <div className="max-w-[1600px] mx-auto space-y-20">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-20 items-center">
+          <div className={cn(
+            "grid items-center transition-all",
+            deviceMode === 'mobile' ? "grid-cols-1 gap-10" : "grid-cols-1 md:grid-cols-2 gap-20"
+          )}>
             <div className="space-y-8">
               <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
                 <EditableText contentKey="library.badge" defaultValue="Knowledge Library" isEditMode={isEditMode} language={language} siteContent={siteContent} />
               </div>
-              <div className="text-5xl md:text-6xl font-serif font-light leading-tight">
+              <div className={cn(
+                "font-serif font-light leading-tight transition-all",
+                deviceMode === 'mobile' ? "text-3xl" : "text-5xl md:text-6xl"
+              )}>
                 <EditableText contentKey="library.title" defaultValue={language === 'ko' ? '"언어는 고립된 기호가 아니라, 역사가 숨 쉬는 생명체입니다."' : '"Language is not an isolated symbol, but a living organism where history breathes."'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
               </div>
-              <div className="text-lg opacity-70 font-serif leading-relaxed">
+              <div className={cn(
+                "opacity-70 font-serif leading-relaxed transition-all",
+                deviceMode === 'mobile' ? "text-sm" : "text-lg"
+              )}>
                 <EditableText contentKey="library.description" defaultValue={language === 'ko' ? 'L.C.L Knowledge Library는 중국 언어학 박사의 학문적 엄격함과 20년 현지 체류의 직관을 결합한 지식의 정수입니다. 단순한 학습 자료를 넘어, 언어의 구조적 원리와 문화적 맥락을 관통하는 통찰력을 제공합니다.' : 'The L.C.L Knowledge Library is the essence of knowledge that combines the academic rigor of a PhD in Chinese linguistics with the intuition of 20 years of local residence. Beyond simple learning materials, it provides insight into the structural principles and cultural context of language.'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
               </div>
             </div>
@@ -3413,7 +3521,10 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+          <div className={cn(
+            "grid gap-8 transition-all",
+            deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-1 md:grid-cols-3"
+          )}>
             {RESOURCE_GROUPS.map((group) => (
               <motion.div 
                 key={group.id}
@@ -7062,7 +7173,10 @@ const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: -20 }}
               transition={{ duration: 0.4, ease: "easeInOut" }}
-              className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-px bg-ink/10 border border-ink/10"
+              className={cn(
+                "grid gap-px bg-ink/10 border border-ink/10 transition-all",
+                deviceMode === 'mobile' ? "grid-cols-1" : "md:grid-cols-3 lg:grid-cols-5"
+              )}
             >
               {currentCourses.map((course: any) => (
                 <motion.div 
@@ -7672,7 +7786,12 @@ const InquiryView: FC<{
         >
           <Check size={40} />
         </motion.div>
-        <h2 className="text-4xl font-serif mb-4">{t.inquiry.successTitle}</h2>
+        <h2 className={cn(
+          "font-serif mb-4 transition-all",
+          deviceMode === 'mobile' ? "text-2xl" : "text-4xl"
+        )}>
+          {t.inquiry.successTitle}
+        </h2>
         <p className="text-lg opacity-60 max-w-md mx-auto">{t.inquiry.successMessage}</p>
       </div>
     );
@@ -7682,16 +7801,28 @@ const InquiryView: FC<{
     <motion.div 
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-3xl mx-auto px-6 py-20"
+      className={cn(
+        "max-w-3xl mx-auto transition-all",
+        deviceMode === 'mobile' ? "px-4 py-12" : "px-6 py-20"
+      )}
     >
-      <div className="text-center space-y-4 mb-16">
+      <div className={cn(
+        "text-center space-y-4 transition-all",
+        deviceMode === 'mobile' ? "mb-10" : "mb-16"
+      )}>
         <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
           <EditableText contentKey="inquiry.badge" defaultValue={t.inquiry.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
         </div>
-        <div className="text-5xl font-serif font-light">
+        <div className={cn(
+          "font-serif font-light transition-all",
+          deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
+        )}>
           <EditableText contentKey="inquiry.title" defaultValue={t.inquiry.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
         </div>
-        <div className="text-lg opacity-60 font-serif italic">
+        <div className={cn(
+          "opacity-60 font-serif italic transition-all",
+          deviceMode === 'mobile' ? "text-sm" : "text-lg"
+        )}>
           <EditableText contentKey="inquiry.subtitle" defaultValue={t.inquiry.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
         </div>
       </div>
@@ -8344,12 +8475,18 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
           </div>
         ) : (
           filteredTests.map(test => (
-            <div key={test.id} className="group p-6 bg-paper border border-ink/10 rounded-2xl flex items-center justify-between hover:border-gold/50 transition-all">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-ink/5 rounded-xl flex items-center justify-center text-gold">
+            <div key={test.id} className={cn(
+              "group p-6 bg-paper border border-ink/10 rounded-2xl flex transition-all hover:border-gold/50",
+              deviceMode === 'mobile' ? "flex-col items-start gap-4" : "flex-row items-center justify-between"
+            )}>
+              <div className={cn(
+                "flex gap-4",
+                deviceMode === 'mobile' ? "w-full" : "items-center"
+              )}>
+                <div className="w-12 h-12 bg-ink/5 rounded-xl flex-shrink-0 flex items-center justify-center text-gold">
                   <FileText size={24} />
                 </div>
-                <div className="flex-grow">
+                <div className="flex-grow min-w-0">
                   {editingTestId === test.id ? (
                     <div className="space-y-4">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -8417,7 +8554,10 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
                           {test.level}
                         </span>
                       </div>
-                      <h3 className="font-bold text-lg">{test.name}</h3>
+                      <h3 className={cn(
+                        "font-serif font-medium transition-all",
+                        deviceMode === 'mobile' ? "text-base" : "text-lg"
+                      )}>{test.name}</h3>
                       <p className="text-[10px] uppercase tracking-widest opacity-40">
                         {test.createdAt?.toDate ? new Date(test.createdAt.toDate()).toLocaleDateString() : ''} • {(test.size / 1024 / 1024).toFixed(2)}MB
                       </p>
@@ -8425,12 +8565,18 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
                   )}
                 </div>
               </div>
-              <div className="flex items-center gap-2">
+              <div className={cn(
+                "flex items-center gap-2",
+                deviceMode === 'mobile' ? "w-full justify-between pt-4 border-t border-ink/5" : ""
+              )}>
                 <a 
                   href={test.url} 
                   target="_blank" 
                   rel="noopener noreferrer"
-                  className="px-6 py-2 bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all"
+                  className={cn(
+                    "bg-ink text-paper rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-gold hover:text-ink transition-all",
+                    deviceMode === 'mobile' ? "px-4 py-2" : "px-6 py-2"
+                  )}
                 >
                   {t.archive.download}
                 </a>
@@ -8745,18 +8891,30 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
             <motion.div 
               layout
               key={post.id} 
-              className="p-8 border border-ink/10 rounded-[40px] space-y-6 bg-white hover:shadow-2xl hover:shadow-ink/5 transition-all group"
+              className={cn(
+                "border border-ink/10 rounded-[40px] bg-white hover:shadow-2xl hover:shadow-ink/5 transition-all group",
+                deviceMode === 'mobile' ? "p-6 space-y-4" : "p-8 space-y-6"
+              )}
             >
-              <div className="flex justify-between items-start">
+              <div className={cn(
+                "flex justify-between transition-all",
+                deviceMode === 'mobile' ? "flex-col gap-4" : "flex-row items-start"
+              )}>
                 <div className="space-y-3">
-                  <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "flex transition-all",
+                    deviceMode === 'mobile' ? "flex-col items-start gap-2" : "flex-row items-center gap-3"
+                  )}>
                     <span className={cn(
                       "text-[8px] uppercase tracking-widest px-3 py-1 rounded-full font-bold",
                       cat.color
                     )}>
                       {cat.label}
                     </span>
-                    <h3 className="text-2xl font-serif font-medium tracking-tight">{post.title}</h3>
+                    <h3 className={cn(
+                      "font-serif font-medium tracking-tight transition-all",
+                      deviceMode === 'mobile' ? "text-xl" : "text-2xl"
+                    )}>{post.title}</h3>
                   </div>
                   <div className="flex items-center gap-3 text-[10px] opacity-40 font-bold uppercase tracking-widest">
                     <span>{post.userName}</span>
@@ -8765,7 +8923,7 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
                   </div>
                 </div>
                 {post.reply && (
-                  <div className="flex items-center gap-2 text-gold bg-gold/5 px-3 py-1 rounded-full">
+                  <div className="flex items-center gap-2 text-gold bg-gold/5 px-3 py-1 rounded-full self-start">
                     <Check size={14} />
                     <span className="text-[10px] uppercase tracking-widest font-bold">{t.community.answered}</span>
                   </div>
