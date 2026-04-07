@@ -62,7 +62,11 @@ import {
   Bold,
   Italic,
   Underline,
-  Settings
+  Monitor,
+  Tablet,
+  Smartphone,
+  Settings,
+  Menu
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder } from 'motion/react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
@@ -116,6 +120,7 @@ export default function App() {
   const [view, setView] = useState<'landing' | 'booking' | 'mypage' | 'admin' | 'image-gen' | 'archive' | 'community' | 'inquiry' | 'curriculum' | 'pricing' | 'level-test'>('landing');
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [appMode, setAppMode] = useState<'learner' | 'admin'>('learner');
+  const [deviceMode, setDeviceMode] = useState<'pc' | 'pad' | 'mobile'>('pc');
   const [isAnyTextEditing, setIsAnyTextEditing] = useState(false);
 
   useEffect(() => {
@@ -366,12 +371,20 @@ export default function App() {
 
       {/* Navigation */}
       <nav 
-        className="sticky top-0 z-50 bg-paper/80 backdrop-blur-md border-b border-ink/10"
+        className={cn(
+          "sticky top-0 z-50 bg-paper/80 backdrop-blur-md border-b border-ink/10 transition-all duration-500 mx-auto",
+          deviceMode === 'pc' ? "w-full" : 
+          deviceMode === 'pad' ? "max-w-[768px] border-x border-ink/10" : 
+          "max-w-[375px] border-x border-ink/10"
+        )}
         onMouseLeave={() => {
           if (!isAnyTextEditing) setHoveredMenu(null);
         }}
       >
-        <div className="max-w-[1600px] mx-auto px-0 h-20 flex items-center justify-between">
+        <div className={cn(
+          "max-w-[1600px] mx-auto h-20 flex items-center justify-between transition-all",
+          deviceMode === 'mobile' ? "px-4" : "px-6 lg:px-12"
+        )}>
           <div 
             className="flex items-center gap-3 cursor-pointer group" 
             onClick={() => setView('landing')}
@@ -380,33 +393,22 @@ export default function App() {
             }}
           >
             <div className="flex flex-col items-start justify-center leading-none">
-              <span className="font-serif text-2xl font-bold tracking-tighter group-hover:text-gold transition-colors">L.C.L</span>
+              <span className={cn(
+                "font-serif font-bold tracking-tighter group-hover:text-gold transition-all",
+                deviceMode === 'mobile' ? "text-lg" : "text-2xl"
+              )}>L.C.L</span>
               <div className="h-[1px] w-full bg-gold/20 my-1 group-hover:bg-gold/50 transition-colors" />
-              <span className="text-[8px] uppercase tracking-[0.25em] opacity-60 font-bold">Language & Culture Link</span>
+              <span className={cn(
+                "uppercase tracking-[0.25em] opacity-60 font-bold transition-all",
+                deviceMode === 'mobile' ? "text-[6px]" : "text-[8px]"
+              )}>Language & Culture Link</span>
             </div>
           </div>
 
-          <div className="hidden md:flex items-center gap-3 lg:gap-4 xl:gap-6">
-            <div className="relative group">
-              <button className="flex items-center gap-1 text-[10px] lg:text-xs uppercase tracking-widest hover:text-gold transition-colors">
-                <Globe size={12} /> {LANGUAGES.find(l => l.code === language)?.nativeName}
-              </button>
-              <div className="absolute top-full right-0 mt-2 w-48 bg-paper border border-ink/10 rounded-2xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-[60] max-h-[60vh] overflow-y-auto p-2">
-                {LANGUAGES.map(lang => (
-                  <button
-                    key={lang.code}
-                    onClick={() => setLanguage(lang.code)}
-                    className={cn(
-                      "w-full text-left px-4 py-2 text-xs rounded-xl transition-colors",
-                      language === lang.code ? "bg-ink text-paper" : "hover:bg-ink/5"
-                    )}
-                  >
-                    {lang.nativeName} ({lang.name})
-                  </button>
-                ))}
-              </div>
-            </div>
-
+          <div className={cn(
+            "items-center transition-all",
+            deviceMode === 'mobile' ? "hidden" : "flex gap-3 lg:gap-4 xl:gap-6"
+          )}>
             {/* Home */}
             <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu(null)}>
               <div 
@@ -687,8 +689,77 @@ export default function App() {
               </AnimatePresence>
             </div>
 
-          <div className="flex items-center gap-3 lg:gap-6">
-            {/* Theme Toggle */}
+            <div className="flex items-center gap-3 lg:gap-6">
+              {/* Language Selector */}
+              <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('language')} onMouseLeave={() => setHoveredMenu(null)}>
+                <button className="flex items-center gap-2 p-2 hover:bg-ink/5 rounded-full transition-colors text-ink/70 hover:text-ink">
+                  <Globe size={18} />
+                  <span className="text-[10px] font-bold uppercase tracking-widest hidden sm:inline">{LANGUAGES.find(l => l.code === language)?.name}</span>
+                </button>
+                <AnimatePresence>
+                  {hoveredMenu === 'language' && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }} 
+                      animate={{ opacity: 1, y: 0 }} 
+                      exit={{ opacity: 0, y: 10 }} 
+                      className="absolute top-full right-0 bg-paper border border-ink/10 rounded-xl shadow-xl z-[60] py-2 min-w-[120px]"
+                    >
+                      {LANGUAGES.map(lang => (
+                        <button 
+                          key={lang.code}
+                          onClick={() => { setLanguage(lang.code as LanguageCode); setHoveredMenu(null); }}
+                          className={cn(
+                            "w-full text-left px-6 py-2 text-[10px] uppercase tracking-widest transition-colors hover:bg-ink/5 hover:text-gold",
+                            language === lang.code ? "text-gold font-bold" : "text-ink/70"
+                          )}
+                        >
+                          {lang.name}
+                        </button>
+                      ))}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
+
+              <div className="h-4 w-[1px] bg-ink/10" />
+
+              {/* Device Mode Selector */}
+              <div className="flex items-center gap-1 bg-ink/5 p-1 rounded-full border border-ink/10">
+                <button 
+                  onClick={() => setDeviceMode('pc')}
+                  className={cn(
+                    "p-1.5 rounded-full transition-all",
+                    deviceMode === 'pc' ? "bg-paper text-gold shadow-sm" : "text-ink/40 hover:text-ink"
+                  )}
+                  title="PC Mode"
+                >
+                  <Monitor size={14} />
+                </button>
+                <button 
+                  onClick={() => setDeviceMode('pad')}
+                  className={cn(
+                    "p-1.5 rounded-full transition-all",
+                    deviceMode === 'pad' ? "bg-paper text-gold shadow-sm" : "text-ink/40 hover:text-ink"
+                  )}
+                  title="Pad Mode"
+                >
+                  <Tablet size={14} />
+                </button>
+                <button 
+                  onClick={() => setDeviceMode('mobile')}
+                  className={cn(
+                    "p-1.5 rounded-full transition-all",
+                    deviceMode === 'mobile' ? "bg-paper text-gold shadow-sm" : "text-ink/40 hover:text-ink"
+                  )}
+                  title="Mobile Mode"
+                >
+                  <Smartphone size={14} />
+                </button>
+              </div>
+
+              <div className="h-4 w-[1px] bg-ink/10" />
+
+              {/* Theme Toggle */}
             <button 
               onClick={() => setIsDarkMode(!isDarkMode)}
               className="p-2 hover:bg-ink/5 rounded-full transition-colors text-ink/70 hover:text-ink"
@@ -774,21 +845,25 @@ export default function App() {
 
             {/* User Profile & Logout */}
             {user ? (
-              <div className="flex items-center gap-4">
+              <div className={cn(
+                "flex items-center transition-all",
+                deviceMode === 'mobile' ? "gap-2" : "gap-4"
+              )}>
                 <div 
                   onClick={() => setView('mypage')}
                   onMouseEnter={() => {
                     if (!isAnyTextEditing) setHoveredMenu(null);
                   }}
                   className={cn(
-                    "flex items-center gap-1 text-[10px] lg:text-xs uppercase tracking-widest transition-colors whitespace-nowrap cursor-pointer",
+                    "flex items-center gap-1 uppercase tracking-widest transition-colors whitespace-nowrap cursor-pointer",
+                    deviceMode === 'mobile' ? "text-[8px]" : "text-[10px] lg:text-xs",
                     view === 'mypage' ? "text-gold font-bold underline underline-offset-4" : "hover:text-gold"
                   )}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setView('mypage'); } }}
                 >
-                  <User size={14} /> 
+                  <User size={deviceMode === 'mobile' ? 12 : 14} /> 
                   <EditableText 
                     contentKey="global.nav.myPage"
                     defaultValue={t.nav.myPage}
@@ -798,7 +873,7 @@ export default function App() {
                   />
                 </div>
                 <button onClick={handleLogout} className="text-ink/50 hover:text-ink transition-colors">
-                  <LogOut size={18} />
+                  <LogOut size={deviceMode === 'mobile' ? 16 : 18} />
                 </button>
               </div>
             ) : (
@@ -815,7 +890,10 @@ export default function App() {
                 onMouseEnter={() => {
                   if (!isAnyTextEditing) setHoveredMenu(null);
                 }}
-                className="px-6 py-2 border border-ink rounded-full text-[10px] lg:text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-all whitespace-nowrap font-bold cursor-pointer"
+                className={cn(
+                  "border border-ink rounded-full uppercase tracking-widest hover:bg-ink hover:text-paper transition-all whitespace-nowrap font-bold cursor-pointer",
+                  deviceMode === 'mobile' ? "px-3 py-1.5 text-[8px]" : "px-6 py-2 text-[10px] lg:text-xs"
+                )}
               >
                 <EditableText 
                   contentKey="global.nav.login"
@@ -827,25 +905,94 @@ export default function App() {
               </div>
             )}
           </div>
+
+          {/* Mobile Menu Button */}
+          {deviceMode === 'mobile' && (
+            <div className="flex items-center gap-2 pr-4">
+              <button 
+                onClick={() => setIsDarkMode(!isDarkMode)}
+                className="p-2 hover:bg-ink/5 rounded-full transition-colors text-ink/70 hover:text-ink"
+              >
+                {isDarkMode ? <Sun size={16} /> : <Moon size={16} />}
+              </button>
+              <button 
+                onClick={() => setHoveredMenu(hoveredMenu === 'mobile' ? null : 'mobile')}
+                className="p-2 hover:bg-ink/5 rounded-full transition-colors text-ink/70 hover:text-ink"
+              >
+                <Menu size={20} />
+              </button>
+            </div>
+          )}
         </div>
+
+        {/* Mobile Dropdown Menu */}
+        <AnimatePresence>
+          {deviceMode === 'mobile' && hoveredMenu === 'mobile' && (
+            <motion.div 
+              initial={{ height: 0, opacity: 0 }}
+              animate={{ height: 'auto', opacity: 1 }}
+              exit={{ height: 0, opacity: 0 }}
+              className="bg-paper border-t border-ink/10 overflow-hidden"
+            >
+              <div className="p-4 space-y-4">
+                <div onClick={() => { setView('landing'); setHoveredMenu(null); }} className="text-[10px] uppercase tracking-widest font-bold">Home</div>
+                <div onClick={() => { scrollToSection('curriculum'); setHoveredMenu(null); }} className="text-[10px] uppercase tracking-widest font-bold">Curriculum</div>
+                <div onClick={() => { setView('pricing'); setHoveredMenu(null); }} className="text-[10px] uppercase tracking-widest font-bold">Pricing</div>
+                <div onClick={() => { scrollToSection('library'); setHoveredMenu(null); }} className="text-[10px] uppercase tracking-widest font-bold">Archive</div>
+                <div onClick={() => { setView('community'); setHoveredMenu(null); }} className="text-[10px] uppercase tracking-widest font-bold">Community</div>
+                <div onClick={() => { setView('inquiry'); setHoveredMenu(null); }} className="text-[10px] uppercase tracking-widest font-bold text-gold">Inquiry</div>
+                
+                <div className="pt-4 border-t border-ink/10 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Globe size={14} />
+                    <span className="text-[10px] uppercase tracking-widest">{LANGUAGES.find(l => l.code === language)?.name}</span>
+                  </div>
+                  <div className="flex gap-2">
+                    {LANGUAGES.map(lang => (
+                      <button 
+                        key={lang.code}
+                        onClick={() => setLanguage(lang.code as LanguageCode)}
+                        className={cn(
+                          "text-[8px] uppercase tracking-widest px-2 py-1 rounded border",
+                          language === lang.code ? "bg-ink text-paper border-ink" : "border-ink/10"
+                        )}
+                      >
+                        {lang.code}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
 
       {/* Dropdown Menus handled inline now */}
       </nav>
 
-      <main className="flex-grow">
+      <div 
+        className={cn(
+          "flex-grow transition-all duration-500 mx-auto bg-paper shadow-2xl relative overflow-hidden flex flex-col",
+          deviceMode === 'pc' ? "w-full" : 
+          deviceMode === 'pad' ? "max-w-[768px] border-x border-ink/10" : 
+          "max-w-[375px] border-x border-ink/10"
+        )}
+        style={{ minHeight: 'calc(100vh - 80px)' }}
+      >
+        <main className="flex-grow">
         <AnimatePresence mode="wait">
-          {view === 'landing' && <LandingView key="landing" setView={setView} onBook={(course) => { setSelectedCourse(course); setView('inquiry'); }} setInitialArchiveFilter={setInitialArchiveFilter} language={language} isEditMode={isEditMode} isAdmin={isAdmin} siteContent={siteContent} isEventPeriod={isEventPeriod} />}
-          {view === 'curriculum' && <CurriculumView key="curriculum" language={language} onBook={(course) => { setSelectedCourse(course); setView('inquiry'); }} isEditMode={isEditMode} isAdmin={isAdmin} siteContent={siteContent} />}
-          {view === 'pricing' && <PricingView key="pricing" language={language} setView={setView} isEditMode={isEditMode} isAdmin={isAdmin} siteContent={siteContent} isEventPeriod={isEventPeriod} />}
-          {view === 'booking' && <BookingView key="booking" course={selectedCourse} onComplete={() => setView('mypage')} isEventPeriod={isEventPeriod} siteContent={siteContent} />}
-          {view === 'mypage' && <MyPageView key="mypage" />}
-          {view === 'admin' && <AdminView key="admin" language={language} siteContent={siteContent} initialTab={adminTab} />}
-          {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} siteContent={siteContent} />}
-          {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} isEditMode={isEditMode} siteContent={siteContent} />}
-          {view === 'community' && <CommunityView key="community" language={language} initialFilter={initialCommunityFilter} onClearFilter={() => setInitialCommunityFilter('all')} />}
-          {view === 'level-test' && <LevelTestView key="level-test" language={language} isAdmin={isAdmin} isEditMode={isEditMode} siteContent={siteContent} />}
-          {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} isEventPeriod={isEventPeriod} siteContent={siteContent} isEditMode={isEditMode} isAdmin={isAdmin} initialCourse={selectedCourse} initialLevel={selectedLevel || undefined} />}
+          {view === 'landing' && <LandingView key="landing" setView={setView} onBook={(course) => { setSelectedCourse(course); setView('inquiry'); }} setInitialArchiveFilter={setInitialArchiveFilter} language={language} isEditMode={isEditMode} isAdmin={isAdmin} siteContent={siteContent} isEventPeriod={isEventPeriod} deviceMode={deviceMode} />}
+          {view === 'curriculum' && <CurriculumView key="curriculum" language={language} onBook={(course) => { setSelectedCourse(course); setView('inquiry'); }} isEditMode={isEditMode} isAdmin={isAdmin} siteContent={siteContent} deviceMode={deviceMode} />}
+          {view === 'pricing' && <PricingView key="pricing" language={language} setView={setView} isEditMode={isEditMode} isAdmin={isAdmin} siteContent={siteContent} isEventPeriod={isEventPeriod} deviceMode={deviceMode} />}
+          {view === 'booking' && <BookingView key="booking" course={selectedCourse} onComplete={() => setView('mypage')} isEventPeriod={isEventPeriod} siteContent={siteContent} deviceMode={deviceMode} />}
+          {view === 'mypage' && <MyPageView key="mypage" deviceMode={deviceMode} />}
+          {view === 'admin' && <AdminView key="admin" language={language} siteContent={siteContent} initialTab={adminTab} deviceMode={deviceMode} />}
+          {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} siteContent={siteContent} deviceMode={deviceMode} />}
+          {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} isEditMode={isEditMode} siteContent={siteContent} deviceMode={deviceMode} />}
+          {view === 'community' && <CommunityView key="community" language={language} initialFilter={initialCommunityFilter} onClearFilter={() => setInitialCommunityFilter('all')} deviceMode={deviceMode} />}
+          {view === 'level-test' && <LevelTestView key="level-test" language={language} isAdmin={isAdmin} isEditMode={isEditMode} siteContent={siteContent} deviceMode={deviceMode} />}
+          {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} isEventPeriod={isEventPeriod} siteContent={siteContent} isEditMode={isEditMode} isAdmin={isAdmin} initialCourse={selectedCourse} initialLevel={selectedLevel || undefined} deviceMode={deviceMode} />}
         </AnimatePresence>
 
         {/* Edit Mode Instruction Bar */}
@@ -952,6 +1099,7 @@ export default function App() {
         </div>
       </footer>
     </div>
+  </div>
   );
 }
 
@@ -2916,7 +3064,7 @@ const GlobalStyleEditor: FC<{
   );
 };
 
-const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode, isEditMode: boolean, isAdmin?: boolean, siteContent: Record<string, any>, isEventPeriod: boolean }> = ({ setView, onBook, setInitialArchiveFilter, language, isEditMode, isAdmin, siteContent, isEventPeriod }) => {
+const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode, isEditMode: boolean, isAdmin?: boolean, siteContent: Record<string, any>, isEventPeriod: boolean, deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ setView, onBook, setInitialArchiveFilter, language, isEditMode, isAdmin, siteContent, isEventPeriod, deviceMode }) => {
   const t = TRANSLATIONS[language];
   
   return (
@@ -2929,10 +3077,19 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       <DynamicContentArea contentKey="landing.top" isEditMode={isEditMode} isAdmin={isAdmin} language={language} siteContent={siteContent} />
 
       {/* Hero Section */}
-      <section className="relative h-[90vh] flex items-center overflow-hidden px-4 landing-hero-bg">
+      <section className={cn(
+        "relative flex items-center overflow-hidden px-4 landing-hero-bg",
+        deviceMode === 'mobile' ? "h-[60vh]" : deviceMode === 'pad' ? "h-[75vh]" : "h-[90vh]"
+      )}>
         <div className="absolute inset-0 landing-hero-overlay pointer-events-none" />
-        <div className="absolute right-0 top-0 w-1/2 h-full bg-ink/5 z-0 flex items-center justify-center">
-          <div className="w-[80%] aspect-[3/4] bg-ink/10 rounded-[200px] overflow-hidden relative">
+        <div className={cn(
+          "absolute right-0 top-0 h-full bg-ink/5 z-0 flex items-center justify-center transition-all",
+          deviceMode === 'mobile' ? "w-full opacity-20" : "w-1/2"
+        )}>
+          <div className={cn(
+            "aspect-[3/4] bg-ink/10 rounded-[200px] overflow-hidden relative transition-all",
+            deviceMode === 'mobile' ? "w-[60%]" : "w-[80%]"
+          )}>
             <EditableImage 
               contentKey="hero.image"
               defaultUrl="https://picsum.photos/seed/chinese-culture/800/1200" 
@@ -2966,7 +3123,10 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.4 }}
-              className="text-7xl md:text-8xl font-serif font-light leading-[0.9] tracking-tighter"
+              className={cn(
+                "font-serif font-light leading-[0.9] tracking-tighter transition-all",
+                deviceMode === 'mobile' ? "text-4xl" : deviceMode === 'pad' ? "text-6xl" : "text-7xl md:text-8xl"
+              )}
             >
               <EditableText 
                 contentKey="hero.title" 
@@ -2983,7 +3143,10 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.6 }}
-              className="text-lg font-serif max-w-md opacity-70 leading-relaxed"
+              className={cn(
+                "font-serif opacity-70 leading-relaxed transition-all",
+                deviceMode === 'mobile' ? "text-sm max-w-xs" : "text-lg max-w-md"
+              )}
             >
               <EditableText contentKey="hero.subtitle" defaultValue={t.hero.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
             </motion.div>
@@ -2991,17 +3154,26 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.8 }}
-              className="flex flex-wrap items-center gap-6"
+              className={cn(
+                "flex flex-wrap items-center transition-all",
+                deviceMode === 'mobile' ? "gap-3" : "gap-6"
+              )}
             >
               <button 
                 onClick={() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' })}
-                className="px-10 py-4 bg-ink text-paper rounded-full text-xs uppercase tracking-widest hover:scale-105 transition-transform"
+                className={cn(
+                  "bg-ink text-paper rounded-full uppercase tracking-widest hover:scale-105 transition-all",
+                  deviceMode === 'mobile' ? "px-6 py-3 text-[10px]" : "px-10 py-4 text-xs"
+                )}
               >
                 {t.hero.cta}
               </button>
               <button 
                 onClick={() => setView('inquiry')}
-                className="px-10 py-4 border border-ink text-ink rounded-full text-xs uppercase tracking-widest hover:bg-ink hover:text-paper transition-all"
+                className={cn(
+                  "border border-ink text-ink rounded-full uppercase tracking-widest hover:bg-ink hover:text-paper transition-all",
+                  deviceMode === 'mobile' ? "px-6 py-3 text-[10px]" : "px-10 py-4 text-xs"
+                )}
               >
                 {t.inquiry.title}
               </button>
@@ -3360,7 +3532,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
   );
 };
 
-const BookingView: FC<{ course: any, onComplete: () => void, isEventPeriod: boolean, siteContent: any }> = ({ course, onComplete, isEventPeriod, siteContent }) => {
+const BookingView: FC<{ course: any, onComplete: () => void, isEventPeriod: boolean, siteContent: any, deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ course, onComplete, isEventPeriod, siteContent, deviceMode }) => {
   const [level, setLevel] = useState(course.levels[0]);
   const [weeks, setWeeks] = useState(12);
   const [sessions, setSessions] = useState(1);
@@ -3413,7 +3585,10 @@ const BookingView: FC<{ course: any, onComplete: () => void, isEventPeriod: bool
     <motion.div 
       initial={{ opacity: 0, y: 20 }} 
       animate={{ opacity: 1, y: 0 }}
-      className="max-w-4xl mx-auto px-6 py-20"
+      className={cn(
+        "max-w-4xl mx-auto transition-all",
+        deviceMode === 'mobile' ? "px-4 py-12" : "px-6 py-20"
+      )}
     >
       <div className="flex items-center gap-4 mb-12">
         <button onClick={() => window.history.back()} className="text-xs uppercase tracking-widest opacity-50 hover:opacity-100">Back</button>
@@ -3421,7 +3596,10 @@ const BookingView: FC<{ course: any, onComplete: () => void, isEventPeriod: bool
         <span className="text-[10px] uppercase tracking-widest opacity-50">Step {step} of 3</span>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+      <div className={cn(
+        "grid gap-12 transition-all",
+        deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-1 md:grid-cols-3"
+      )}>
         <div className="md:col-span-2 space-y-12">
           {step === 1 && (
             <div className="space-y-8">
@@ -3625,7 +3803,7 @@ const BookingView: FC<{ course: any, onComplete: () => void, isEventPeriod: bool
   );
 }
 
-const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 'reservations' | 'resources' | 'community' | 'users' | 'stats' | 'inquiries' }> = ({ language, siteContent, initialTab = 'reservations' }) => {
+const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 'reservations' | 'resources' | 'community' | 'users' | 'stats' | 'inquiries', deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ language, siteContent, initialTab = 'reservations', deviceMode }) => {
   const t = TRANSLATIONS[language];
   const [reservations, setReservations] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -4153,20 +4331,32 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }}
-      className="max-w-[1600px] mx-auto px-6 py-20 space-y-12"
+      className={cn(
+        "max-w-[1600px] mx-auto transition-all",
+        deviceMode === 'mobile' ? "px-4 py-12 space-y-8" : "px-6 py-20 space-y-12"
+      )}
     >
-      <div className="flex flex-col md:flex-row justify-between items-end gap-8">
+      <div className={cn(
+        "flex justify-between transition-all",
+        deviceMode === 'mobile' ? "flex-col items-start gap-6" : "flex-row items-end gap-8"
+      )}>
         <div className="space-y-4">
           <span className="text-gold text-[10px] uppercase tracking-[0.4em]">{t.admin.title}</span>
-          <h2 className="text-5xl font-serif font-light">{t.nav.systemName}</h2>
+          <h2 className={cn(
+            "font-serif font-light transition-all",
+            deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
+          )}>{t.nav.systemName}</h2>
         </div>
-        <div className="flex bg-ink/5 p-1 rounded-2xl">
+        <div className={cn(
+          "flex bg-ink/5 p-1 rounded-2xl transition-all",
+          deviceMode === 'mobile' ? "w-full overflow-x-auto no-scrollbar" : ""
+        )}>
           {(['reservations', 'resources', 'community', 'inquiries', 'users', 'stats'] as const).map(tab => (
             <button 
               key={tab}
               onClick={() => setActiveTab(tab)}
               className={cn(
-                "px-6 py-2 rounded-xl text-[10px] uppercase tracking-widest font-bold transition-all",
+                "px-6 py-2 rounded-xl text-[10px] uppercase tracking-widest font-bold transition-all whitespace-nowrap",
                 activeTab === tab ? "bg-ink text-paper shadow-lg" : "opacity-40 hover:opacity-100"
               )}
             >
@@ -4177,7 +4367,10 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
       </div>
 
       {/* Quick Actions Bar */}
-      <div className="flex flex-wrap gap-4 p-6 bg-gold/5 border border-gold/10 rounded-3xl">
+      <div className={cn(
+        "flex flex-wrap p-6 bg-gold/5 border border-gold/10 rounded-3xl transition-all",
+        deviceMode === 'mobile' ? "gap-2 p-4" : "gap-4"
+      )}>
         <button 
           onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', fileUrls: [], textContent: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '', color: '#F27D26', fontFamily: 'serif', fontSize: 16, fontColor: '#000000', fontWeight: '400', hasOverlay: false, overlayPos: 'center' }); }}
           className="flex items-center gap-2 px-6 py-3 bg-ink text-paper rounded-xl text-[10px] uppercase tracking-widest font-bold hover:bg-gold transition-all"
@@ -4407,10 +4600,19 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
       )}
 
       {activeTab === 'resources' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-12">
+        <div className={cn(
+          "grid gap-12 transition-all",
+          deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-1 md:grid-cols-3"
+        )}>
           {/* Upload Form */}
-          <div className="md:col-span-1 space-y-8">
-            <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6 sticky top-32 max-h-[80vh] overflow-y-auto pr-2">
+          <div className={cn(
+            "space-y-8 transition-all",
+            deviceMode === 'mobile' ? "order-2" : "md:col-span-1 order-1"
+          )}>
+            <div className={cn(
+              "p-8 border border-ink/10 rounded-3xl bg-white space-y-6 transition-all pr-2",
+              deviceMode !== 'mobile' && "sticky top-32 max-h-[80vh] overflow-y-auto"
+            )}>
               <div className="flex justify-between items-center">
               <h3 className="text-xl font-serif">{editingResource ? (language === 'ko' ? '자료 수정' : 'Edit Resource') : t.admin.upload}</h3>
               {editingResource && (
@@ -5067,7 +5269,10 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
                             </div>
                           </div>
 
-                          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 pt-6 border-t border-ink/5">
+                          <div className={cn(
+                            "grid gap-8 pt-6 border-t border-ink/5 transition-all",
+                            deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-1 md:grid-cols-3"
+                          )}>
                             <div className="space-y-2">
                               <p className="text-[10px] uppercase tracking-widest opacity-50">Learning History</p>
                               <p className="text-sm leading-relaxed whitespace-pre-wrap">{inq.history}</p>
@@ -5224,7 +5429,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
   );
 };
 
-const MyPageView: FC = () => {
+const MyPageView: FC<{ deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ deviceMode }) => {
   const [reservations, setReservations] = useState<any[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -5271,12 +5476,21 @@ const MyPageView: FC = () => {
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }}
-      className="max-w-[1600px] mx-auto px-6 py-20 space-y-20"
+      className={cn(
+        "max-w-[1600px] mx-auto transition-all",
+        deviceMode === 'mobile' ? "px-4 py-12 space-y-12" : "px-6 py-20 space-y-20"
+      )}
     >
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-8">
+      <div className={cn(
+        "flex flex-col justify-between transition-all",
+        deviceMode === 'mobile' ? "gap-6" : "md:flex-row md:items-end gap-8"
+      )}>
         <div className="space-y-4">
           <span className="text-gold text-[10px] uppercase tracking-[0.4em]">Student Dashboard</span>
-          <h2 className="text-5xl font-serif font-light">나의 학습 현황</h2>
+          <h2 className={cn(
+            "font-serif font-light transition-all",
+            deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
+          )}>나의 학습 현황</h2>
         </div>
         <div className="flex items-center gap-4 p-4 bg-ink/5 rounded-2xl">
           <div className="w-12 h-12 rounded-full overflow-hidden">
@@ -5385,8 +5599,9 @@ const ArchiveView: FC<{
   language: LanguageCode, 
   isAdmin: boolean,
   isEditMode: boolean,
-  siteContent: any
-}> = ({ initialFilter, onClearFilter, language, isAdmin, isEditMode, siteContent }) => {
+  siteContent: any,
+  deviceMode: 'pc' | 'pad' | 'mobile'
+}> = ({ initialFilter, onClearFilter, language, isAdmin, isEditMode, siteContent, deviceMode }) => {
   const t = TRANSLATIONS[language];
   const [resources, setResources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -5825,22 +6040,34 @@ const ArchiveView: FC<{
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }}
-      className="max-w-[1600px] mx-auto px-6 py-20 space-y-16"
+      className={cn(
+        "max-w-[1600px] mx-auto transition-all",
+        deviceMode === 'mobile' ? "px-4 py-12 space-y-8" : "px-6 py-20 space-y-16"
+      )}
     >
       <div className="text-center space-y-4">
         <span className="text-gold text-[10px] uppercase tracking-[0.4em]">
           <EditableText contentKey="archive.badge" defaultValue="L.C.L Archive" isEditMode={isEditMode} language={language} siteContent={siteContent} as="span" />
         </span>
-        <h2 className="text-5xl font-serif font-light">
+        <h2 className={cn(
+          "font-serif font-light transition-all",
+          deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
+        )}>
           <EditableText contentKey="archive.title" defaultValue={t.archive.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="span" />
         </h2>
-        <div className="max-w-3xl mx-auto opacity-60 font-serif italic leading-relaxed">
+        <div className={cn(
+          "max-w-3xl mx-auto opacity-60 font-serif italic leading-relaxed transition-all",
+          deviceMode === 'mobile' ? "text-xs" : "text-sm"
+        )}>
           <EditableText contentKey="archive.subtitle" defaultValue={t.archive.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
         </div>
       </div>
 
       {/* Category Hub */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className={cn(
+        "grid gap-8 transition-all",
+        deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-1 md:grid-cols-3"
+      )}>
         {(t.resourceGroups || RESOURCE_GROUPS).map((group: any) => (
           <motion.div 
             key={group.id}
@@ -6753,7 +6980,7 @@ const ArchiveView: FC<{
   );
 };
 
-const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void, isEditMode: boolean, isAdmin?: boolean, siteContent: any }> = ({ language, onBook, isEditMode, isAdmin, siteContent }) => {
+const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void, isEditMode: boolean, isAdmin?: boolean, siteContent: any, deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ language, onBook, isEditMode, isAdmin, siteContent, deviceMode }) => {
   const t = TRANSLATIONS[language];
   const [currentPage, setCurrentPage] = useState(0);
   const itemsPerPage = 5;
@@ -6775,18 +7002,30 @@ const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void
       initial={{ opacity: 0, y: 20 }} 
       animate={{ opacity: 1, y: 0 }} 
       exit={{ opacity: 0, y: -20 }}
-      className="max-w-[1600px] mx-auto px-6 md:px-20 py-32"
+      className={cn(
+        "max-w-[1600px] mx-auto transition-all",
+        deviceMode === 'mobile' ? "px-4 py-12" : "px-6 md:px-20 py-32"
+      )}
     >
-      <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
+      <div className={cn(
+        "flex justify-between transition-all mb-10",
+        deviceMode === 'mobile' ? "flex-col gap-4" : "flex-row items-end gap-8 mb-20"
+      )}>
         <div className="space-y-4">
           <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
             <EditableText contentKey="curriculum.badge" defaultValue={t.curriculum.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
-          <div className="text-5xl font-serif font-light">
+          <div className={cn(
+            "font-serif font-light transition-all",
+            deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
+          )}>
             <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
           </div>
         </div>
-        <div className="max-w-xs text-sm opacity-60 font-serif italic">
+        <div className={cn(
+          "opacity-60 font-serif italic transition-all",
+          deviceMode === 'mobile' ? "text-xs max-w-full" : "text-sm max-w-xs"
+        )}>
           <EditableText contentKey="curriculum.subtitle" defaultValue={t.curriculum.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
         </div>
       </div>
@@ -6890,7 +7129,7 @@ const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void
   );
 };
 
-const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEditMode: boolean, isAdmin?: boolean, siteContent: any, isEventPeriod: boolean }> = ({ language, setView, isEditMode, isAdmin, siteContent, isEventPeriod }) => {
+const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEditMode: boolean, isAdmin?: boolean, siteContent: any, isEventPeriod: boolean, deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ language, setView, isEditMode, isAdmin, siteContent, isEventPeriod, deviceMode }) => {
   const t = TRANSLATIONS[language];
   const event = siteContent['event-discount'];
   const customRate = event?.discountRate;
@@ -6957,17 +7196,29 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
       initial={{ opacity: 0, y: 20 }} 
       animate={{ opacity: 1, y: 0 }} 
       exit={{ opacity: 0, y: -20 }}
-      className="bg-ink text-paper py-32 px-6 min-h-screen"
+      className={cn(
+        "bg-ink text-paper transition-all min-h-screen",
+        deviceMode === 'mobile' ? "py-12 px-4" : "py-32 px-6"
+      )}
     >
       <div className="max-w-[1600px] mx-auto w-full">
-        <div className="text-center space-y-6 mb-20">
+        <div className={cn(
+          "text-center space-y-6 transition-all",
+          deviceMode === 'mobile' ? "mb-10" : "mb-20"
+        )}>
           <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
             <EditableText contentKey="pricing.badge" defaultValue={t.pricing.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
-          <div className="text-5xl font-serif font-light">
+          <div className={cn(
+            "font-serif font-light transition-all",
+            deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
+          )}>
             <EditableText contentKey="pricing.title" defaultValue={t.pricing.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
           </div>
-          <div className="max-w-xl mx-auto opacity-60 font-serif italic">
+          <div className={cn(
+            "max-w-xl mx-auto opacity-60 font-serif italic transition-all",
+            deviceMode === 'mobile' ? "text-xs" : "text-sm"
+          )}>
             <EditableText contentKey="pricing.subtitle" defaultValue={t.pricing.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
           
@@ -7070,13 +7321,19 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
           </div>
         )}
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-12">
+        <div className={cn(
+          "grid gap-12 transition-all",
+          deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-1 lg:grid-cols-3"
+        )}>
           {/* Selection Panel */}
           <div className="lg:col-span-2 space-y-12">
             {/* Course Selection */}
             <div className="space-y-6">
               <h3 className="text-xs uppercase tracking-[0.3em] opacity-50">1. {language === 'ko' ? '과정 선택' : 'Select Course'}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div className={cn(
+                "grid gap-4 transition-all",
+                deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-1 sm:grid-cols-3"
+              )}>
                 {COURSES.map(course => (
                   <button
                     key={course.id}
@@ -7122,11 +7379,17 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+            <div className={cn(
+              "grid gap-12 transition-all",
+              deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
+            )}>
               {/* Duration Selection */}
               <div className="space-y-6">
                 <h3 className="text-xs uppercase tracking-[0.3em] opacity-50">3. {language === 'ko' ? '기간 선택' : 'Select Duration'}</h3>
-                <div className="grid grid-cols-2 gap-3">
+                <div className={cn(
+                  "grid gap-3 transition-all",
+                  deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-2"
+                )}>
                   {[4, 8, 10, 12].map(weeks => (
                     <button
                       key={weeks}
@@ -7146,11 +7409,17 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
               </div>
 
               {/* Frequency & Duration Selection */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
+              <div className={cn(
+                "grid gap-12 transition-all",
+                deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
+              )}>
                 {/* Frequency Selection */}
                 <div className="space-y-6">
                   <h3 className="text-xs uppercase tracking-[0.3em] opacity-50">4. {language === 'ko' ? '수업 횟수' : 'Sessions per Week'}</h3>
-                  <div className="grid grid-cols-2 gap-3">
+                  <div className={cn(
+                    "grid gap-3 transition-all",
+                    deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-2"
+                  )}>
                     {[1, 2].map(num => (
                       <button
                         key={num}
@@ -7169,7 +7438,10 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
                 {/* Class Duration Selection */}
                 <div className="space-y-6">
                   <h3 className="text-xs uppercase tracking-[0.3em] opacity-50">5. {language === 'ko' ? '수업 시간' : 'Class Duration'}</h3>
-                  <div className="grid grid-cols-3 gap-3">
+                  <div className={cn(
+                    "grid gap-3 transition-all",
+                    deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-3"
+                  )}>
                     {[1, 1.5, 2].map(h => (
                       <button
                         key={h}
@@ -7190,7 +7462,10 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
 
           {/* Price Summary Panel */}
           <div className="lg:col-span-1">
-            <div className="sticky top-32 p-10 border border-gold/30 rounded-3xl bg-paper/5 space-y-8">
+            <div className={cn(
+              "p-10 border border-gold/30 rounded-3xl bg-paper/5 space-y-8 transition-all",
+              deviceMode === 'mobile' ? "relative top-0" : "sticky top-32"
+            )}>
               <div className="space-y-2">
                 <p className="text-[10px] uppercase tracking-[0.3em] opacity-40">{language === 'ko' ? '선택한 과정 합계' : 'Total for Selected Course'}</p>
                 <h4 className="text-xl font-serif">{selectedCourse.title}</h4>
@@ -7276,8 +7551,9 @@ const InquiryView: FC<{
   isEditMode: boolean, 
   isAdmin?: boolean,
   initialCourse?: Course,
-  initialLevel?: string
-}> = ({ language, onComplete, isEventPeriod, siteContent, isEditMode, isAdmin, initialCourse, initialLevel }) => {
+  initialLevel?: string,
+  deviceMode: 'pc' | 'pad' | 'mobile'
+}> = ({ language, onComplete, isEventPeriod, siteContent, isEditMode, isAdmin, initialCourse, initialLevel, deviceMode }) => {
   const t = TRANSLATIONS[language];
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
@@ -7745,7 +8021,7 @@ const InquiryView: FC<{
   );
 };
 
-const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: boolean, siteContent: any }> = ({ language, isAdmin, isEditMode, siteContent }) => {
+const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: boolean, siteContent: any, deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ language, isAdmin, isEditMode, siteContent, deviceMode }) => {
   const t = TRANSLATIONS[language];
   const [tests, setTests] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -7848,9 +8124,18 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
   }, [tests, filterCategory, filterLevel]);
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-20">
-      <div className="text-center space-y-4 mb-16">
-        <h2 className="text-5xl font-serif font-light">{t.nav.levelTest}</h2>
+    <div className={cn(
+      "max-w-4xl mx-auto transition-all",
+      deviceMode === 'mobile' ? "px-4 py-12" : "px-6 py-20"
+    )}>
+      <div className={cn(
+        "text-center space-y-4 transition-all",
+        deviceMode === 'mobile' ? "mb-10" : "mb-16"
+      )}>
+        <h2 className={cn(
+          "font-serif font-light transition-all",
+          deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
+        )}>{t.nav.levelTest}</h2>
         <p className="text-lg opacity-60 font-serif italic">
           {language === 'ko' ? '박사가 직접 설계한 레벨테스트로 실력을 진단해 보세요.' : 'Diagnose your skills with level tests designed by the PhD.'}
         </p>
@@ -7972,7 +8257,10 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
       )}
 
       {/* Filters */}
-      <div className="mb-8 p-6 bg-ink/5 rounded-2xl flex flex-col md:flex-row gap-6 items-start md:items-center">
+      <div className={cn(
+        "mb-8 p-6 bg-ink/5 rounded-2xl flex transition-all",
+        deviceMode === 'mobile' ? "flex-col gap-4" : "flex-col md:flex-row gap-6 items-start md:items-center"
+      )}>
         <div className="space-y-2 flex-grow">
           <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">
             {language === 'ko' ? '카테고리 필터' : 'Category Filter'}
@@ -8176,7 +8464,7 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
   );
 };
 
-const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClearFilter?: () => void }> = ({ language, initialFilter, onClearFilter }) => {
+const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClearFilter?: () => void, deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ language, initialFilter, onClearFilter, deviceMode }) => {
   const t = TRANSLATIONS[language];
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -8292,12 +8580,21 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }}
-      className="max-w-4xl mx-auto px-6 py-20 space-y-12"
+      className={cn(
+        "max-w-4xl mx-auto transition-all",
+        deviceMode === 'mobile' ? "px-4 py-12 space-y-8" : "px-6 py-20 space-y-12"
+      )}
     >
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+      <div className={cn(
+        "flex flex-col justify-between transition-all",
+        deviceMode === 'mobile' ? "gap-6" : "md:flex-row md:items-end gap-6"
+      )}>
         <div className="space-y-4">
           <span className="text-gold text-[10px] uppercase tracking-[0.4em] font-bold">Community</span>
-          <h2 className="text-5xl font-serif font-light tracking-tight">{t.community.title}</h2>
+          <h2 className={cn(
+            "font-serif font-light tracking-tight transition-all",
+            deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
+          )}>{t.community.title}</h2>
         </div>
         {!showForm && (
           <button 
@@ -8310,7 +8607,10 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
       </div>
 
       {/* Filter Tabs */}
-      <div className="flex flex-wrap gap-2 pb-4 border-b border-ink/5">
+      <div className={cn(
+        "flex pb-4 border-b border-ink/5 transition-all",
+        deviceMode === 'mobile' ? "overflow-x-auto gap-2 no-scrollbar" : "flex-wrap gap-2"
+      )}>
         <button
           onClick={() => setFilter('all')}
           className={cn(
@@ -8502,7 +8802,7 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
   );
 };
 
-const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: boolean, setView: (v: any) => void, siteContent: any }> = ({ language, userProfile, isAuthReady, setView, siteContent }) => {
+const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: boolean, setView: (v: any) => void, siteContent: any, deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ language, userProfile, isAuthReady, setView, siteContent, deviceMode }) => {
   const t = TRANSLATIONS[language];
   const [prompt, setPrompt] = useState('');
   const [level, setLevel] = useState('beginner');
@@ -8737,7 +9037,10 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
     <motion.div 
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }}
-      className="max-w-6xl mx-auto px-6 py-20 space-y-12"
+      className={cn(
+        "max-w-6xl mx-auto transition-all",
+        deviceMode === 'mobile' ? "px-4 py-12 space-y-8" : "px-6 py-20 space-y-12"
+      )}
     >
       <div className="text-center space-y-4">
         <div className="flex flex-col items-center gap-2">
@@ -8752,7 +9055,10 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
             </motion.div>
           )}
         </div>
-        <h2 className="text-5xl font-serif font-light">{t.aiStudio.title}</h2>
+        <h2 className={cn(
+          "font-serif font-light transition-all",
+          deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
+        )}>{t.aiStudio.title}</h2>
         {error && (
           <motion.div 
             initial={{ opacity: 0, y: -10 }}
@@ -8795,12 +9101,18 @@ const ImageGenView: FC<{ language: LanguageCode, userProfile: any, isAuthReady: 
               onChange={(e) => setPrompt(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleGenerate()}
               placeholder={t.aiStudio.placeholder}
-              className="w-full p-6 bg-ink/5 border border-ink/10 rounded-2xl focus:outline-none focus:border-gold transition-colors pr-32"
+              className={cn(
+                "w-full bg-ink/5 border border-ink/10 rounded-2xl focus:outline-none focus:border-gold transition-all",
+                deviceMode === 'mobile' ? "p-4 pr-24 text-sm" : "p-6 pr-32"
+              )}
             />
             <button 
               onClick={handleGenerate}
               disabled={!prompt || isGenerating}
-              className="absolute right-2 top-2 bottom-2 px-6 bg-ink text-paper rounded-xl text-xs uppercase tracking-widest hover:bg-gold hover:text-ink transition-all disabled:opacity-50"
+              className={cn(
+                "absolute bg-ink text-paper rounded-xl uppercase tracking-widest hover:bg-gold hover:text-ink transition-all disabled:opacity-50",
+                deviceMode === 'mobile' ? "right-1.5 top-1.5 bottom-1.5 px-4 text-[10px]" : "right-2 top-2 bottom-2 px-6 text-xs"
+              )}
             >
               {isGenerating ? t.aiStudio.generating : t.aiStudio.generate}
             </button>
