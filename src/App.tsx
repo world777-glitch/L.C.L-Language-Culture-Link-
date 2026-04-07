@@ -1336,7 +1336,7 @@ const EditableText: FC<{
           className={cn(
             "outline-none focus:ring-2 focus:ring-gold/30 rounded px-1 transition-all min-w-[1ch] inline-block",
             !value && "opacity-30 italic",
-            isEditing && "bg-white/50"
+            isEditing && "bg-gold/10"
           )}
           style={currentStyles}
           dangerouslySetInnerHTML={!isEditing ? { __html: value || defaultValue } : undefined}
@@ -1344,7 +1344,7 @@ const EditableText: FC<{
         
         {isEditing && (
           <div className={cn(
-            "absolute left-0 p-5 bg-white border-2 border-gold shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[24px] z-[300] flex flex-col gap-4 min-w-[340px]",
+            "absolute left-0 p-5 bg-card border-2 border-gold shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[24px] z-[300] flex flex-col gap-4 min-w-[340px]",
             "animate-in fade-in zoom-in duration-200",
             // Position below for nav/menu items to avoid being cut off by the top of the screen
             contentKey.includes('nav') || contentKey.includes('menu') ? "top-full mt-4" : "bottom-full mb-4"
@@ -3529,7 +3529,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               <motion.div 
                 key={group.id}
                 whileHover={{ y: -5 }}
-                className="group p-8 bg-white border border-ink/5 rounded-[32px] shadow-sm hover:shadow-xl hover:border-gold/30 transition-all space-y-8"
+                className="group p-8 bg-card border border-ink/5 rounded-[32px] shadow-sm hover:shadow-xl hover:border-gold/30 transition-all space-y-8"
               >
                 <div className="space-y-4">
                   <div className="w-12 h-12 rounded-2xl bg-gold/10 text-gold flex items-center justify-center group-hover:bg-gold group-hover:text-ink transition-colors">
@@ -4579,7 +4579,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
                   {courseReservations.map(res => {
                     const student = users.find(u => u.uid === res.studentUid);
                     return (
-                      <div key={res.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6 hover:shadow-lg transition-all">
+                      <div key={res.id} className="p-8 border border-ink/10 rounded-3xl bg-card space-y-6 hover:shadow-lg transition-all">
                         <div className="flex justify-between items-start">
                           <div className="flex items-center gap-4">
                             <div className="w-12 h-12 rounded-full overflow-hidden bg-ink/5">
@@ -5069,7 +5069,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
               </button>
             </div>
             {resources.map(res => (
-              <div key={res.id} className="p-6 border border-ink/10 rounded-3xl bg-white flex items-center justify-between gap-6">
+              <div key={res.id} className="p-6 border border-ink/10 rounded-3xl bg-card flex items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
                   <div 
                     className="w-12 h-12 rounded-xl flex items-center justify-center text-white shadow-lg"
@@ -5116,7 +5116,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
       {activeTab === 'community' && (
         <div className="space-y-8">
           {communityPosts.map(post => (
-            <div key={post.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
+            <div key={post.id} className="p-8 border border-ink/10 rounded-3xl bg-card space-y-6">
               <div className="flex justify-between items-start">
                 <div className="space-y-2">
                   <div className="flex items-center gap-3">
@@ -5214,7 +5214,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
         <div className="space-y-6">
           <div className="grid grid-cols-1 gap-4">
             {users.map(u => (
-              <div key={u.id} className="p-6 border border-ink/10 rounded-3xl bg-white flex items-center justify-between gap-6">
+              <div key={u.id} className="p-6 border border-ink/10 rounded-3xl bg-card flex items-center justify-between gap-6">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 rounded-full overflow-hidden bg-ink/5">
                     <img src={u.photoURL || "https://i.pravatar.cc/100"} alt="Profile" referrerPolicy="no-referrer" />
@@ -5259,7 +5259,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
       {activeTab === 'inquiries' && (
         <div className="space-y-12">
           {editingInquiry ? (
-            <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
+            <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-6">
               <div className="flex justify-between items-center">
                 <h3 className="text-xl font-serif">Edit Inquiry</h3>
                 <button onClick={() => setEditingInquiry(null)} className="text-xs text-gold underline">Cancel</button>
@@ -5349,7 +5349,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
                     </div>
                     <div className="grid grid-cols-1 gap-6">
                       {courseInquiries.map(inq => (
-                        <div key={inq.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
+                        <div key={inq.id} className="p-8 border border-ink/10 rounded-3xl bg-card space-y-6">
                           <div className="flex justify-between items-start">
                             <div className="space-y-1">
                               <h4 className="text-xl font-bold">{inq.name}</h4>
@@ -5424,7 +5424,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
                       const desired = Array.isArray(inq.desiredClass) ? inq.desiredClass : [inq.desiredClass];
                       return !desired.some((d: string) => COURSES.some(c => d.toLowerCase().includes(c.id.toLowerCase()) || d.toLowerCase().includes(c.title.toLowerCase())) || d.toLowerCase().includes('custom'));
                     }).map(inq => (
-                      <div key={inq.id} className="p-8 border border-ink/10 rounded-3xl bg-white space-y-6">
+                      <div key={inq.id} className="p-8 border border-ink/10 rounded-3xl bg-card space-y-6">
                         <div className="flex justify-between items-start">
                           <div className="space-y-1">
                             <h4 className="text-xl font-bold">{inq.name}</h4>
@@ -5492,23 +5492,23 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
 
       {activeTab === 'stats' && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-4">
+          <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-4">
             <BarChart3 className="text-gold" size={32} />
             <h4 className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.totalDownloads}</h4>
             <p className="text-4xl font-serif">{downloads.length}</p>
           </div>
-          <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-4">
+          <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-4">
             <Users className="text-gold" size={32} />
             <h4 className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.activeStudents}</h4>
             <p className="text-4xl font-serif">{users.length}</p>
           </div>
-          <div className="p-8 border border-ink/10 rounded-3xl bg-white space-y-4">
+          <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-4">
             <FileText className="text-gold" size={32} />
             <h4 className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.totalResources}</h4>
             <p className="text-4xl font-serif">{resources.length}</p>
           </div>
 
-          <div className="md:col-span-3 p-8 border border-ink/10 rounded-3xl bg-white space-y-8">
+          <div className="md:col-span-3 p-8 border border-ink/10 rounded-3xl bg-card space-y-8">
             <h3 className="text-xl font-serif">{t.admin.recentDownloads}</h3>
             <div className="space-y-4">
               {downloads.slice(0, 10).map(dl => {
@@ -6337,7 +6337,7 @@ const ArchiveView: FC<{
                 placeholder={t.archive.search}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-6 py-4 bg-white border border-ink/10 rounded-full text-sm focus:outline-none focus:border-gold transition-all"
+                className="w-full pl-12 pr-6 py-4 bg-card border border-ink/10 rounded-full text-sm focus:outline-none focus:border-gold transition-all"
               />
             </div>
           </div>
@@ -6359,7 +6359,7 @@ const ArchiveView: FC<{
                 }
                 setSelectedResource(res);
               }}
-              className="p-6 border border-ink/10 rounded-2xl bg-white space-y-4 flex flex-col hover:shadow-xl hover:shadow-ink/5 transition-all group cursor-pointer"
+              className="p-6 border border-ink/10 rounded-2xl bg-card space-y-4 flex flex-col hover:shadow-xl hover:shadow-ink/5 transition-all group cursor-pointer"
             >
               <div className="flex justify-between items-start">
                 <div 
@@ -6972,7 +6972,7 @@ const ArchiveView: FC<{
                     <div 
                       id="resource-text-preview"
                       className={cn(
-                        "text-sm whitespace-pre-wrap leading-relaxed overflow-y-auto custom-scrollbar pr-2 p-8 bg-white rounded-3xl shadow-inner transition-all duration-500",
+                        "text-sm whitespace-pre-wrap leading-relaxed overflow-y-auto custom-scrollbar pr-2 p-8 bg-card rounded-3xl shadow-inner transition-all duration-500",
                         isFullScreen ? "max-h-none min-h-[70vh]" : "max-h-[400px]"
                       )}
                       style={{ 
@@ -7909,7 +7909,7 @@ const InquiryView: FC<{
                     placeholder={language === 'ko' ? '직접 입력해 주세요.' : 'Please enter directly.'}
                     value={formData.otherLevelConcern}
                     onChange={(e) => setFormData(prev => ({ ...prev, otherLevelConcern: e.target.value }))}
-                    className="w-full p-4 bg-white border border-gold/30 rounded-xl outline-none focus:border-gold text-sm"
+                    className="w-full p-4 bg-card border border-gold/30 rounded-xl outline-none focus:border-gold text-sm"
                   />
                 )}
               </div>
@@ -8036,7 +8036,7 @@ const InquiryView: FC<{
               placeholder={language === 'ko' ? '직접 입력해 주세요.' : 'Please enter directly.'}
               value={formData.otherDesiredClass}
               onChange={(e) => setFormData(prev => ({ ...prev, otherDesiredClass: e.target.value }))}
-              className="w-full p-4 bg-white border border-gold/30 rounded-xl outline-none focus:border-gold text-sm"
+              className="w-full p-4 bg-card border border-gold/30 rounded-xl outline-none focus:border-gold text-sm"
             />
           )}
         </div>
@@ -8305,7 +8305,7 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
                             "px-4 py-2 rounded-full text-xs font-bold transition-all border",
                             newCategory === course.category 
                               ? "bg-gold text-ink border-gold" 
-                              : "bg-white text-ink/60 border-ink/10 hover:border-gold/50"
+                              : "bg-card text-ink/60 border-ink/10 hover:border-gold/50"
                           )}
                         >
                           {course.title.split(' (')[0]}
@@ -8331,7 +8331,7 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
                             "px-4 py-2 rounded-full text-xs font-bold transition-all border",
                             newLevel === lvl 
                               ? "bg-ink text-paper border-ink" 
-                              : "bg-white text-ink/60 border-ink/10 hover:border-gold/50"
+                              : "bg-card text-ink/60 border-ink/10 hover:border-gold/50"
                           )}
                         >
                           {lvl}
@@ -8350,7 +8350,7 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
                     value={newName}
                     onChange={(e) => setNewName(e.target.value)}
                     placeholder={language === 'ko' ? '예: 초급 레벨테스트' : 'e.g., Beginner Level Test'}
-                    className="w-full p-4 bg-white border border-ink/10 rounded-xl outline-none focus:border-gold transition-colors"
+                    className="w-full p-4 bg-card border border-ink/10 rounded-xl outline-none focus:border-gold transition-colors"
                     required
                   />
                 </div>
@@ -8361,7 +8361,7 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
                   <input 
                     type="file" 
                     ref={fileInputRef} 
-                    className="w-full p-4 bg-white border border-ink/10 rounded-xl outline-none focus:border-gold transition-colors"
+                    className="w-full p-4 bg-card border border-ink/10 rounded-xl outline-none focus:border-gold transition-colors"
                     required
                   />
                 </div>
@@ -8406,7 +8406,7 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
                 "px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border",
                 filterCategory === 'All' 
                   ? "bg-ink text-paper border-ink" 
-                  : "bg-white text-ink/60 border-ink/10 hover:border-gold/50"
+                  : "bg-card text-ink/60 border-ink/10 hover:border-gold/50"
               )}
             >
               {language === 'ko' ? '전체' : 'All'}
@@ -8422,7 +8422,7 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
                   "px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border",
                   filterCategory === course.category 
                     ? "bg-gold text-ink border-gold" 
-                    : "bg-white text-ink/60 border-ink/10 hover:border-gold/50"
+                    : "bg-card text-ink/60 border-ink/10 hover:border-gold/50"
                 )}
               >
                 {course.title.split(' (')[0]}
@@ -8442,7 +8442,7 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
                   "px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border",
                   filterLevel === 'All' 
                     ? "bg-ink text-paper border-ink" 
-                    : "bg-white text-ink/60 border-ink/10 hover:border-gold/50"
+                    : "bg-card text-ink/60 border-ink/10 hover:border-gold/50"
                 )}
               >
                 {language === 'ko' ? '전체' : 'All'}
@@ -8455,7 +8455,7 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
                     "px-4 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-widest transition-all border",
                     filterLevel === lvl 
                       ? "bg-ink text-paper border-ink" 
-                      : "bg-white text-ink/60 border-ink/10 hover:border-gold/50"
+                      : "bg-card text-ink/60 border-ink/10 hover:border-gold/50"
                   )}
                 >
                   {lvl}
@@ -8528,7 +8528,7 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
                           type="text"
                           value={editName}
                           onChange={(e) => setEditName(e.target.value)}
-                          className="flex-grow p-2 bg-white border border-gold rounded-lg text-sm outline-none"
+                          className="flex-grow p-2 bg-card border border-gold rounded-lg text-sm outline-none"
                         />
                         <button 
                           onClick={() => handleUpdateName(test.id)}
@@ -8787,7 +8787,7 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -20 }}
             onSubmit={handleSubmit}
-            className="p-8 border border-ink/10 rounded-[40px] bg-white shadow-2xl space-y-8 overflow-hidden relative"
+            className="p-8 border border-ink/10 rounded-[40px] bg-card shadow-2xl space-y-8 overflow-hidden relative"
           >
             <div className="space-y-4">
               <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">Select Category</label>
@@ -8892,7 +8892,7 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
               layout
               key={post.id} 
               className={cn(
-                "border border-ink/10 rounded-[40px] bg-white hover:shadow-2xl hover:shadow-ink/5 transition-all group",
+                "border border-ink/10 rounded-[40px] bg-card hover:shadow-2xl hover:shadow-ink/5 transition-all group",
                 deviceMode === 'mobile' ? "p-6 space-y-4" : "p-8 space-y-6"
               )}
             >

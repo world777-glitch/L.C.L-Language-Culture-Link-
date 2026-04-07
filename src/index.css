@@ -6,6 +6,7 @@
   --font-sans: "Montserrat", sans-serif;
   
   --color-paper: #f5f2ed;
+  --color-card: #ffffff;
   --color-ink: #1a1a1a;
   --color-gold: #c5a059;
 }
@@ -15,6 +16,7 @@
   --font-sans: var(--font-sans);
   
   --color-paper: var(--color-paper);
+  --color-card: var(--color-card);
   --color-ink: var(--color-ink);
   --color-gold: var(--color-gold);
 }
@@ -34,6 +36,7 @@
 
 .dark {
   --color-paper: #1a1a1a;
+  --color-card: #262626;
   --color-ink: #f5f2ed;
   --color-gold: #d4af37;
 }
