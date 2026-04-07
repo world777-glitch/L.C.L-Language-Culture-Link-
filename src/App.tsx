@@ -3162,7 +3162,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       {/* Hero Section */}
       <section className={cn(
         "relative flex items-center overflow-hidden px-4 landing-hero-bg transition-all",
-        deviceMode === 'mobile' ? "h-[80vh] pt-20" : deviceMode === 'pad' ? "h-[70vh]" : "h-[85vh]"
+        deviceMode === 'mobile' ? "h-[85vh] pt-20" : deviceMode === 'pad' ? "h-[75vh]" : "h-[90vh]"
       )}>
         <div className="absolute inset-0 landing-hero-overlay pointer-events-none" />
         <div className={cn(
@@ -3170,8 +3170,8 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
           deviceMode === 'mobile' ? "w-full opacity-30" : "w-1/2"
         )}>
           <div className={cn(
-            "aspect-[3/4] bg-ink/10 rounded-[160px] overflow-hidden relative transition-all",
-            deviceMode === 'mobile' ? "w-[45%]" : deviceMode === 'pad' ? "w-[55%]" : "w-[60%]"
+            "aspect-[3/4] bg-ink/10 rounded-[200px] overflow-hidden relative transition-all",
+            deviceMode === 'mobile' ? "w-[55%]" : deviceMode === 'pad' ? "w-[70%]" : "w-[75%]"
           )}>
             <EditableImage 
               contentKey="hero.image"
@@ -3182,7 +3182,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               isAdmin={isAdmin}
               language={language}
               siteContent={siteContent}
-              rounded="rounded-[160px]"
+              rounded="rounded-[200px]"
             >
               <div className="absolute inset-0 bg-gradient-to-t from-paper/40 to-transparent pointer-events-none" />
             </EditableImage>
