@@ -133,6 +133,18 @@
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["name", "contact", "createdAt"]
+    },
+    "visits": {
+      "title": "Site Visit",
+      "description": "Tracks unique daily visits.",
+      "type": "object",
+      "properties": {
+        "timestamp": { "type": "string", "format": "date-time" },
+        "userUid": { "type": "string", "description": "Optional user UID" },
+        "userAgent": { "type": "string" },
+        "date": { "type": "string", "description": "YYYY-MM-DD format for easy grouping" }
+      },
+      "required": ["timestamp", "date"]
     }
   },
   "firestore": {
@@ -144,6 +156,7 @@
     "/comments/{commentId}": { "schema": "comments", "description": "Resource comments" },
     "/community/{postId}": { "schema": "community", "description": "Community posts" },
     "/siteContent/{contentId}": { "schema": "siteContent", "description": "Landing page content overrides" },
-    "/inquiries/{inquiryId}": { "schema": "inquiries", "description": "Student inquiries" }
+    "/inquiries/{inquiryId}": { "schema": "inquiries", "description": "Student inquiries" },
+    "/visits/{visitId}": { "schema": "visits", "description": "Daily visit tracking" }
   }
 }

@@ -76,9 +76,19 @@ service cloud.firestore {
       allow delete: if isAdmin() || isOwner(resource.data.userUid);
     }
 
+    match /levelTests/{testId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
     match /siteContent/{contentId} {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    match /visits/{visitId} {
+      allow read: if isAdmin();
+      allow create: if true;
     }
   }
 }

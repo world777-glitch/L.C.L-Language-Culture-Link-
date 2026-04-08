@@ -66,9 +66,10 @@ import {
   Tablet,
   Smartphone,
   Settings,
-  Menu
+  Menu,
+  TrendingUp
 } from 'lucide-react';
-import { motion, AnimatePresence, Reorder } from 'motion/react';
+import { motion, AnimatePresence, Reorder, useScroll, useSpring } from 'motion/react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
 import { COURSES, calculatePrice, RESOURCE_GROUPS, LEVEL_PRICES, CourseCategory, Course } from './constants';
 import { cn } from './lib/utils';
@@ -77,10 +78,11 @@ import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 import { Document, Packer, Paragraph, TextRun } from 'docx';
 import { saveAs } from 'file-saver';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LineChart, Line, AreaChart, Area } from 'recharts';
 
 import { auth, loginWithGoogle, logout as firebaseLogout, db, storage, handleFirestoreError, OperationType } from './firebase';
 import { onAuthStateChanged } from 'firebase/auth';
-import { collection, addDoc, setDoc, serverTimestamp, onSnapshot, query, where, orderBy, doc, getDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
+import { collection, addDoc, setDoc, serverTimestamp, onSnapshot, query, where, orderBy, limit, doc, getDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 
 // Helper to convert raw PCM from Gemini TTS to a playable WAV Blob
@@ -254,7 +256,7 @@ export default function App() {
         }
       });
       setSiteContent(content);
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'siteContent'));
     return () => unsubscribe();
   }, [language]);
 
@@ -300,6 +302,28 @@ export default function App() {
     return () => unsubscribe();
   }, []);
 
+  useEffect(() => {
+    const trackVisit = async () => {
+      const today = new Date().toISOString().split('T')[0];
+      const lastVisit = localStorage.getItem('lastVisit');
+      
+      if (lastVisit !== today) {
+        try {
+          await addDoc(collection(db, 'visits'), {
+            timestamp: serverTimestamp(),
+            date: today,
+            userAgent: navigator.userAgent,
+            userUid: auth.currentUser?.uid || null
+          });
+          localStorage.setItem('lastVisit', today);
+        } catch (error) {
+          console.error('Failed to track visit:', error);
+        }
+      }
+    };
+    trackVisit();
+  }, [auth.currentUser]);
+
   const handleLogin = async () => {
     try {
       await loginWithGoogle();
@@ -342,8 +366,21 @@ export default function App() {
     allPagesBg: siteContent['global.style.allPagesBg']?.value || '',
   }), [siteContent]);
 
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, {
+    damping: 30,
+    stiffness: 100,
+    restDelta: 0.001
+  });
+
   return (
     <div className={cn("min-h-screen flex flex-col bg-paper text-ink font-sans selection:bg-gold selection:text-ink overflow-x-hidden transition-colors duration-300", isDarkMode && "dark")}>
+      {/* Scroll Progress Bar */}
+      <motion.div
+        className="fixed top-0 left-0 right-0 h-1 bg-gold z-[1000] origin-left"
+        style={{ scaleX }}
+      />
+      
       <style dangerouslySetInnerHTML={{ __html: `
         :root {
           --color-paper: ${isDarkMode ? '#1a1a1a' : styles.paper};
@@ -367,6 +404,22 @@ export default function App() {
             background-color: rgba(0,0,0,${styles.landingOverlay});
           }
         ` : ''}
+        
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+          width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+          background: var(--color-paper);
+        }
+        ::-webkit-scrollbar-thumb {
+          background: var(--color-gold);
+          opacity: 0.5;
+          border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+          background: var(--color-ink);
+        }
       `}} />
       
       <GlobalStyleEditor isEditMode={isEditMode} siteContent={siteContent} language={language} />
@@ -379,9 +432,9 @@ export default function App() {
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.5 }}
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="fixed bottom-8 right-8 z-50 w-12 h-12 bg-ink text-paper rounded-full flex items-center justify-center shadow-2xl hover:scale-110 transition-transform"
+            className="fixed bottom-8 right-8 z-50 w-12 h-12 bg-ink text-paper rounded-full flex items-center justify-center shadow-2xl hover:bg-gold hover:text-ink transition-all group"
           >
-            <Plus className="rotate-45" size={24} />
+            <ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" />
           </motion.button>
         )}
       </AnimatePresence>
@@ -424,7 +477,7 @@ export default function App() {
 
           <div className={cn(
             "items-center transition-all",
-            deviceMode === 'mobile' ? "hidden" : "flex gap-2 lg:gap-4 xl:gap-6"
+            (deviceMode === 'mobile' || deviceMode === 'pad') ? "hidden" : "flex gap-2 lg:gap-4 xl:gap-6"
           )}>
             {/* Home */}
             <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu(null)}>
@@ -925,7 +978,7 @@ export default function App() {
         </div>
 
           {/* Mobile Menu Button */}
-          {deviceMode === 'mobile' && (
+          {(deviceMode === 'mobile' || deviceMode === 'pad') && (
             <div className="flex items-center gap-2 pr-4">
               <button 
                 onClick={() => setIsDarkMode(!isDarkMode)}
@@ -1066,7 +1119,7 @@ export default function App() {
           {view === 'curriculum' && <CurriculumView key="curriculum" language={language} onBook={(course) => { setSelectedCourse(course); setView('inquiry'); }} isEditMode={isEditMode} isAdmin={isAdmin} siteContent={siteContent} deviceMode={deviceMode} />}
           {view === 'pricing' && <PricingView key="pricing" language={language} setView={setView} isEditMode={isEditMode} isAdmin={isAdmin} siteContent={siteContent} isEventPeriod={isEventPeriod} deviceMode={deviceMode} />}
           {view === 'booking' && <BookingView key="booking" course={selectedCourse} onComplete={() => setView('mypage')} isEventPeriod={isEventPeriod} siteContent={siteContent} deviceMode={deviceMode} />}
-          {view === 'mypage' && <MyPageView key="mypage" deviceMode={deviceMode} />}
+          {view === 'mypage' && <MyPageView key="mypage" deviceMode={deviceMode} setView={setView} setInitialArchiveFilter={setInitialArchiveFilter} />}
           {view === 'admin' && <AdminView key="admin" language={language} siteContent={siteContent} initialTab={adminTab} deviceMode={deviceMode} />}
           {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} siteContent={siteContent} deviceMode={deviceMode} />}
           {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} isEditMode={isEditMode} siteContent={siteContent} deviceMode={deviceMode} />}
@@ -2608,7 +2661,7 @@ const EditableImage: FC<{
         updatedAt: serverTimestamp()
       });
     } catch (error) {
-      console.error('Upload failed', error);
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
     } finally {
       setIsUploading(false);
     }
@@ -3171,7 +3224,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
         )}>
           <div className={cn(
             "aspect-[3/4] bg-ink/10 rounded-[200px] overflow-hidden relative transition-all",
-            deviceMode === 'mobile' ? "w-[55%]" : deviceMode === 'pad' ? "w-[70%]" : "w-[75%]"
+            deviceMode === 'mobile' ? "w-[60%]" : deviceMode === 'pad' ? "w-[75%]" : "w-[80%]"
           )}>
             <EditableImage 
               contentKey="hero.image"
@@ -3329,7 +3382,13 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       </section>
 
       {/* Curriculum Section */}
-      <section id="curriculum" className="max-w-[1600px] mx-auto px-0 py-16">
+      <motion.section 
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-100px" }}
+        id="curriculum" 
+        className="max-w-[1600px] mx-auto px-0 py-16"
+      >
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
           <div className="space-y-4">
             <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
@@ -3390,10 +3449,15 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
             );
           }}
         />
-      </section>
+      </motion.section>
 
       {/* Dynamic Gallery Section */}
-      <section className="max-w-[1600px] mx-auto px-0 py-16">
+      <motion.section 
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-100px" }}
+        className="max-w-[1600px] mx-auto px-0 py-16"
+      >
         <div className="text-center space-y-4 mb-20">
           <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
             <EditableText contentKey="gallery.badge" defaultValue="Gallery & Highlights" isEditMode={isEditMode} language={language} siteContent={siteContent} />
@@ -3442,11 +3506,17 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
             </motion.div>
           )}
         />
-      </section>
+      </motion.section>
 
       {/* Dynamic Content Sections */}
       {(isEditMode || Number(siteContent['landing.dynamic.count']?.value || 0) > 0) && (
-        <section id="landing-dynamic-area" className="max-w-[1600px] mx-auto px-0 py-16">
+        <motion.section 
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true, margin: "-100px" }}
+          id="landing-dynamic-area" 
+          className="max-w-[1600px] mx-auto px-0 py-16"
+        >
           <DynamicContentArea 
             contentKey="landing.dynamic"
             isEditMode={isEditMode}
@@ -3454,13 +3524,18 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
             language={language}
             siteContent={siteContent}
           />
-        </section>
+        </motion.section>
       )}
 
-      <section className={cn(
-        "max-w-4xl mx-auto text-center space-y-12 transition-all",
-        deviceMode === 'mobile' ? "px-4 py-12" : "px-6 py-20"
-      )}>
+      <motion.section 
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-100px" }}
+        className={cn(
+          "max-w-4xl mx-auto text-center space-y-12 transition-all",
+          deviceMode === 'mobile' ? "px-4 py-12" : "px-6 py-20"
+        )}
+      >
         <div className="w-12 h-12 mx-auto border border-ink/10 rounded-full flex items-center justify-center opacity-20">"</div>
         <div className={cn(
           "font-serif font-light italic leading-tight transition-all",
@@ -3476,12 +3551,18 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
             <EditableText contentKey="testimonial.authorTitle" defaultValue={t.testimonial.authorTitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
         </div>
-      </section>
+      </motion.section>
 
-      <section id="library" className={cn(
-        "bg-paper border-y border-ink/5 transition-all",
-        deviceMode === 'mobile' ? "py-12 px-4" : "py-20 px-6"
-      )}>
+      <motion.section 
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-100px" }}
+        id="library" 
+        className={cn(
+          "bg-paper border-y border-ink/5 transition-all",
+          deviceMode === 'mobile' ? "py-12 px-4" : "py-20 px-6"
+        )}
+      >
         <div className="max-w-[1600px] mx-auto space-y-20">
           <div className={cn(
             "grid items-center transition-all",
@@ -3637,7 +3718,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
             </div>
           </div>
         </div>
-      </section>
+      </motion.section>
       <DynamicContentArea contentKey="landing.bottom" isEditMode={isEditMode} isAdmin={isAdmin} language={language} siteContent={siteContent} />
     </motion.div>
   );
@@ -3914,7 +3995,7 @@ const BookingView: FC<{ course: any, onComplete: () => void, isEventPeriod: bool
   );
 }
 
-const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 'reservations' | 'resources' | 'community' | 'users' | 'stats' | 'inquiries', deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ language, siteContent, initialTab = 'reservations', deviceMode }) => {
+const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 'reservations' | 'resources' | 'community' | 'users' | 'stats' | 'inquiries' | 'visitors', deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ language, siteContent, initialTab = 'reservations', deviceMode }) => {
   const t = TRANSLATIONS[language];
   const [reservations, setReservations] = useState<any[]>([]);
   const [users, setUsers] = useState<any[]>([]);
@@ -3923,8 +4004,9 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
   const [downloads, setDownloads] = useState<any[]>([]);
   const [communityPosts, setCommunityPosts] = useState<any[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [visits, setVisits] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'reservations' | 'resources' | 'community' | 'users' | 'stats' | 'inquiries'>(initialTab);
+  const [activeTab, setActiveTab] = useState<'reservations' | 'resources' | 'community' | 'users' | 'stats' | 'inquiries' | 'visitors'>(initialTab as any);
   
   useEffect(() => {
     setActiveTab(initialTab);
@@ -3962,6 +4044,28 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
     overlayPos: 'center' as 'top' | 'center' | 'bottom'
   });
 
+  const statsData = useMemo(() => {
+    const counts: Record<string, number> = {};
+    downloads.forEach(dl => {
+      const res = resources.find(r => r.id === dl.resourceId);
+      const catName = res?.categoryId || 'Unknown';
+      counts[catName] = (counts[catName] || 0) + 1;
+    });
+    return Object.entries(counts).map(([name, value]) => ({ name, value }));
+  }, [downloads, resources]);
+
+  const visitorStats = useMemo(() => {
+    const dailyCounts: Record<string, number> = {};
+    visits.forEach(v => {
+      const date = v.date || 'Unknown';
+      dailyCounts[date] = (dailyCounts[date] || 0) + 1;
+    });
+    return Object.entries(dailyCounts)
+      .map(([date, count]) => ({ date, count }))
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-14); // Last 14 days
+  }, [visits]);
+
   useEffect(() => {
     const unsubRes = onSnapshot(query(collection(db, 'reservations'), orderBy('createdAt', 'desc')), (snapshot) => {
       setReservations(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
@@ -3991,6 +4095,10 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
       setInquiries(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'inquiries'));
 
+    const unsubVisits = onSnapshot(query(collection(db, 'visits'), orderBy('timestamp', 'desc')), (snapshot) => {
+      setVisits(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'visits'));
+
     setLoading(false);
 
     return () => {
@@ -4001,6 +4109,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
       unsubCommunity();
       unsubFeedbacks();
       unsubInquiries();
+      unsubVisits();
     };
   }, []);
 
@@ -4444,25 +4553,25 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
       animate={{ opacity: 1 }}
       className={cn(
         "max-w-[1600px] mx-auto transition-all",
-        deviceMode === 'mobile' ? "px-4 py-12 space-y-8" : "px-6 py-20 space-y-12"
+        (deviceMode === 'mobile' || deviceMode === 'pad') ? "px-4 py-12 space-y-8" : "px-6 py-20 space-y-12"
       )}
     >
       <div className={cn(
         "flex justify-between transition-all",
-        deviceMode === 'mobile' ? "flex-col items-start gap-6" : "flex-row items-end gap-8"
+        (deviceMode === 'mobile' || deviceMode === 'pad') ? "flex-col items-start gap-6" : "flex-row items-end gap-8"
       )}>
         <div className="space-y-4">
           <span className="text-gold text-[10px] uppercase tracking-[0.4em]">{t.admin.title}</span>
           <h2 className={cn(
             "font-serif font-light transition-all",
-            deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
+            (deviceMode === 'mobile' || deviceMode === 'pad') ? "text-3xl" : "text-5xl"
           )}>{t.nav.systemName}</h2>
         </div>
         <div className={cn(
-          "flex bg-ink/5 p-1 rounded-2xl transition-all",
-          deviceMode === 'mobile' ? "w-full overflow-x-auto no-scrollbar" : ""
+          "flex bg-ink/5 p-1 rounded-2xl transition-all overflow-x-auto no-scrollbar",
+          (deviceMode === 'mobile' || deviceMode === 'pad') ? "w-full" : ""
         )}>
-          {(['reservations', 'resources', 'community', 'inquiries', 'users', 'stats'] as const).map(tab => (
+          {(['reservations', 'resources', 'community', 'inquiries', 'users', 'stats', 'visitors'] as const).map(tab => (
             <button 
               key={tab}
               onClick={() => setActiveTab(tab)}
@@ -4480,7 +4589,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
       {/* Quick Actions Bar */}
       <div className={cn(
         "flex flex-wrap p-6 bg-gold/5 border border-gold/10 rounded-3xl transition-all",
-        deviceMode === 'mobile' ? "gap-2 p-4" : "gap-4"
+        (deviceMode === 'mobile' || deviceMode === 'pad') ? "gap-3 p-4 justify-center" : "gap-4"
       )}>
         <button 
           onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', fileUrls: [], textContent: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '', color: '#F27D26', fontFamily: 'serif', fontSize: 16, fontColor: '#000000', fontWeight: '400', hasOverlay: false, overlayPos: 'center' }); }}
@@ -4519,7 +4628,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
             <option value="all">Everyone</option>
           </select>
         </div>
-        <div className="flex-grow" />
+        <div className="flex-grow hidden lg:block" />
           <div className="flex items-center gap-4 bg-white p-3 rounded-2xl border border-ink/5">
             <span className="text-[10px] uppercase tracking-widest font-bold opacity-50">Event Discount</span>
             <div className="flex items-center gap-2">
@@ -5490,48 +5599,200 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
         </div>
       )}
 
-      {activeTab === 'stats' && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-4">
-            <BarChart3 className="text-gold" size={32} />
-            <h4 className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.totalDownloads}</h4>
-            <p className="text-4xl font-serif">{downloads.length}</p>
-          </div>
-          <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-4">
-            <Users className="text-gold" size={32} />
-            <h4 className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.activeStudents}</h4>
-            <p className="text-4xl font-serif">{users.length}</p>
-          </div>
-          <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-4">
-            <FileText className="text-gold" size={32} />
-            <h4 className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.totalResources}</h4>
-            <p className="text-4xl font-serif">{resources.length}</p>
+      {activeTab === 'visitors' && (
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-4">
+              <Users className="text-gold" size={32} />
+              <h4 className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.totalVisitors}</h4>
+              <p className="text-4xl font-serif">{visits.length}</p>
+            </div>
+            <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-4">
+              <Calendar className="text-gold" size={32} />
+              <h4 className="text-[10px] uppercase tracking-widest opacity-50">{language === 'ko' ? '오늘 방문자' : 'Today Visitors'}</h4>
+              <p className="text-4xl font-serif">
+                {visits.filter(v => v.date === new Date().toISOString().split('T')[0]).length}
+              </p>
+            </div>
+            <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-4">
+              <TrendingUp className="text-gold" size={32} />
+              <h4 className="text-[10px] uppercase tracking-widest opacity-50">{language === 'ko' ? '평균 일일 방문' : 'Avg Daily Visits'}</h4>
+              <p className="text-4xl font-serif">
+                {visitorStats.length > 0 
+                  ? Math.round(visitorStats.reduce((acc, curr) => acc + curr.count, 0) / visitorStats.length) 
+                  : 0}
+              </p>
+            </div>
           </div>
 
-          <div className="md:col-span-3 p-8 border border-ink/10 rounded-3xl bg-card space-y-8">
-            <h3 className="text-xl font-serif">{t.admin.recentDownloads}</h3>
-            <div className="space-y-4">
-              {downloads.slice(0, 10).map(dl => {
-                const user = users.find(u => u.uid === dl.userUid);
-                const resource = resources.find(r => r.id === dl.resourceId);
-                return (
-                  <div key={dl.id} className="flex justify-between items-center py-3 border-b border-ink/5">
-                    <div className="flex items-center gap-4">
-                      <div className="w-8 h-8 rounded-full overflow-hidden bg-ink/5">
-                        <img src={user?.photoURL || "https://i.pravatar.cc/100"} alt="User" referrerPolicy="no-referrer" />
+          <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-8">
+            <h3 className="text-xl font-serif">{t.admin.dailyVisitors}</h3>
+            <div className="h-[400px] w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={visitorStats}>
+                  <defs>
+                    <linearGradient id="colorVisits" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#c5a059" stopOpacity={0.3}/>
+                      <stop offset="95%" stopColor="#c5a059" stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                  <XAxis 
+                    dataKey="date" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }}
+                    tickFormatter={(str) => str.split('-').slice(1).join('/')}
+                  />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }} 
+                  />
+                  <Tooltip 
+                    contentStyle={{ 
+                      borderRadius: '16px', 
+                      border: 'none', 
+                      boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+                      fontSize: '12px'
+                    }}
+                  />
+                  <Area 
+                    type="monotone" 
+                    dataKey="count" 
+                    stroke="#c5a059" 
+                    strokeWidth={3}
+                    fillOpacity={1} 
+                    fill="url(#colorVisits)" 
+                  />
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-8">
+            <h3 className="text-xl font-serif">{language === 'ko' ? '최근 방문 기록' : 'Recent Visit Logs'}</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead>
+                  <tr className="border-b border-ink/10">
+                    <th className="py-4 font-serif opacity-50">Time</th>
+                    <th className="py-4 font-serif opacity-50">User</th>
+                    <th className="py-4 font-serif opacity-50">Device/Agent</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {visits.slice(0, 20).map(v => {
+                    const user = users.find(u => u.uid === v.userUid);
+                    return (
+                      <tr key={v.id} className="border-b border-ink/5 hover:bg-ink/[0.02] transition-colors">
+                        <td className="py-4 opacity-70">
+                          {v.timestamp?.toDate ? v.timestamp.toDate().toLocaleString() : 'Just now'}
+                        </td>
+                        <td className="py-4">
+                          {user ? (
+                            <div className="flex items-center gap-2">
+                              <img src={user.photoURL} alt="" className="w-6 h-6 rounded-full" referrerPolicy="no-referrer" />
+                              <span>{user.displayName}</span>
+                            </div>
+                          ) : (
+                            <span className="opacity-40 italic">Guest</span>
+                          )}
+                        </td>
+                        <td className="py-4 opacity-40 text-xs truncate max-w-[300px]">
+                          {v.userAgent}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {activeTab === 'stats' && (
+        <div className="space-y-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+            <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-4">
+              <BarChart3 className="text-gold" size={32} />
+              <h4 className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.totalDownloads}</h4>
+              <p className="text-4xl font-serif">{downloads.length}</p>
+            </div>
+            <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-4">
+              <Users className="text-gold" size={32} />
+              <h4 className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.activeStudents}</h4>
+              <p className="text-4xl font-serif">{users.length}</p>
+            </div>
+            <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-4">
+              <FileText className="text-gold" size={32} />
+              <h4 className="text-[10px] uppercase tracking-widest opacity-50">{t.admin.totalResources}</h4>
+              <p className="text-4xl font-serif">{resources.length}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-8">
+              <h3 className="text-xl font-serif">카테고리별 다운로드 현황</h3>
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={statsData}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                    <XAxis 
+                      dataKey="name" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }} 
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }} 
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        borderRadius: '16px', 
+                        border: 'none', 
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+                        fontSize: '12px'
+                      }}
+                    />
+                    <Bar dataKey="value" radius={[10, 10, 0, 0]}>
+                      {statsData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={index % 2 === 0 ? '#c5a059' : '#1a1a1a'} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-8">
+              <h3 className="text-xl font-serif">{t.admin.recentDownloads}</h3>
+              <div className="space-y-4 max-h-[300px] overflow-y-auto pr-2 custom-scrollbar">
+                {downloads.slice(0, 10).map(dl => {
+                  const user = users.find(u => u.uid === dl.userUid);
+                  const resource = resources.find(r => r.id === dl.resourceId);
+                  return (
+                    <div key={dl.id} className="flex justify-between items-center py-3 border-b border-ink/5">
+                      <div className="flex items-center gap-4">
+                        <div className="w-8 h-8 rounded-full overflow-hidden bg-ink/5">
+                          <img src={user?.photoURL || "https://i.pravatar.cc/100"} alt="User" referrerPolicy="no-referrer" />
+                        </div>
+                        <div>
+                          <p className="text-sm font-bold">{user?.displayName || user?.email}</p>
+                          <p className="text-[10px] opacity-40">{dl.timestamp?.toDate().toLocaleString()}</p>
+                        </div>
                       </div>
-                      <div>
-                        <p className="text-sm font-bold">{user?.displayName || user?.email}</p>
-                        <p className="text-[10px] opacity-40">{dl.timestamp?.toDate().toLocaleString()}</p>
+                      <div className="text-right">
+                        <p className="text-xs font-bold">{resource?.title}</p>
+                        <p className="text-[8px] uppercase tracking-widest opacity-40">{resource?.fileType}</p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-xs font-bold">{resource?.title}</p>
-                      <p className="text-[8px] uppercase tracking-widest opacity-40">{resource?.fileType}</p>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
+              </div>
             </div>
           </div>
         </div>
@@ -5540,9 +5801,10 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
   );
 };
 
-const MyPageView: FC<{ deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ deviceMode }) => {
+const MyPageView: FC<{ deviceMode: 'pc' | 'pad' | 'mobile', setView: (v: any) => void, setInitialArchiveFilter: (f: any) => void }> = ({ deviceMode, setView, setInitialArchiveFilter }) => {
   const [reservations, setReservations] = useState<any[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
+  const [resources, setResources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -5575,13 +5837,33 @@ const MyPageView: FC<{ deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ deviceMode })
       handleFirestoreError(error, OperationType.LIST, feedPath);
     });
 
+    const resourcesPath = 'resources';
+    const qResources = query(collection(db, resourcesPath), orderBy('createdAt', 'desc'), limit(4));
+    const unsubResources = onSnapshot(qResources, (snapshot) => {
+      setResources(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, resourcesPath);
+    });
+
     return () => {
       unsubRes();
       unsubFeed();
+      unsubResources();
     };
   }, []);
 
   const activeRes = reservations.find(r => r.status === 'pending' || r.status === 'confirmed');
+  const progress = useMemo(() => {
+    if (!activeRes?.createdAt || !activeRes?.durationWeeks) return 0;
+    // Handle both Firestore Timestamp and regular Date
+    const start = activeRes.createdAt.toDate ? activeRes.createdAt.toDate() : new Date(activeRes.createdAt);
+    const end = new Date(start);
+    end.setDate(end.getDate() + (activeRes.durationWeeks * 7));
+    const now = new Date();
+    const total = end.getTime() - start.getTime();
+    const current = now.getTime() - start.getTime();
+    return Math.min(100, Math.max(0, Math.round((current / total) * 100)));
+  }, [activeRes]);
 
   return (
     <motion.div 
@@ -5632,8 +5914,13 @@ const MyPageView: FC<{ deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ deviceMode })
                   <h4 className="text-xl font-serif">{COURSES.find(c => c.id === activeRes.courseId)?.title} ({activeRes.level})</h4>
                   <p className="text-sm opacity-60">{activeRes.durationWeeks}주 패키지 / {activeRes.sessionsPerWeek}회 세션</p>
                   <div className="w-64 h-1 bg-ink/10 rounded-full overflow-hidden">
-                    <div className="w-1/3 h-full bg-gold" />
+                    <motion.div 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${progress}%` }}
+                      className="h-full bg-gold" 
+                    />
                   </div>
+                  <p className="text-[10px] uppercase tracking-widest opacity-40 font-bold">{progress}% Completed</p>
                 </div>
               </div>
             </div>
@@ -5649,8 +5936,39 @@ const MyPageView: FC<{ deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ deviceMode })
             </div>
           )}
 
-          <div className="space-y-6">
-            <h3 className="text-2xl font-serif">박사님의 학습 피드백</h3>
+          <div className="space-y-12">
+            <div className="space-y-6">
+              <h3 className="text-2xl font-serif">최근 학습 자료</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {resources.map(res => (
+                  <div 
+                    key={res.id} 
+                    onClick={() => { setView('archive'); setInitialArchiveFilter({ groupId: res.groupId, categoryId: res.categoryId }); }}
+                    className="p-6 border border-ink/10 rounded-2xl bg-card hover:border-gold transition-all cursor-pointer group"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white" style={{ backgroundColor: res.color || '#F27D26' }}>
+                        {res.fileType === 'pdf' && <FileText size={18} />}
+                        {res.fileType === 'mp3' && <Music size={18} />}
+                        {res.fileType === 'image' && <ImageIcon size={18} />}
+                        {res.fileType === 'video' && <Video size={18} />}
+                        {res.fileType === 'text' && <FileText size={18} />}
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-bold group-hover:text-gold transition-colors">{res.title}</h4>
+                        <p className="text-[10px] opacity-40 uppercase tracking-widest">{res.fileType}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {resources.length === 0 && (
+                  <p className="text-sm opacity-40 italic col-span-2">아직 등록된 자료가 없습니다.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <h3 className="text-2xl font-serif">박사님의 학습 피드백</h3>
             {feedbacks.length > 0 ? feedbacks.map((f, i) => (
               <div key={f.id} className="p-8 bg-ink/5 rounded-3xl space-y-4">
                 <div className="flex items-center justify-between">
@@ -5666,8 +5984,9 @@ const MyPageView: FC<{ deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ deviceMode })
             )}
           </div>
         </div>
+      </div>
 
-        <div className="space-y-8">
+      <div className="space-y-8">
           <div className="p-8 bg-ink text-paper rounded-3xl space-y-8">
             <h3 className="text-2xl font-serif">수업 스케줄</h3>
             <div className="space-y-6">
@@ -5704,6 +6023,10 @@ const MyPageView: FC<{ deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ deviceMode })
   );
 }
 
+const Skeleton: FC<{ className?: string }> = ({ className }) => (
+  <div className={cn("animate-pulse bg-ink/5 rounded-xl", className)} />
+);
+
 const ArchiveView: FC<{ 
   initialFilter?: { groupId: string | null, categoryId: string | null }, 
   onClearFilter?: () => void, 
@@ -5719,6 +6042,7 @@ const ArchiveView: FC<{
   const [selectedGroup, setSelectedGroup] = useState<string | null>(initialFilter?.groupId || null);
   const [selectedCategory, setSelectedCategory] = useState<string | null>(initialFilter?.categoryId || null);
   const [searchQuery, setSearchQuery] = useState('');
+  const [sortBy, setSortBy] = useState<'newest' | 'title' | 'downloads'>('newest');
   const [selectedResource, setSelectedResource] = useState<any | null>(null);
 
   // Admin Resource Form State
@@ -5824,10 +6148,7 @@ const ArchiveView: FC<{
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setResources(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
-    }, (error) => {
-      console.error("Archive fetch error:", error);
-      setLoading(false);
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'resources'));
     return () => unsubscribe();
   }, []);
 
@@ -5837,6 +6158,16 @@ const ArchiveView: FC<{
     const matchesSearch = !searchQuery || res.title.toLowerCase().includes(searchQuery.toLowerCase()) || res.description.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesGroup && matchesCategory && matchesSearch;
   });
+
+  const sortedResources = useMemo(() => {
+    return [...filteredResources].sort((a, b) => {
+      if (sortBy === 'title') return a.title.localeCompare(b.title);
+      if (sortBy === 'downloads') return (b.downloadCount || 0) - (a.downloadCount || 0);
+      const timeA = a.createdAt?.toDate ? a.createdAt.toDate().getTime() : (a.createdAt || 0);
+      const timeB = b.createdAt?.toDate ? b.createdAt.toDate().getTime() : (b.createdAt || 0);
+      return (timeB as number) - (timeA as number);
+    });
+  }, [filteredResources, sortBy]);
 
   const handleDownloadFormat = async (resource: any, format: 'pdf' | 'docx' | 'png' | 'txt') => {
     if (!auth.currentUser) {
@@ -5886,8 +6217,7 @@ const ArchiveView: FC<{
         downloadCount: (resource.downloadCount || 0) + 1
       });
     } catch (error) {
-      console.error('Download error:', error);
-      alert('Download failed.');
+      handleFirestoreError(error, OperationType.UPDATE, 'resources');
     }
   };
 
@@ -6330,22 +6660,48 @@ const ArchiveView: FC<{
                 {language === 'ko' ? '자료 추가' : 'Add Resource'}
               </button>
             )}
-            <div className="relative flex-grow md:w-80">
-              <Search className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30" size={18} />
-              <input 
-                type="text" 
-                placeholder={t.archive.search}
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-12 pr-6 py-4 bg-card border border-ink/10 rounded-full text-sm focus:outline-none focus:border-gold transition-all"
-              />
+            <div className="flex items-center gap-4 flex-grow md:w-auto">
+              <div className="relative flex-grow md:w-80">
+                <Search className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30" size={18} />
+                <input 
+                  type="text" 
+                  placeholder={t.archive.search}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full pl-12 pr-6 py-4 bg-card border border-ink/10 rounded-full text-sm focus:outline-none focus:border-gold transition-all"
+                />
+              </div>
+              <select
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as any)}
+                className="px-6 py-4 bg-card border border-ink/10 rounded-full text-xs font-bold outline-none focus:border-gold transition-all appearance-none cursor-pointer"
+              >
+                <option value="newest">{language === 'ko' ? '최신순' : 'Newest'}</option>
+                <option value="title">{language === 'ko' ? '제목순' : 'Title'}</option>
+                <option value="downloads">{language === 'ko' ? '인기순' : 'Popular'}</option>
+              </select>
             </div>
           </div>
         </div>
 
         {/* Resource Grid */}
         <div className="flex-grow grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredResources.length > 0 ? filteredResources.map(res => (
+          {loading ? (
+            Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="p-6 border border-ink/10 rounded-2xl bg-card space-y-4">
+                <div className="flex justify-between items-start">
+                  <Skeleton className="w-10 h-10" />
+                  <Skeleton className="w-16 h-4" />
+                </div>
+                <Skeleton className="w-3/4 h-6" />
+                <Skeleton className="w-full h-4" />
+                <div className="flex justify-between pt-4">
+                  <Skeleton className="w-20 h-4" />
+                  <Skeleton className="w-20 h-4" />
+                </div>
+              </div>
+            ))
+          ) : sortedResources.length > 0 ? sortedResources.map(res => (
             <motion.div 
               key={res.id}
               layout
@@ -6359,7 +6715,7 @@ const ArchiveView: FC<{
                 }
                 setSelectedResource(res);
               }}
-              className="p-6 border border-ink/10 rounded-2xl bg-card space-y-4 flex flex-col hover:shadow-xl hover:shadow-ink/5 transition-all group cursor-pointer"
+              className="p-6 border border-ink/10 rounded-2xl bg-card space-y-4 flex flex-col hover:shadow-2xl hover:shadow-gold/10 hover:-translate-y-1 transition-all group cursor-pointer"
             >
               <div className="flex justify-between items-start">
                 <div 
@@ -8174,7 +8530,7 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setTests(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
-    });
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'levelTests'));
     return () => unsubscribe();
   }, []);
 
@@ -8616,6 +8972,7 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [filter, setFilter] = useState(initialFilter || 'all');
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (initialFilter) setFilter(initialFilter);
@@ -8640,7 +8997,7 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
       setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     }, (error) => {
-      console.error("Community fetch error:", error);
+      handleFirestoreError(error, OperationType.LIST, path);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -8694,9 +9051,43 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
     }
   };
 
-  const filteredPosts = filter === 'all' ? posts : posts.filter(p => p.type === filter);
+  const filteredPosts = posts.filter(p => {
+    const matchesFilter = filter === 'all' || p.type === filter;
+    const matchesSearch = !searchQuery || 
+      p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      p.content.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesFilter && matchesSearch;
+  });
 
-  if (loading) return <div className="py-20 text-center font-serif italic opacity-50">{t.community.loading}</div>;
+  if (loading) {
+    return (
+      <div className="max-w-4xl mx-auto px-6 py-20 space-y-12">
+        <div className="space-y-4">
+          <Skeleton className="w-20 h-4" />
+          <Skeleton className="w-64 h-12" />
+        </div>
+        <div className="flex gap-2">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <Skeleton key={i} className="w-20 h-8 rounded-full" />
+          ))}
+        </div>
+        <div className="space-y-8">
+          {Array.from({ length: 3 }).map((_, i) => (
+            <div key={i} className="p-8 border border-ink/10 rounded-[40px] bg-card space-y-6">
+              <div className="flex justify-between">
+                <div className="space-y-3">
+                  <Skeleton className="w-24 h-6 rounded-full" />
+                  <Skeleton className="w-64 h-8" />
+                  <Skeleton className="w-32 h-4" />
+                </div>
+              </div>
+              <Skeleton className="w-full h-24" />
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
 
   if (!auth.currentUser) {
     return (
@@ -8752,32 +9143,46 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
         )}
       </div>
 
-      {/* Filter Tabs */}
-      <div className={cn(
-        "flex pb-4 border-b border-ink/5 transition-all",
-        deviceMode === 'mobile' ? "overflow-x-auto gap-2 no-scrollbar" : "flex-wrap gap-2"
-      )}>
-        <button
-          onClick={() => setFilter('all')}
-          className={cn(
-            "px-5 py-2 rounded-full text-xs font-bold transition-all",
-            filter === 'all' ? "bg-ink text-paper" : "bg-ink/5 hover:bg-ink/10"
-          )}
-        >
-          {t.community.all}
-        </button>
-        {categories.map(cat => (
-          <button
-            key={cat.id}
-            onClick={() => setFilter(cat.id)}
-            className={cn(
-              "px-5 py-2 rounded-full text-xs font-bold transition-all",
-              filter === cat.id ? cat.color : "bg-ink/5 hover:bg-ink/10"
-            )}
-          >
-            {cat.label}
-          </button>
-        ))}
+      {/* Filter Tabs & Search */}
+      <div className="space-y-6">
+        <div className="flex flex-col md:flex-row justify-between items-center gap-4">
+          <div className={cn(
+            "flex pb-2 transition-all w-full md:w-auto",
+            deviceMode === 'mobile' ? "overflow-x-auto gap-2 no-scrollbar" : "flex-wrap gap-2"
+          )}>
+            <button
+              onClick={() => setFilter('all')}
+              className={cn(
+                "px-5 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap",
+                filter === 'all' ? "bg-ink text-paper" : "bg-ink/5 hover:bg-ink/10"
+              )}
+            >
+              {t.community.all}
+            </button>
+            {categories.map(cat => (
+              <button
+                key={cat.id}
+                onClick={() => setFilter(cat.id)}
+                className={cn(
+                  "px-5 py-2 rounded-full text-xs font-bold transition-all whitespace-nowrap",
+                  filter === cat.id ? cat.color : "bg-ink/5 hover:bg-ink/10"
+                )}
+              >
+                {cat.label}
+              </button>
+            ))}
+          </div>
+          <div className="relative w-full md:w-64">
+            <Search className="absolute left-4 top-1/2 -translate-y-1/2 opacity-30" size={16} />
+            <input 
+              type="text"
+              placeholder={language === 'ko' ? '검색...' : 'Search...'}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-ink/5 border border-transparent rounded-full text-xs outline-none focus:bg-white focus:border-gold transition-all"
+            />
+          </div>
+        </div>
       </div>
 
       <AnimatePresence>

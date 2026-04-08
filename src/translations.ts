@@ -210,6 +210,9 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       activeStudents: '활성 수강생',
       totalResources: '총 자료 수',
       recentDownloads: '최근 다운로드 기록',
+      visitors: '방문자 관리',
+      totalVisitors: '총 방문자 수',
+      dailyVisitors: '일일 방문자 추이',
     },
     globalStyle: {
       title: '글로벌 스타일',
@@ -512,6 +515,9 @@ export const TRANSLATIONS: Record<LanguageCode, any> = {
       activeStudents: 'Active Students',
       totalResources: 'Total Resources',
       recentDownloads: 'Recent Downloads',
+      visitors: 'Visitors',
+      totalVisitors: 'Total Visitors',
+      dailyVisitors: 'Daily Visitor Trends',
     },
     globalStyle: {
       title: 'Global Styles',

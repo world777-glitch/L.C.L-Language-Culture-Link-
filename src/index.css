@@ -35,11 +35,15 @@
 }
 
 .dark {
-  --color-paper: #1a1a1a;
-  --color-card: #262626;
-  --color-ink: #f5f2ed;
-  --color-gold: #d4af37;
+  --color-paper: #121212;
+  --color-card: #1e1e1e;
+  --color-ink: #e2e2e2;
+  --color-gold: #e5c07b;
 }
+
+.dark .opacity-40 { opacity: 0.6; }
+.dark .opacity-50 { opacity: 0.7; }
+.dark .opacity-60 { opacity: 0.8; }
 
 .oval-mask {
   mask-image: radial-gradient(ellipse at center, black 60%, transparent 100%);
