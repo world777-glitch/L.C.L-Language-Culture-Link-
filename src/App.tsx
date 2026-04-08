@@ -758,7 +758,12 @@ export default function App() {
                 )}
               </AnimatePresence>
             </div>
+          </div>
 
+          <div className={cn(
+            "items-center gap-3 lg:gap-6 transition-all",
+            deviceMode === 'mobile' ? "hidden" : "flex"
+          )}>
             <div className="flex items-center gap-3 lg:gap-6">
               {/* Language Selector */}
               <div className="relative group" onMouseEnter={() => !isAnyTextEditing && setHoveredMenu('language')} onMouseLeave={() => setHoveredMenu(null)}>
