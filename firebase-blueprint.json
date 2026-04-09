@@ -145,6 +145,28 @@
         "date": { "type": "string", "description": "YYYY-MM-DD format for easy grouping" }
       },
       "required": ["timestamp", "date"]
+    },
+    "likes": {
+      "title": "Post Like",
+      "description": "User likes on community posts.",
+      "type": "object",
+      "properties": {
+        "postUid": { "type": "string" },
+        "userUid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["postUid", "userUid"]
+    },
+    "bookmarks": {
+      "title": "Resource Bookmark",
+      "description": "User bookmarks for learning materials.",
+      "type": "object",
+      "properties": {
+        "resourceUid": { "type": "string" },
+        "userUid": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["resourceUid", "userUid"]
     }
   },
   "firestore": {
@@ -157,6 +179,8 @@
     "/community/{postId}": { "schema": "community", "description": "Community posts" },
     "/siteContent/{contentId}": { "schema": "siteContent", "description": "Landing page content overrides" },
     "/inquiries/{inquiryId}": { "schema": "inquiries", "description": "Student inquiries" },
-    "/visits/{visitId}": { "schema": "visits", "description": "Daily visit tracking" }
+    "/visits/{visitId}": { "schema": "visits", "description": "Daily visit tracking" },
+    "/likes/{likeId}": { "schema": "likes", "description": "Post likes" },
+    "/bookmarks/{bookmarkId}": { "schema": "bookmarks", "description": "User bookmarks" }
   }
 }

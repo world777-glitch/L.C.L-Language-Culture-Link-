@@ -38,6 +38,8 @@ import {
   Users,
   Search,
   Download,
+  Eye,
+  EyeOff,
   MessageCircle,
   Send,
   Filter,
@@ -48,13 +50,15 @@ import {
   ExternalLink,
   Instagram,
   Facebook,
+  Bookmark,
+  Heart,
+  Video,
   Youtube,
   Twitter,
   Linkedin,
   Copy,
   Minimize2,
   Maximize2,
-  Video,
   Palette,
   Type as TypeIcon,
   Square,
@@ -226,6 +230,9 @@ export default function App() {
   };
 
   const [siteContent, setSiteContent] = useState<Record<string, any>>({});
+  const [likes, setLikes] = useState<any[]>([]);
+  const [bookmarks, setBookmarks] = useState<any[]>([]);
+  const [allResources, setAllResources] = useState<any[]>([]);
 
   const navStyleL1 = useMemo(() => ({
     fontSize: siteContent['global.style.navL1FontSize']?.value ? `${siteContent['global.style.navL1FontSize'].value}px` : undefined,
@@ -246,6 +253,50 @@ export default function App() {
   }), [siteContent]);
   const isAdmin = userProfile?.role === 'admin';
 
+  const toggleLike = async (postUid: string) => {
+    if (!auth.currentUser) return;
+    const existingLike = likes.find(l => l.postUid === postUid && l.userUid === auth.currentUser?.uid);
+    if (existingLike) {
+      try {
+        await deleteDoc(doc(db, 'likes', existingLike.id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, 'likes');
+      }
+    } else {
+      try {
+        await addDoc(collection(db, 'likes'), {
+          postUid,
+          userUid: auth.currentUser.uid,
+          createdAt: serverTimestamp()
+        });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, 'likes');
+      }
+    }
+  };
+
+  const toggleBookmark = async (resourceUid: string) => {
+    if (!auth.currentUser) return;
+    const existingBookmark = bookmarks.find(b => b.resourceUid === resourceUid && b.userUid === auth.currentUser?.uid);
+    if (existingBookmark) {
+      try {
+        await deleteDoc(doc(db, 'bookmarks', existingBookmark.id));
+      } catch (error) {
+        handleFirestoreError(error, OperationType.DELETE, 'bookmarks');
+      }
+    } else {
+      try {
+        await addDoc(collection(db, 'bookmarks'), {
+          resourceUid,
+          userUid: auth.currentUser.uid,
+          createdAt: serverTimestamp()
+        });
+      } catch (error) {
+        handleFirestoreError(error, OperationType.CREATE, 'bookmarks');
+      }
+    }
+  };
+
   useEffect(() => {
     const unsubscribe = onSnapshot(collection(db, 'siteContent'), (snapshot) => {
       const content: Record<string, any> = {};
@@ -257,8 +308,41 @@ export default function App() {
       });
       setSiteContent(content);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'siteContent'));
-    return () => unsubscribe();
-  }, [language]);
+
+    const unsubLikes = onSnapshot(collection(db, 'likes'), (snapshot) => {
+      setLikes(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'likes'));
+
+    const unsubAllResources = onSnapshot(
+      isAdmin 
+        ? collection(db, 'resources') 
+        : query(collection(db, 'resources'), where('status', '==', 'published')), 
+      (snapshot) => {
+        setAllResources(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+      }, 
+      (error) => handleFirestoreError(error, OperationType.LIST, 'resources')
+    );
+
+    return () => {
+      unsubscribe();
+      unsubLikes();
+      unsubAllResources();
+    };
+  }, [language, isAdmin]);
+
+  useEffect(() => {
+    if (!user) {
+      setBookmarks([]);
+      return;
+    }
+
+    const q = query(collection(db, 'bookmarks'), where('userUid', '==', user.uid));
+    const unsubBookmarks = onSnapshot(q, (snapshot) => {
+      setBookmarks(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'bookmarks'));
+
+    return unsubBookmarks;
+  }, [user]);
 
   const isEventPeriod = useMemo(() => {
     const event = siteContent['event-discount'];
@@ -1124,11 +1208,11 @@ export default function App() {
           {view === 'curriculum' && <CurriculumView key="curriculum" language={language} onBook={(course) => { setSelectedCourse(course); setView('inquiry'); }} isEditMode={isEditMode} isAdmin={isAdmin} siteContent={siteContent} deviceMode={deviceMode} />}
           {view === 'pricing' && <PricingView key="pricing" language={language} setView={setView} isEditMode={isEditMode} isAdmin={isAdmin} siteContent={siteContent} isEventPeriod={isEventPeriod} deviceMode={deviceMode} />}
           {view === 'booking' && <BookingView key="booking" course={selectedCourse} onComplete={() => setView('mypage')} isEventPeriod={isEventPeriod} siteContent={siteContent} deviceMode={deviceMode} />}
-          {view === 'mypage' && <MyPageView key="mypage" deviceMode={deviceMode} setView={setView} setInitialArchiveFilter={setInitialArchiveFilter} />}
+          {view === 'mypage' && <MyPageView key="mypage" deviceMode={deviceMode} setView={setView} setInitialArchiveFilter={setInitialArchiveFilter} bookmarks={bookmarks} toggleBookmark={toggleBookmark} language={language} allResources={allResources} isAdmin={isAdmin} />}
           {view === 'admin' && <AdminView key="admin" language={language} siteContent={siteContent} initialTab={adminTab} deviceMode={deviceMode} />}
           {view === 'image-gen' && <ImageGenView key="image-gen" language={language} userProfile={userProfile} isAuthReady={isAuthReady} setView={setView} siteContent={siteContent} deviceMode={deviceMode} />}
-          {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} isEditMode={isEditMode} siteContent={siteContent} deviceMode={deviceMode} />}
-          {view === 'community' && <CommunityView key="community" language={language} initialFilter={initialCommunityFilter} onClearFilter={() => setInitialCommunityFilter('all')} deviceMode={deviceMode} />}
+          {view === 'archive' && <ArchiveView key="archive" initialFilter={initialArchiveFilter} onClearFilter={() => setInitialArchiveFilter({ groupId: null, categoryId: null })} language={language} isAdmin={isAdmin} isEditMode={isEditMode} siteContent={siteContent} deviceMode={deviceMode} bookmarks={bookmarks} toggleBookmark={toggleBookmark} />}
+          {view === 'community' && <CommunityView key="community" language={language} initialFilter={initialCommunityFilter} onClearFilter={() => setInitialCommunityFilter('all')} deviceMode={deviceMode} likes={likes} toggleLike={toggleLike} isAdmin={isAdmin} />}
           {view === 'level-test' && <LevelTestView key="level-test" language={language} isAdmin={isAdmin} isEditMode={isEditMode} siteContent={siteContent} deviceMode={deviceMode} />}
           {view === 'inquiry' && <InquiryView key="inquiry" language={language} onComplete={() => setView('landing')} isEventPeriod={isEventPeriod} siteContent={siteContent} isEditMode={isEditMode} isAdmin={isAdmin} initialCourse={selectedCourse} initialLevel={selectedLevel || undefined} deviceMode={deviceMode} />}
         </AnimatePresence>
@@ -3207,6 +3291,31 @@ const GlobalStyleEditor: FC<{
 
 const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode, isEditMode: boolean, isAdmin?: boolean, siteContent: Record<string, any>, isEventPeriod: boolean, deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ setView, onBook, setInitialArchiveFilter, language, isEditMode, isAdmin, siteContent, isEventPeriod, deviceMode }) => {
   const t = TRANSLATIONS[language];
+  const [todayVisits, setTodayVisits] = useState(0);
+  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!isAdmin) {
+      setTodayVisits(0);
+      setRecentActivity([]);
+      return;
+    }
+    const today = new Date().toISOString().split('T')[0];
+    const qVisits = query(collection(db, 'visits'), where('date', '==', today));
+    const unsubVisits = onSnapshot(qVisits, (snapshot) => {
+      setTodayVisits(snapshot.size);
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'visits'));
+
+    const qActivity = query(collection(db, 'community'), orderBy('createdAt', 'desc'), limit(5));
+    const unsubActivity = onSnapshot(qActivity, (snapshot) => {
+      setRecentActivity(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data(), type: 'post' })));
+    }, (error) => handleFirestoreError(error, OperationType.LIST, 'community'));
+
+    return () => {
+      unsubVisits();
+      unsubActivity();
+    };
+  }, [isAdmin]);
   
   return (
     <motion.div 
@@ -3216,6 +3325,26 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
       className="space-y-20"
     >
       <DynamicContentArea contentKey="landing.top" isEditMode={isEditMode} isAdmin={isAdmin} language={language} siteContent={siteContent} />
+
+      {/* Live Activity Ticker */}
+      <div className="bg-ink text-paper py-2 overflow-hidden whitespace-nowrap relative">
+        <motion.div 
+          animate={{ x: [0, -1000] }}
+          transition={{ duration: 30, repeat: Infinity, ease: "linear" }}
+          className="flex gap-20 items-center"
+        >
+          {Array.from({ length: 10 }).map((_, i) => (
+            <div key={i} className="flex items-center gap-4 text-[10px] uppercase tracking-[0.2em] font-bold">
+              <span className="text-gold">●</span>
+              <span>{language === 'ko' ? '실시간 학습 커뮤니티 활성화 중' : 'Live Learning Community Active'}</span>
+              <span className="opacity-40">/</span>
+              <span>{todayVisits} {language === 'ko' ? '명의 학습자가 오늘 방문했습니다' : 'Learners Visited Today'}</span>
+              <span className="opacity-40">/</span>
+              <span>{language === 'ko' ? '프리미엄 중국어 교육의 새로운 기준' : 'New Standard for Premium Chinese Education'}</span>
+            </div>
+          ))}
+        </motion.div>
+      </div>
 
       {/* Hero Section */}
       <section className={cn(
@@ -3262,9 +3391,19 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               initial={{ x: -50, opacity: 0 }}
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.2 }}
-              className="inline-block px-4 py-1 border border-gold text-gold text-[10px] uppercase tracking-[0.3em] rounded-full"
+              className="flex items-center gap-4"
             >
-              <EditableText contentKey="hero.badge" defaultValue={t.hero.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+              <div className="inline-block px-4 py-1 border border-gold text-gold text-[10px] uppercase tracking-[0.3em] rounded-full">
+                <EditableText contentKey="hero.badge" defaultValue={t.hero.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+              </div>
+              {todayVisits > 0 && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-gold/10 rounded-full">
+                  <div className="w-1.5 h-1.5 bg-gold rounded-full animate-pulse" />
+                  <span className="text-[9px] uppercase tracking-widest font-bold text-gold">
+                    {todayVisits} {language === 'ko' ? '오늘 방문' : 'Visits Today'}
+                  </span>
+                </div>
+              )}
             </motion.div>
             <motion.div 
               initial={{ y: 30, opacity: 0 }}
@@ -3511,6 +3650,62 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
             </motion.div>
           )}
         />
+      </motion.section>
+
+      {/* Recent Activity Section */}
+      <motion.section 
+        initial={{ opacity: 0 }}
+        whileInView={{ opacity: 1 }}
+        viewport={{ once: true }}
+        className="max-w-[1600px] mx-auto px-6 py-16"
+      >
+        <div className="bg-ink/5 rounded-[60px] p-12 md:p-20 space-y-12">
+          <div className="flex flex-col md:flex-row justify-between items-end gap-8">
+            <div className="space-y-4">
+              <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
+                <EditableText contentKey="activity.badge" defaultValue="Live Updates" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+              </div>
+              <div className="text-4xl font-serif font-light">
+                <EditableText contentKey="activity.title" defaultValue={language === 'ko' ? '최근 커뮤니티 소식' : 'Recent Community Activity'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
+              </div>
+            </div>
+            <button 
+              onClick={() => setView('community')}
+              className="px-8 py-3 border border-ink/20 rounded-full text-[10px] uppercase tracking-widest font-bold hover:bg-ink hover:text-paper transition-all"
+            >
+              {language === 'ko' ? '전체 보기' : 'View All'}
+            </button>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {recentActivity.map((activity, idx) => (
+              <motion.div 
+                key={activity.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.1 }}
+                className="p-8 bg-paper rounded-[32px] border border-ink/5 space-y-4 hover:shadow-xl transition-all cursor-pointer"
+                onClick={() => setView('community')}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-[9px] uppercase tracking-widest px-2 py-1 bg-ink/5 rounded-full font-bold opacity-60">{activity.type}</span>
+                  <span className="text-[9px] opacity-30">{activity.createdAt?.toDate().toLocaleDateString()}</span>
+                </div>
+                <h4 className="font-serif text-lg line-clamp-1">{activity.title}</h4>
+                <p className="text-xs opacity-50 line-clamp-2 leading-relaxed">{activity.content}</p>
+                <div className="flex items-center gap-2 pt-2">
+                  <div className="w-5 h-5 rounded-full bg-ink/10" />
+                  <span className="text-[10px] font-bold opacity-40">{activity.userName}</span>
+                </div>
+              </motion.div>
+            ))}
+            {recentActivity.length === 0 && (
+              <div className="col-span-full py-12 text-center opacity-30 italic font-serif">
+                {language === 'ko' ? '최근 활동이 없습니다.' : 'No recent activity.'}
+              </div>
+            )}
+          </div>
+        </div>
       </motion.section>
 
       {/* Dynamic Content Sections */}
@@ -4038,6 +4233,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
     textContent: '',
     fileType: 'pdf' as 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' | 'video',
     accessLevel: 'member' as 'public' | 'member' | 'premium',
+    status: 'published' as 'published' | 'hidden',
     author: '',
     tags: '',
     color: '#F27D26',
@@ -4061,14 +4257,35 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
 
   const visitorStats = useMemo(() => {
     const dailyCounts: Record<string, number> = {};
+    const deviceCounts: Record<string, number> = { 'Mobile': 0, 'Tablet': 0, 'Desktop': 0, 'Other': 0 };
+
     visits.forEach(v => {
       const date = v.date || 'Unknown';
       dailyCounts[date] = (dailyCounts[date] || 0) + 1;
+
+      const ua = v.userAgent?.toLowerCase() || '';
+      if (ua.includes('mobi')) {
+        if (ua.includes('tablet') || ua.includes('ipad')) deviceCounts['Tablet']++;
+        else deviceCounts['Mobile']++;
+      } else if (ua.includes('tablet') || ua.includes('ipad')) {
+        deviceCounts['Tablet']++;
+      } else if (ua.includes('windows') || ua.includes('macintosh') || ua.includes('linux')) {
+        deviceCounts['Desktop']++;
+      } else {
+        deviceCounts['Other']++;
+      }
     });
-    return Object.entries(dailyCounts)
+
+    const daily = Object.entries(dailyCounts)
       .map(([date, count]) => ({ date, count }))
       .sort((a, b) => a.date.localeCompare(b.date))
-      .slice(-14); // Last 14 days
+      .slice(-14);
+
+    const devices = Object.entries(deviceCounts)
+      .filter(([_, value]) => value > 0)
+      .map(([name, value]) => ({ name, value }));
+
+    return { daily, devices };
   }, [visits]);
 
   useEffect(() => {
@@ -4217,6 +4434,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
         textContent: '',
         fileType: 'pdf',
         accessLevel: 'member',
+        status: 'published',
         author: '',
         tags: '',
         color: '#F27D26',
@@ -4372,6 +4590,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
       textContent: res.textContent || '',
       fileType: res.fileType,
       accessLevel: res.accessLevel,
+      status: res.status || 'published',
       author: res.author || '',
       tags: Array.isArray(res.tags) ? res.tags.join(', ') : '',
       color: res.color || '#F27D26',
@@ -4597,7 +4816,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
         (deviceMode === 'mobile' || deviceMode === 'pad') ? "gap-3 p-4 justify-center" : "gap-4"
       )}>
         <button 
-          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', fileUrls: [], textContent: '', fileType: 'pdf', accessLevel: 'member', author: '', tags: '', color: '#F27D26', fontFamily: 'serif', fontSize: 16, fontColor: '#000000', fontWeight: '400', hasOverlay: false, overlayPos: 'center' }); }}
+          onClick={() => { setActiveTab('resources'); setEditingResource(null); setNewResource({ title: '', description: '', groupId: RESOURCE_GROUPS[0].id, categoryId: RESOURCE_GROUPS[0].categories[0].id, fileUrl: '', fileUrls: [], textContent: '', fileType: 'pdf', accessLevel: 'member', status: 'published', author: '', tags: '', color: '#F27D26', fontFamily: 'serif', fontSize: 16, fontColor: '#000000', fontWeight: '400', hasOverlay: false, overlayPos: 'center' }); }}
           className="flex items-center gap-2 px-6 py-3 bg-ink text-paper rounded-xl text-[10px] uppercase tracking-widest font-bold hover:bg-gold transition-all"
         >
           <Upload size={14} />
@@ -4854,6 +5073,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
                       textContent: '',
                       fileType: 'pdf',
                       accessLevel: 'member',
+                      status: 'published',
                       author: '',
                       tags: '',
                       color: '#F27D26',
@@ -5623,55 +5843,86 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
               <TrendingUp className="text-gold" size={32} />
               <h4 className="text-[10px] uppercase tracking-widest opacity-50">{language === 'ko' ? '평균 일일 방문' : 'Avg Daily Visits'}</h4>
               <p className="text-4xl font-serif">
-                {visitorStats.length > 0 
-                  ? Math.round(visitorStats.reduce((acc, curr) => acc + curr.count, 0) / visitorStats.length) 
+                {visitorStats.daily.length > 0 
+                  ? Math.round(visitorStats.daily.reduce((acc, curr) => acc + curr.count, 0) / visitorStats.daily.length) 
                   : 0}
               </p>
             </div>
           </div>
 
-          <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-8">
-            <h3 className="text-xl font-serif">{t.admin.dailyVisitors}</h3>
-            <div className="h-[400px] w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={visitorStats}>
-                  <defs>
-                    <linearGradient id="colorVisits" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#c5a059" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="#c5a059" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
-                  <XAxis 
-                    dataKey="date" 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }}
-                    tickFormatter={(str) => str.split('-').slice(1).join('/')}
-                  />
-                  <YAxis 
-                    axisLine={false} 
-                    tickLine={false} 
-                    tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }} 
-                  />
-                  <Tooltip 
-                    contentStyle={{ 
-                      borderRadius: '16px', 
-                      border: 'none', 
-                      boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
-                      fontSize: '12px'
-                    }}
-                  />
-                  <Area 
-                    type="monotone" 
-                    dataKey="count" 
-                    stroke="#c5a059" 
-                    strokeWidth={3}
-                    fillOpacity={1} 
-                    fill="url(#colorVisits)" 
-                  />
-                </AreaChart>
-              </ResponsiveContainer>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-8">
+              <h3 className="text-xl font-serif">{t.admin.dailyVisitors}</h3>
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={visitorStats.daily}>
+                    <defs>
+                      <linearGradient id="colorVisits" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="5%" stopColor="#c5a059" stopOpacity={0.3}/>
+                        <stop offset="95%" stopColor="#c5a059" stopOpacity={0}/>
+                      </linearGradient>
+                    </defs>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(0,0,0,0.05)" />
+                    <XAxis 
+                      dataKey="date" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }}
+                      tickFormatter={(str) => str.split('-').slice(1).join('/')}
+                    />
+                    <YAxis 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }} 
+                    />
+                    <Tooltip 
+                      contentStyle={{ 
+                        borderRadius: '16px', 
+                        border: 'none', 
+                        boxShadow: '0 10px 30px rgba(0,0,0,0.1)',
+                        fontSize: '12px'
+                      }}
+                    />
+                    <Area 
+                      type="monotone" 
+                      dataKey="count" 
+                      stroke="#c5a059" 
+                      strokeWidth={3}
+                      fillOpacity={1} 
+                      fill="url(#colorVisits)" 
+                    />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+
+            <div className="p-8 border border-ink/10 rounded-3xl bg-card space-y-8">
+              <h3 className="text-xl font-serif">{language === 'ko' ? '기기별 접속 분포' : 'Device Distribution'}</h3>
+              <div className="h-[300px] w-full">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={visitorStats.devices} layout="vertical">
+                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="rgba(0,0,0,0.05)" />
+                    <XAxis type="number" hide />
+                    <YAxis 
+                      dataKey="name" 
+                      type="category" 
+                      axisLine={false} 
+                      tickLine={false} 
+                      tick={{ fontSize: 10, fill: 'rgba(0,0,0,0.4)' }}
+                      width={80}
+                    />
+                    <Tooltip 
+                      cursor={{ fill: 'rgba(0,0,0,0.02)' }}
+                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 30px rgba(0,0,0,0.1)' }}
+                    />
+                    <Bar dataKey="value" radius={[0, 10, 10, 0]}>
+                      {visitorStats.devices.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={['#c5a059', '#1a1a1a', '#F27D26', '#888888'][index % 4]} />
+                      ))}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
             </div>
           </div>
 
@@ -5806,7 +6057,7 @@ const AdminView: FC<{ language: LanguageCode, siteContent: any, initialTab?: 're
   );
 };
 
-const MyPageView: FC<{ deviceMode: 'pc' | 'pad' | 'mobile', setView: (v: any) => void, setInitialArchiveFilter: (f: any) => void }> = ({ deviceMode, setView, setInitialArchiveFilter }) => {
+const MyPageView: FC<{ deviceMode: 'pc' | 'pad' | 'mobile', setView: (v: any) => void, setInitialArchiveFilter: (f: any) => void, bookmarks: any[], toggleBookmark: (id: string) => void, language: LanguageCode, allResources: any[], isAdmin: boolean }> = ({ deviceMode, setView, setInitialArchiveFilter, bookmarks, toggleBookmark, language, allResources, isAdmin }) => {
   const [reservations, setReservations] = useState<any[]>([]);
   const [feedbacks, setFeedbacks] = useState<any[]>([]);
   const [resources, setResources] = useState<any[]>([]);
@@ -5843,7 +6094,10 @@ const MyPageView: FC<{ deviceMode: 'pc' | 'pad' | 'mobile', setView: (v: any) =>
     });
 
     const resourcesPath = 'resources';
-    const qResources = query(collection(db, resourcesPath), orderBy('createdAt', 'desc'), limit(4));
+    const qResources = isAdmin 
+      ? query(collection(db, resourcesPath), orderBy('createdAt', 'desc'), limit(4))
+      : query(collection(db, resourcesPath), where('status', '==', 'published'), orderBy('createdAt', 'desc'), limit(4));
+      
     const unsubResources = onSnapshot(qResources, (snapshot) => {
       setResources(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
     }, (error) => {
@@ -5855,7 +6109,7 @@ const MyPageView: FC<{ deviceMode: 'pc' | 'pad' | 'mobile', setView: (v: any) =>
       unsubFeed();
       unsubResources();
     };
-  }, []);
+  }, [isAdmin]);
 
   const activeRes = reservations.find(r => r.status === 'pending' || r.status === 'confirmed');
   const progress = useMemo(() => {
@@ -6024,6 +6278,68 @@ const MyPageView: FC<{ deviceMode: 'pc' | 'pad' | 'mobile', setView: (v: any) =>
           </div>
         </div>
       </div>
+
+      {/* Bookmarked Resources */}
+      <div className="max-w-7xl mx-auto px-6 pb-20">
+        <section className="space-y-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gold/10 rounded-2xl flex items-center justify-center">
+                <Bookmark className="text-gold" size={20} />
+              </div>
+              <h3 className="text-2xl font-serif">{language === 'ko' ? '내가 찜한 자료' : 'My Bookmarks'}</h3>
+            </div>
+          </div>
+
+          {bookmarks.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {allResources.filter(r => bookmarks.some(b => b.resourceUid === r.id && b.userUid === auth.currentUser?.uid)).map(resource => (
+                <motion.div 
+                  key={resource.id}
+                  whileHover={{ y: -5 }}
+                  className="p-6 border border-ink/10 rounded-[32px] bg-card space-y-4 relative group"
+                >
+                  <button 
+                    onClick={() => toggleBookmark(resource.id)}
+                    className="absolute top-6 right-6 p-2 bg-paper rounded-full shadow-sm text-gold"
+                  >
+                    <Bookmark size={16} fill="currentColor" />
+                  </button>
+                  <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-lg")} style={{ backgroundColor: resource.color || '#F27D26' }}>
+                    {resource.fileType === 'pdf' && <FileText size={24} />}
+                    {resource.fileType === 'mp3' && <Music size={24} />}
+                    {resource.fileType === 'image' && <ImageIcon size={24} />}
+                    {resource.fileType === 'video' && <Video size={24} />}
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="font-serif text-lg">{resource.title}</h4>
+                    <p className="text-xs opacity-50 line-clamp-2">{resource.description}</p>
+                  </div>
+                  <button 
+                    onClick={() => {
+                      setInitialArchiveFilter({ groupId: resource.groupId, categoryId: resource.categoryId });
+                      setView('archive');
+                    }}
+                    className="w-full py-3 bg-ink/5 hover:bg-ink hover:text-paper rounded-xl text-[10px] uppercase tracking-widest font-bold transition-all"
+                  >
+                    View in Archive
+                  </button>
+                </motion.div>
+              ))}
+            </div>
+          ) : (
+            <div className="p-12 border border-dashed border-ink/10 rounded-[40px] text-center space-y-4">
+              <p className="opacity-40 font-serif italic">{language === 'ko' ? '찜한 자료가 없습니다.' : 'No bookmarked resources yet.'}</p>
+              <button 
+                onClick={() => setView('archive')}
+                className="text-gold text-xs uppercase tracking-widest font-bold hover:underline"
+              >
+                Go to Archive
+              </button>
+            </div>
+          )}
+        </section>
+      </div>
     </motion.div>
   );
 }
@@ -6039,8 +6355,10 @@ const ArchiveView: FC<{
   isAdmin: boolean,
   isEditMode: boolean,
   siteContent: any,
-  deviceMode: 'pc' | 'pad' | 'mobile'
-}> = ({ initialFilter, onClearFilter, language, isAdmin, isEditMode, siteContent, deviceMode }) => {
+  deviceMode: 'pc' | 'pad' | 'mobile',
+  bookmarks: any[],
+  toggleBookmark: (id: string) => void
+}> = ({ initialFilter, onClearFilter, language, isAdmin, isEditMode, siteContent, deviceMode, bookmarks, toggleBookmark }) => {
   const t = TRANSLATIONS[language];
   const [resources, setResources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -6067,6 +6385,7 @@ const ArchiveView: FC<{
     textContent: '',
     fileType: 'pdf' as 'pdf' | 'mp3' | 'image' | 'ppt' | 'word' | 'text' | 'video',
     accessLevel: 'member' as 'public' | 'member' | 'premium',
+    status: 'published' as 'published' | 'hidden',
     author: '',
     tags: '',
     color: '#F27D26',
@@ -6149,19 +6468,23 @@ const ArchiveView: FC<{
   }, [initialFilter]);
   useEffect(() => {
     const path = 'resources';
-    const q = query(collection(db, path), orderBy('createdAt', 'desc'));
+    const q = isAdmin 
+      ? query(collection(db, path), orderBy('createdAt', 'desc'))
+      : query(collection(db, path), where('status', '==', 'published'), orderBy('createdAt', 'desc'));
+      
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setResources(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
     }, (error) => handleFirestoreError(error, OperationType.LIST, 'resources'));
     return () => unsubscribe();
-  }, []);
+  }, [isAdmin]);
 
   const filteredResources = resources.filter(res => {
+    const isVisible = isAdmin || res.status !== 'hidden';
     const matchesGroup = !selectedGroup || res.groupId === selectedGroup;
     const matchesCategory = !selectedCategory || res.categoryId === selectedCategory;
     const matchesSearch = !searchQuery || res.title.toLowerCase().includes(searchQuery.toLowerCase()) || res.description.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesGroup && matchesCategory && matchesSearch;
+    return isVisible && matchesGroup && matchesCategory && matchesSearch;
   });
 
   const sortedResources = useMemo(() => {
@@ -6296,6 +6619,7 @@ const ArchiveView: FC<{
         textContent: '',
         fileType: 'pdf',
         accessLevel: 'member',
+        status: 'published',
         author: '',
         tags: '',
         color: '#F27D26',
@@ -6452,6 +6776,7 @@ const ArchiveView: FC<{
       textContent: res.textContent || '',
       fileType: res.fileType,
       accessLevel: res.accessLevel,
+      status: res.status || 'published',
       author: res.author || '',
       tags: Array.isArray(res.tags) ? res.tags.join(', ') : '',
       color: res.color || '#F27D26',
@@ -6758,6 +7083,30 @@ const ArchiveView: FC<{
                   )}>
                     {res.accessLevel === 'public' ? t.archive.access.public : res.accessLevel === 'member' ? t.archive.access.member : t.archive.access.premium}
                   </span>
+                  {isAdmin && res.status === 'hidden' && (
+                    <span className="text-[8px] uppercase tracking-widest px-2 py-1 rounded-full font-bold bg-ink text-paper">
+                      {language === 'ko' ? '비공개' : 'Hidden'}
+                    </span>
+                  )}
+                  <button 
+                    onClick={(e) => { 
+                      e.stopPropagation(); 
+                      if (!auth.currentUser) {
+                        alert(language === 'ko' ? '로그인이 필요한 서비스입니다.' : 'Login is required.');
+                        loginWithGoogle().catch(console.error);
+                        return;
+                      }
+                      toggleBookmark(res.id); 
+                    }}
+                    className={cn(
+                      "p-2 rounded-full transition-all",
+                      bookmarks.some(b => b.resourceUid === res.id && b.userUid === auth.currentUser?.uid)
+                        ? "bg-gold/10 text-gold"
+                        : "hover:bg-ink/5 text-ink/20 hover:text-ink/40"
+                    )}
+                  >
+                    <Bookmark size={14} fill={bookmarks.some(b => b.resourceUid === res.id && b.userUid === auth.currentUser?.uid) ? "currentColor" : "none"} />
+                  </button>
                 </div>
               </div>
               <div className="space-y-2 flex-grow">
@@ -6906,6 +7255,17 @@ const ArchiveView: FC<{
                           <option value="ppt">PPT / PowerPoint</option>
                           <option value="word">Word / Document</option>
                           <option value="text">Text / Content</option>
+                        </select>
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-[10px] uppercase tracking-widest opacity-50">Visibility</label>
+                        <select 
+                          value={newResource.status}
+                          onChange={(e) => setNewResource(prev => ({ ...prev, status: e.target.value as any }))}
+                          className="w-full p-4 bg-ink/5 border border-ink/10 rounded-2xl text-sm focus:outline-none focus:border-gold transition-all"
+                        >
+                          <option value="published">{language === 'ko' ? '공개' : 'Published'}</option>
+                          <option value="hidden">{language === 'ko' ? '비공개' : 'Hidden'}</option>
                         </select>
                       </div>
                       <div className="space-y-2">
@@ -8971,7 +9331,7 @@ const LevelTestView: FC<{ language: LanguageCode, isAdmin: boolean, isEditMode: 
   );
 };
 
-const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClearFilter?: () => void, deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ language, initialFilter, onClearFilter, deviceMode }) => {
+const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClearFilter?: () => void, deviceMode: 'pc' | 'pad' | 'mobile', likes: any[], toggleLike: (id: string) => void, isAdmin: boolean }> = ({ language, initialFilter, onClearFilter, deviceMode, likes, toggleLike, isAdmin }) => {
   const t = TRANSLATIONS[language];
   const [posts, setPosts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -8982,7 +9342,7 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
   useEffect(() => {
     if (initialFilter) setFilter(initialFilter);
   }, [initialFilter]);
-  const [newPost, setNewPost] = useState({ title: '', content: '', type: 'trend', imageUrl: '' });
+  const [newPost, setNewPost] = useState({ title: '', content: '', type: 'trend', imageUrl: '', status: 'published' as 'published' | 'hidden' });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -8997,7 +9357,10 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
 
   useEffect(() => {
     const path = 'community';
-    const q = query(collection(db, path), orderBy('createdAt', 'desc'));
+    const q = isAdmin 
+      ? query(collection(db, path), orderBy('createdAt', 'desc'))
+      : query(collection(db, path), where('status', '==', 'published'), orderBy('createdAt', 'desc'));
+      
     const unsubscribe = onSnapshot(q, (snapshot) => {
       setPosts(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
       setLoading(false);
@@ -9006,7 +9369,7 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
       setLoading(false);
     });
     return () => unsubscribe();
-  }, []);
+  }, [isAdmin]);
 
   const handleLoginRequired = () => {
     loginWithGoogle().catch(console.error);
@@ -9042,11 +9405,12 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
     try {
       await addDoc(collection(db, path), {
         ...newPost,
+        status: newPost.status || 'published',
         userUid: auth.currentUser.uid,
         userName: auth.currentUser.displayName || auth.currentUser.email,
         createdAt: serverTimestamp()
       });
-      setNewPost({ title: '', content: '', type: 'trend', imageUrl: '' });
+      setNewPost({ title: '', content: '', type: 'trend', imageUrl: '', status: 'published' });
       setShowForm(false);
       alert(language === 'ko' ? '게시글이 등록되었습니다.' : 'Post has been registered.');
     } catch (error) {
@@ -9056,7 +9420,17 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
     }
   };
 
+  const toggleVisibility = async (postId: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'hidden' ? 'published' : 'hidden';
+    try {
+      await updateDoc(doc(db, 'community', postId), { status: newStatus });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'community');
+    }
+  };
+
   const filteredPosts = posts.filter(p => {
+    const isVisible = isAdmin || p.status !== 'hidden' || p.userUid === auth.currentUser?.uid;
     const matchesFilter = filter === 'all' || p.type === filter;
     const matchesSearch = !searchQuery || 
       p.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
@@ -9321,6 +9695,11 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
                     )}>
                       {cat.label}
                     </span>
+                    {isAdmin && post.status === 'hidden' && (
+                      <span className="text-[8px] uppercase tracking-widest px-3 py-1 rounded-full font-bold bg-ink text-paper">
+                        {language === 'ko' ? '비공개' : 'Hidden'}
+                      </span>
+                    )}
                     <h3 className={cn(
                       "font-serif font-medium tracking-tight transition-all",
                       deviceMode === 'mobile' ? "text-xl" : "text-2xl"
@@ -9358,6 +9737,43 @@ const CommunityView: FC<{ language: LanguageCode, initialFilter?: string, onClea
                   <p className="text-base italic opacity-80 font-serif">"{post.reply}"</p>
                 </div>
               )}
+
+              <div className="pt-6 border-t border-ink/5 flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <button 
+                    onClick={() => toggleLike(post.id)}
+                    className={cn(
+                      "flex items-center gap-2 px-4 py-2 rounded-full transition-all",
+                      likes.some(l => l.postUid === post.id && l.userUid === auth.currentUser?.uid)
+                        ? "bg-gold/10 text-gold"
+                        : "bg-ink/5 text-ink/40 hover:bg-ink/10 hover:text-ink"
+                    )}
+                  >
+                    <Heart size={16} fill={likes.some(l => l.postUid === post.id && l.userUid === auth.currentUser?.uid) ? "currentColor" : "none"} />
+                    <span className="text-xs font-bold">{likes.filter(l => l.postUid === post.id).length}</span>
+                  </button>
+                </div>
+                {isAdmin && (
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => toggleVisibility(post.id, post.status)}
+                      className={cn(
+                        "p-2 rounded-full transition-all",
+                        post.status === 'hidden' ? "bg-ink text-paper" : "hover:bg-ink/5 text-ink/40 hover:text-ink"
+                      )}
+                      title={post.status === 'hidden' ? "Show" : "Hide"}
+                    >
+                      {post.status === 'hidden' ? <Eye size={16} /> : <EyeOff size={16} />}
+                    </button>
+                    <button className="p-2 hover:bg-ink/5 rounded-full text-ink/40 hover:text-ink transition-colors">
+                      <Edit size={16} />
+                    </button>
+                    <button className="p-2 hover:bg-red-50 rounded-full text-ink/40 hover:text-red-500 transition-colors">
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </motion.div>
           );
         }) : (

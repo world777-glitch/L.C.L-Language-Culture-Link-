@@ -15,9 +15,22 @@ service cloud.firestore {
     
     function isAdmin() {
       return isAuthenticated() && (
-        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin') ||
-        (request.auth.token.email == "lhbin777@gmail.com")
+        request.auth.token.email == "lhbin777@gmail.com" ||
+        (exists(/databases/$(database)/documents/users/$(request.auth.uid)) && 
+         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin')
       );
+    }
+
+    function isPublished(data) {
+      return !('status' in data) || data.status == 'published';
+    }
+    
+    function canReadResource(data) {
+      return isAdmin() || isPublished(data);
+    }
+
+    function canReadPost(data) {
+      return isAdmin() || isPublished(data) || (isAuthenticated() && data.userUid == request.auth.uid);
     }
 
     function isValidInquiry(data) {
@@ -53,7 +66,7 @@ service cloud.firestore {
     }
 
     match /resources/{resourceId} {
-      allow read: if true;
+      allow read: if canReadResource(resource.data);
       allow write: if isAdmin();
     }
 
@@ -70,7 +83,7 @@ service cloud.firestore {
     }
 
     match /community/{postId} {
-      allow read: if true;
+      allow read: if canReadPost(resource.data);
       allow create: if isAuthenticated() && request.resource.data.userUid == request.auth.uid;
       allow update: if isAdmin();
       allow delete: if isAdmin() || isOwner(resource.data.userUid);
@@ -89,6 +102,18 @@ service cloud.firestore {
     match /visits/{visitId} {
       allow read: if isAdmin();
       allow create: if true;
+    }
+
+    match /likes/{likeId} {
+      allow read: if true;
+      allow create: if isAuthenticated() && request.resource.data.userUid == request.auth.uid;
+      allow delete: if isAuthenticated() && resource.data.userUid == request.auth.uid;
+    }
+
+    match /bookmarks/{bookmarkId} {
+      allow read: if isAdmin() || (isAuthenticated() && resource.data.userUid == request.auth.uid);
+      allow create: if isAuthenticated() && request.resource.data.userUid == request.auth.uid;
+      allow delete: if isAdmin() || (isAuthenticated() && resource.data.userUid == request.auth.uid);
     }
   }
 }
