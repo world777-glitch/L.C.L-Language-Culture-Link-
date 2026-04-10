@@ -73,7 +73,8 @@ import {
   Smartphone,
   Settings,
   Menu,
-  TrendingUp
+  TrendingUp,
+  GripHorizontal
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder, useScroll, useSpring, useDragControls } from 'motion/react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
@@ -1493,35 +1494,28 @@ const EditableText: FC<{
             dragControls={dragControls}
             dragListener={false}
             dragMomentum={false}
-            initial={{ x: '-50%' }}
             className={cn(
-              "absolute left-1/2 p-5 bg-card border-2 border-gold shadow-[0_20px_50px_rgba(0,0,0,0.3)] rounded-[24px] z-[500] flex flex-col gap-4 min-w-[340px] max-w-[90vw]",
-              "animate-in fade-in zoom-in duration-200",
-              // Position below for items likely at the top of the screen to avoid being cut off
-              contentKey.includes('nav') || 
-              contentKey.includes('menu') || 
-              contentKey.includes('hero') || 
-              contentKey.includes('title') || 
-              contentKey.includes('badge') ||
-              contentKey.includes('top') ||
-              contentKey.includes('overlay') ||
-              ['h1', 'h2', 'h3'].includes(Component)
-                ? "top-full mt-4" 
-                : "bottom-full mb-4"
+              "fixed top-1/4 left-1/2 -ml-[170px] p-6 bg-card border-2 border-gold shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[32px] z-[1000] flex flex-col gap-5 min-w-[340px] max-w-[95vw]",
+              "animate-in fade-in zoom-in duration-300"
             )}
           >
             <div 
               onPointerDown={(e) => dragControls.start(e)}
-              className="flex items-center justify-between border-b border-ink/10 pb-3 cursor-move active:cursor-grabbing"
+              className="flex items-center justify-between border-b border-ink/10 pb-4 cursor-move active:cursor-grabbing group/drag"
             >
-              <div className="flex items-center gap-2">
-                <div className="w-2 h-2 bg-gold rounded-full animate-pulse" />
-                <span className="text-xs font-bold uppercase tracking-widest text-ink/60 select-none">Text Editor</span>
+              <div className="flex items-center gap-3">
+                <div className="p-1.5 bg-gold/10 rounded-lg">
+                  <GripHorizontal size={18} className="text-gold" />
+                </div>
+                <div className="flex flex-col">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40 leading-none mb-1">Editor</span>
+                  <span className="text-xs font-bold text-ink leading-none">Text Content</span>
+                </div>
               </div>
-              <div className="flex gap-1.5">
-                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('bold')} title="Bold" className="p-2 hover:bg-gold/20 rounded-lg border border-ink/5 transition-colors"><Bold size={14} /></button>
-                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('italic')} title="Italic" className="p-2 hover:bg-gold/20 rounded-lg border border-ink/5 transition-colors"><Italic size={14} /></button>
-                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('underline')} title="Underline" className="p-2 hover:bg-gold/20 rounded-lg border border-ink/5 transition-colors"><Underline size={14} /></button>
+              <div className="flex gap-2">
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('bold')} title="Bold" className="p-2.5 hover:bg-gold/20 rounded-xl border border-ink/5 transition-colors"><Bold size={16} /></button>
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('italic')} title="Italic" className="p-2.5 hover:bg-gold/20 rounded-xl border border-ink/5 transition-colors"><Italic size={16} /></button>
+                <button onMouseDown={(e) => e.preventDefault()} onClick={() => applyCommand('underline')} title="Underline" className="p-2.5 hover:bg-gold/20 rounded-xl border border-ink/5 transition-colors"><Underline size={16} /></button>
               </div>
             </div>
 
@@ -2419,6 +2413,7 @@ const EditableMedia: FC<{
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
+  const dragControls = useDragControls();
   
   const currentAspect = siteContent[`${contentKey}.aspect`]?.value || aspectRatio;
   const currentFit = siteContent[`${contentKey}.fit`]?.value || 'object-cover';
@@ -2689,7 +2684,25 @@ const EditableMedia: FC<{
             )}
           </div>
 
-          <div className="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-2xl border border-gold/20 flex flex-col gap-3 self-start">
+          <motion.div 
+            drag
+            dragControls={dragControls}
+            dragListener={false}
+            dragMomentum={false}
+            className="fixed top-1/4 left-1/2 -ml-[150px] bg-white/95 backdrop-blur-xl p-5 rounded-[32px] shadow-[0_30px_60px_rgba(0,0,0,0.3)] border-2 border-gold flex flex-col gap-4 min-w-[300px] z-[1000] cursor-default"
+          >
+            <div 
+              onPointerDown={(e) => dragControls.start(e)}
+              className="flex items-center gap-3 border-b border-ink/5 pb-3 mb-1 cursor-move active:cursor-grabbing group/drag"
+            >
+              <div className="p-1.5 bg-gold/10 rounded-lg">
+                <GripHorizontal size={16} className="text-gold" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-widest opacity-40 font-bold leading-none mb-1">Editor</span>
+                <span className="text-[11px] font-bold text-ink leading-none">Media Settings</span>
+              </div>
+            </div>
             <div className="flex flex-col gap-1">
               <span className="text-[8px] uppercase tracking-widest opacity-50 font-bold">Aspect Ratio</span>
               <div className="flex gap-1">
@@ -2733,7 +2746,7 @@ const EditableMedia: FC<{
                 ))}
               </div>
             </div>
-          </div>
+          </motion.div>
           
           <input 
             type="file" 
@@ -2900,14 +2913,19 @@ const EditableLink: FC<{
             dragControls={dragControls}
             dragListener={false}
             dragMomentum={false}
-            className="flex flex-col gap-3 w-full min-w-[300px] bg-white p-4 rounded-xl border border-gold shadow-2xl z-[100] absolute bottom-full left-0 mb-2"
+            className="fixed top-1/4 left-1/2 -ml-[150px] flex flex-col gap-4 w-full min-w-[300px] bg-white/95 backdrop-blur-xl p-6 rounded-[32px] border-2 border-gold shadow-[0_30px_60px_rgba(0,0,0,0.3)] z-[1000]"
           >
             <div 
               onPointerDown={(e) => dragControls.start(e)}
-              className="flex items-center justify-between border-b border-ink/5 pb-2 mb-1 cursor-move active:cursor-grabbing"
+              className="flex items-center gap-3 border-b border-ink/5 pb-4 mb-1 cursor-move active:cursor-grabbing group/drag"
             >
-              <span className="text-[8px] uppercase tracking-widest font-bold text-gold select-none">Link Editor</span>
-              <div className="w-1.5 h-1.5 bg-gold/30 rounded-full" />
+              <div className="p-1.5 bg-gold/10 rounded-lg">
+                <GripHorizontal size={16} className="text-gold" />
+              </div>
+              <div className="flex flex-col">
+                <span className="text-[9px] uppercase tracking-widest opacity-40 font-bold leading-none mb-1">Editor</span>
+                <span className="text-[11px] font-bold text-ink leading-none">Link & URL</span>
+              </div>
             </div>
             <div className="space-y-1">
               <label className="text-[8px] uppercase tracking-widest opacity-50">Link Text</label>
