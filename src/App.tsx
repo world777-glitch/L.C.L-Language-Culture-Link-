@@ -3337,6 +3337,128 @@ const GlobalStyleEditor: FC<{
   );
 };
 
+const ProgramCarousel: FC<{
+  isEditMode: boolean;
+  language: LanguageCode;
+  siteContent: Record<string, any>;
+  deviceMode: 'pc' | 'pad' | 'mobile';
+  t: any;
+}> = ({ isEditMode, language, siteContent, deviceMode, t }) => {
+  const [index, setIndex] = useState(0);
+  const items = t.programs?.items || [];
+
+  const next = () => setIndex((prev) => (prev + 1) % items.length);
+  const prev = () => setIndex((prev) => (prev - 1 + items.length) % items.length);
+
+  if (items.length === 0) return null;
+
+  return (
+    <div className="relative overflow-hidden bg-ink/5 rounded-[40px] p-8 md:p-16 border border-ink/5">
+      <div className="flex items-center justify-between mb-12">
+        <div className="space-y-2">
+          <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
+            <EditableText contentKey="programs.badge" defaultValue="Programs" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </div>
+          <EditableText contentKey="programs.title" defaultValue={t.programs.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" className="text-3xl md:text-4xl font-serif" />
+        </div>
+        <div className="flex gap-3">
+          <button onClick={prev} className="w-12 h-12 rounded-full border border-ink/10 flex items-center justify-center hover:bg-ink hover:text-paper transition-all">
+            <ChevronLeft size={20} />
+          </button>
+          <button onClick={next} className="w-12 h-12 rounded-full border border-ink/10 flex items-center justify-center hover:bg-ink hover:text-paper transition-all">
+            <ChevronRight size={20} />
+          </button>
+        </div>
+      </div>
+
+      <div className="relative min-h-[350px] md:min-h-[250px]">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={index}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="space-y-8"
+          >
+            <div className="space-y-4">
+              <EditableText contentKey={`programs.item_${index}.title`} defaultValue={items[index].title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h4" className="text-2xl md:text-3xl font-serif text-gold" />
+              <div className="w-12 h-1 bg-gold/30 rounded-full" />
+            </div>
+            <div className="text-lg md:text-xl opacity-70 leading-relaxed whitespace-pre-line font-serif italic">
+              <EditableText contentKey={`programs.item_${index}.content`} defaultValue={items[index].content} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
+            </div>
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      <div className="flex gap-3 mt-12">
+        {items.map((_, i) => (
+          <button
+            key={i}
+            onClick={() => setIndex(i)}
+            className={cn(
+              "h-1.5 rounded-full transition-all duration-500",
+              index === i ? "w-12 bg-gold" : "w-3 bg-ink/10"
+            )}
+          />
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const ProfileSection: FC<{
+  isEditMode: boolean;
+  language: LanguageCode;
+  siteContent: Record<string, any>;
+  t: any;
+  isAdmin?: boolean;
+}> = ({ isEditMode, language, siteContent, t, isAdmin }) => {
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+      <div className="space-y-12">
+        <div className="space-y-6">
+          <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
+            <EditableText contentKey="profile.badge" defaultValue="Profile" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </div>
+          <EditableText contentKey="profile.title" defaultValue={t.profile.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" className="text-4xl md:text-5xl font-serif leading-tight" />
+        </div>
+        <div className="space-y-6 text-lg md:text-xl font-serif opacity-80 leading-relaxed">
+          <div className="flex items-start gap-4">
+            <div className="w-1.5 h-1.5 rounded-full bg-gold mt-3 shrink-0" />
+            <EditableText contentKey="profile.education" defaultValue={t.profile.education} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="w-1.5 h-1.5 rounded-full bg-gold mt-3 shrink-0" />
+            <EditableText contentKey="profile.experience" defaultValue={t.profile.experience} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </div>
+          <div className="flex items-start gap-4">
+            <div className="w-1.5 h-1.5 rounded-full bg-gold mt-3 shrink-0" />
+            <EditableText contentKey="profile.data" defaultValue={t.profile.data} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </div>
+          <div className="p-6 bg-gold/5 border-l-4 border-gold rounded-r-2xl italic">
+            <EditableText contentKey="profile.specialty" defaultValue={t.profile.specialty} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </div>
+        </div>
+      </div>
+      <div className="relative aspect-[4/5] rounded-[80px] overflow-hidden bg-ink/5 border border-ink/10 shadow-2xl">
+        <EditableImage 
+          contentKey="profile.image"
+          defaultUrl="https://picsum.photos/seed/doctor-profile/800/1000"
+          alt="Profile"
+          className="w-full h-full object-cover"
+          isEditMode={isEditMode}
+          isAdmin={isAdmin}
+          language={language}
+          siteContent={siteContent}
+          rounded="rounded-[80px]"
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-ink/40 to-transparent pointer-events-none" />
+      </div>
+    </div>
+  );
+};
+
 const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void, setInitialArchiveFilter: (f: any) => void, language: LanguageCode, isEditMode: boolean, isAdmin?: boolean, siteContent: Record<string, any>, isEventPeriod: boolean, deviceMode: 'pc' | 'pad' | 'mobile' }> = ({ setView, onBook, setInitialArchiveFilter, language, isEditMode, isAdmin, siteContent, isEventPeriod, deviceMode }) => {
   const t = TRANSLATIONS[language];
   const [todayVisits, setTodayVisits] = useState(0);
@@ -3393,6 +3515,162 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
           ))}
         </motion.div>
       </div>
+
+      {/* Curriculum Section */}
+      <motion.section 
+        initial={{ opacity: 0, y: 30 }}
+        whileInView={{ opacity: 1, y: 0 }}
+        viewport={{ once: true, margin: "-100px" }}
+        id="curriculum" 
+        className="max-w-[1600px] mx-auto px-0 py-16"
+      >
+        <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
+          <div className="space-y-4">
+            <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
+              <EditableText contentKey="curriculum.badge" defaultValue={t.curriculum.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+            </div>
+            <div className="text-5xl font-serif font-light">
+              <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
+            </div>
+          </div>
+          <div className="max-w-xs text-sm opacity-60 font-serif italic">
+            <EditableText contentKey="curriculum.subtitle" defaultValue={t.curriculum.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </div>
+        </div>
+
+        <div className="space-y-32">
+          {/* Profile Section */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <ProfileSection isEditMode={isEditMode} language={language} siteContent={siteContent} t={t} isAdmin={isAdmin} />
+          </motion.div>
+
+          {/* Programs Carousel */}
+          <motion.div
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+          >
+            <ProgramCarousel isEditMode={isEditMode} language={language} siteContent={siteContent} deviceMode={deviceMode} t={t} />
+          </motion.div>
+
+          {/* Differentiation Section */}
+          <div className="space-y-16">
+            <div className="text-center space-y-4">
+              <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
+                <EditableText contentKey="differentiation.badge" defaultValue="Differentiation" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+              </div>
+              <EditableText contentKey="differentiation.title" defaultValue={t.differentiation.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" className="text-4xl font-serif" />
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+              {(t.differentiation?.items || []).map((item: any, i: number) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: i * 0.1 }}
+                  className="p-8 bg-ink/5 rounded-[32px] border border-ink/5 space-y-4 hover:bg-gold/5 transition-all group"
+                >
+                  <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center text-gold group-hover:scale-110 transition-transform">
+                    {i === 0 && <ShieldCheck size={20} />}
+                    {i === 1 && <BarChart3 size={20} />}
+                    {i === 2 && <CheckCircle2 size={20} />}
+                    {i === 3 && <Heart size={20} />}
+                  </div>
+                  <EditableText contentKey={`differentiation.item_${i}.title`} defaultValue={item.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h4" className="text-xl font-serif" />
+                  <div className="text-sm opacity-60 leading-relaxed">
+                    <EditableText contentKey={`differentiation.item_${i}.content`} defaultValue={item.content} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+
+          {/* Consultation Section */}
+          <div className="bg-ink text-paper rounded-[60px] p-12 md:p-20 space-y-12 overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-gold/10 blur-[100px] rounded-full -translate-y-1/2 translate-x-1/2" />
+            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-16">
+              <div className="space-y-8">
+                <EditableText contentKey="consultation.title" defaultValue={t.consultation.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" className="text-4xl font-serif" />
+                <div className="space-y-6">
+                  {(t.consultation?.items || []).map((item: any, i: number) => (
+                    <div key={i} className="flex items-center gap-6 border-b border-paper/10 pb-4">
+                      <span className="text-[10px] uppercase tracking-widest opacity-40 min-w-[100px]">{item.label}</span>
+                      <span className="text-lg font-serif">
+                        <EditableText contentKey={`consultation.item_${i}.value`} defaultValue={item.value} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="flex flex-col justify-center space-y-8">
+                <div className="text-xl font-serif italic opacity-80 leading-relaxed">
+                  <EditableText contentKey="consultation.footer" defaultValue={t.consultation.footer} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                </div>
+                <button 
+                  onClick={() => setView('inquiry')}
+                  className="w-full md:w-auto px-12 py-5 bg-gold text-ink font-bold rounded-full uppercase tracking-widest hover:scale-105 transition-all text-sm"
+                >
+                  {t.nav.inquiry}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-32">
+          <Repeater 
+            contentKey="landing.curriculum"
+          isEditMode={isEditMode}
+          language={language}
+          siteContent={siteContent}
+          defaultCount={COURSES.length}
+          className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-px bg-ink/10 border border-ink/10"
+          addButtonLabel={language === 'ko' ? '과정 추가' : 'Add Course'}
+          renderItem={(idx) => {
+            const course = COURSES[idx] || { id: `custom_${idx}`, title: 'New Course', description: 'Course description...', levels: ['Basic'] };
+            return (
+              <motion.div 
+                whileHover={{ backgroundColor: 'rgba(26, 26, 26, 0.02)' }}
+                className="bg-paper p-8 space-y-8 flex flex-col h-full"
+              >
+                <div className="space-y-4 flex-grow">
+                  <div className="w-12 h-12 rounded-full border border-ink/10 flex items-center justify-center">
+                    {idx === 0 && <MessageSquare size={20} />}
+                    {idx === 1 && <GraduationCap size={20} />}
+                    {idx === 2 && <Star size={20} />}
+                    {idx === 3 && <Briefcase size={20} />}
+                    {idx === 4 && <Globe size={20} />}
+                    {idx >= 5 && <BookOpen size={20} />}
+                  </div>
+                  <div className="text-2xl font-serif">
+                    <EditableText contentKey={`curriculum.item_${idx}.title`} defaultValue={course.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="span" />
+                  </div>
+                  <div className="text-xs opacity-60 leading-relaxed">
+                    <EditableText contentKey={`curriculum.item_${idx}.desc`} defaultValue={course.description} isEditMode={isEditMode} language={language} siteContent={siteContent} as="span" />
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {course.levels.map(level => (
+                      <span key={level} className="text-[9px] uppercase tracking-widest px-2 py-1 bg-ink/5 rounded-sm">{level}</span>
+                    ))}
+                  </div>
+                </div>
+                <button 
+                  onClick={() => onBook(course)}
+                  className="group flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold hover:text-gold transition-colors"
+                >
+                  {language === 'ko' ? '수강 신청' : t.curriculum.bookNow} <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
+                </button>
+              </motion.div>
+            );
+          }}
+        />
+        </div>
+      </motion.section>
 
       {/* Hero Section */}
       <section className={cn(
@@ -3469,7 +3747,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                 language={language} 
                 siteContent={siteContent} 
                 as="h1" 
-                highlight={language === 'ko' ? "프리미엄 중국어" : "Premium Chinese"}
+                highlight={language === 'ko' ? "학문이자 삶" : "Academic & Life"}
                 highlightClassName="text-gold"
               />
             </motion.div>
@@ -3482,7 +3760,9 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                 deviceMode === 'mobile' ? "text-sm max-w-xs mx-auto" : "text-lg max-w-md"
               )}
             >
-              <EditableText contentKey="hero.subtitle" defaultValue={t.hero.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
+              <div className="text-lg md:text-xl opacity-70 leading-relaxed whitespace-pre-line font-serif italic">
+                <EditableText contentKey="hero.subtitle" defaultValue={t.hero.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
+              </div>
             </motion.div>
             <motion.div 
               initial={{ y: 30, opacity: 0 }}
@@ -3572,76 +3852,6 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
           </div>
         </div>
       </section>
-
-      {/* Curriculum Section */}
-      <motion.section 
-        initial={{ opacity: 0, y: 30 }}
-        whileInView={{ opacity: 1, y: 0 }}
-        viewport={{ once: true, margin: "-100px" }}
-        id="curriculum" 
-        className="max-w-[1600px] mx-auto px-0 py-16"
-      >
-        <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
-          <div className="space-y-4">
-            <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
-              <EditableText contentKey="curriculum.badge" defaultValue={t.curriculum.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-            </div>
-            <div className="text-5xl font-serif font-light">
-              <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
-            </div>
-          </div>
-          <div className="max-w-xs text-sm opacity-60 font-serif italic">
-            <EditableText contentKey="curriculum.subtitle" defaultValue={t.curriculum.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </div>
-        </div>
-
-        <Repeater 
-          contentKey="landing.curriculum"
-          isEditMode={isEditMode}
-          language={language}
-          siteContent={siteContent}
-          defaultCount={COURSES.length}
-          className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-px bg-ink/10 border border-ink/10"
-          addButtonLabel={language === 'ko' ? '과정 추가' : 'Add Course'}
-          renderItem={(idx) => {
-            const course = COURSES[idx] || { id: `custom_${idx}`, title: 'New Course', description: 'Course description...', levels: ['Basic'] };
-            return (
-              <motion.div 
-                whileHover={{ backgroundColor: 'rgba(26, 26, 26, 0.02)' }}
-                className="bg-paper p-8 space-y-8 flex flex-col h-full"
-              >
-                <div className="space-y-4 flex-grow">
-                  <div className="w-12 h-12 rounded-full border border-ink/10 flex items-center justify-center">
-                    {idx === 0 && <MessageSquare size={20} />}
-                    {idx === 1 && <GraduationCap size={20} />}
-                    {idx === 2 && <Star size={20} />}
-                    {idx === 3 && <Briefcase size={20} />}
-                    {idx === 4 && <Globe size={20} />}
-                    {idx >= 5 && <BookOpen size={20} />}
-                  </div>
-                  <div className="text-2xl font-serif">
-                    <EditableText contentKey={`curriculum.item_${idx}.title`} defaultValue={course.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="span" />
-                  </div>
-                  <div className="text-xs opacity-60 leading-relaxed">
-                    <EditableText contentKey={`curriculum.item_${idx}.desc`} defaultValue={course.description} isEditMode={isEditMode} language={language} siteContent={siteContent} as="span" />
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {course.levels.map(level => (
-                      <span key={level} className="text-[9px] uppercase tracking-widest px-2 py-1 bg-ink/5 rounded-sm">{level}</span>
-                    ))}
-                  </div>
-                </div>
-                <button 
-                  onClick={() => onBook(course)}
-                  className="group flex items-center gap-2 text-[10px] uppercase tracking-widest font-bold hover:text-gold transition-colors"
-                >
-                  {language === 'ko' ? '수강 신청' : t.curriculum.bookNow} <ChevronRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                </button>
-              </motion.div>
-            );
-          }}
-        />
-      </motion.section>
 
       {/* Dynamic Gallery Section */}
       <motion.section 
@@ -7895,12 +8105,10 @@ const CurriculumView: FC<{ language: LanguageCode, onBook: (course: any) => void
           <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
             <EditableText contentKey="curriculum.badge" defaultValue={t.curriculum.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
-          <div className={cn(
-            "font-serif font-light transition-all",
-            deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
-          )}>
-            <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
-          </div>
+            <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" className={cn(
+              "font-serif font-light transition-all",
+              deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
+            )} />
         </div>
         <div className={cn(
           "opacity-60 font-serif italic transition-all",
@@ -8092,12 +8300,10 @@ const PricingView: FC<{ language: LanguageCode, setView: (v: any) => void, isEdi
           <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
             <EditableText contentKey="pricing.badge" defaultValue={t.pricing.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
-          <div className={cn(
-            "font-serif font-light transition-all",
-            deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
-          )}>
-            <EditableText contentKey="pricing.title" defaultValue={t.pricing.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" />
-          </div>
+            <EditableText contentKey="pricing.title" defaultValue={t.pricing.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h2" className={cn(
+              "font-serif font-light transition-all",
+              deviceMode === 'mobile' ? "text-3xl" : "text-5xl"
+            )} />
           <div className={cn(
             "max-w-xl mx-auto opacity-60 font-serif italic transition-all",
             deviceMode === 'mobile' ? "text-xs" : "text-sm"
