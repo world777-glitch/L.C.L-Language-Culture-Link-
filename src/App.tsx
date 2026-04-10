@@ -14,6 +14,7 @@ import {
   ArrowUp, 
   ArrowDown, 
   ArrowRight,
+  ArrowUpRight,
   User, 
   LogOut, 
   Calendar, 
@@ -37,6 +38,7 @@ import {
   BarChart3,
   Users,
   Search,
+  Mail,
   Download,
   Eye,
   EyeOff,
@@ -3413,13 +3415,57 @@ const ProfileSection: FC<{
   siteContent: Record<string, any>;
   t: any;
   isAdmin?: boolean;
-}> = ({ isEditMode, language, siteContent, t, isAdmin }) => {
+  setView: (v: any) => void;
+  todayVisits: number;
+}> = ({ isEditMode, language, siteContent, t, isAdmin, setView, todayVisits }) => {
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-      <div className="space-y-12">
+      <div className="space-y-10">
         <div className="space-y-6">
-          <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
-            <EditableText contentKey="profile.badge" defaultValue="Profile" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          <div className="flex items-center justify-between">
+            <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
+              <EditableText contentKey="profile.badge" defaultValue="Profile" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+            </div>
+            
+            {/* Compact Activity Indicators */}
+            <div className="flex items-center gap-4">
+              {todayVisits > 0 && (
+                <div className="flex items-center gap-2 px-3 py-1 bg-gold/5 border border-gold/20 rounded-full">
+                  <div className="w-1 h-1 bg-gold rounded-full animate-pulse" />
+                  <span className="text-[8px] uppercase tracking-widest font-bold text-gold/80">
+                    {todayVisits} {language === 'ko' ? '오늘 방문' : 'Visits Today'}
+                  </span>
+                </div>
+              )}
+              <div className="flex items-center gap-2">
+                <Repeater 
+                  contentKey="hero.avatars"
+                  isEditMode={isEditMode}
+                  language={language}
+                  siteContent={siteContent}
+                  defaultCount={3}
+                  className="flex -space-x-1.5"
+                  renderItem={(i) => (
+                    <div className="w-5 h-5 rounded-full border border-paper bg-ink/10 overflow-hidden relative">
+                      <EditableImage 
+                        contentKey={`hero.avatar_${i}`}
+                        defaultUrl={`https://i.pravatar.cc/100?img=${i + 10}`}
+                        alt="Student"
+                        className="w-full h-full object-cover"
+                        isEditMode={isEditMode}
+                        isAdmin={isAdmin}
+                        language={language}
+                        siteContent={siteContent}
+                        rounded="rounded-full"
+                      />
+                    </div>
+                  )}
+                />
+                <span className="text-[8px] uppercase tracking-widest font-bold opacity-40">
+                  <EditableText contentKey="hero.students_count" defaultValue={language === 'ko' ? '500+ 참여' : '500+ Joined'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                </span>
+              </div>
+            </div>
           </div>
           <EditableText contentKey="profile.title" defaultValue={t.profile.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" className="text-4xl md:text-5xl font-serif leading-tight" />
         </div>
@@ -3438,6 +3484,94 @@ const ProfileSection: FC<{
           </div>
           <div className="p-6 bg-gold/5 border-l-4 border-gold rounded-r-2xl italic">
             <EditableText contentKey="profile.specialty" defaultValue={t.profile.specialty} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </div>
+
+          {/* Compact Quick Actions - 2x2 Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 max-w-xl">
+            {/* Consultation */}
+            <motion.button 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              onClick={() => setView('inquiry')}
+              className="flex items-center gap-3 px-5 py-3 bg-gold text-ink rounded-full shadow-sm hover:shadow-md transition-all group w-full"
+            >
+              <MessageCircle size={18} />
+              <div className="text-left">
+                <div className="text-[7px] uppercase tracking-widest font-bold opacity-60 leading-none mb-0.5">Consultation</div>
+                <div className="text-[11px] font-bold leading-none">
+                  <EditableText contentKey="quick.consultation.label" defaultValue={language === 'ko' ? '무료 상담 신청' : 'Free Consultation'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                </div>
+              </div>
+              <ArrowUpRight size={12} className="ml-auto opacity-40 group-hover:opacity-100 transition-opacity" />
+            </motion.button>
+
+            {/* Contact */}
+            <motion.a 
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
+              href={`mailto:${siteContent['quick.contact.email']?.value || 'lhbin777@gmail.com'}`}
+              className="flex items-center gap-3 px-5 py-3 bg-ink text-paper rounded-full shadow-sm hover:bg-ink/90 transition-all cursor-pointer w-full"
+            >
+              <Mail size={18} className="text-gold" />
+              <div className="text-left">
+                <div className="text-[7px] uppercase tracking-widest font-bold opacity-40 leading-none mb-0.5">Contact</div>
+                <div className="text-[11px] font-serif leading-none">
+                  <EditableText contentKey="quick.contact.email" defaultValue="lhbin777@gmail.com" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                </div>
+              </div>
+            </motion.a>
+
+            {/* Social */}
+            <div className="flex items-center gap-3 px-5 py-3 bg-paper border border-ink/10 rounded-full shadow-sm w-full overflow-hidden">
+              <div className="flex items-center gap-1.5 shrink-0">
+                <Instagram size={14} className="text-gold opacity-60" />
+                <MessageCircle size={14} className="text-gold opacity-60" />
+              </div>
+              <div className="flex gap-2 overflow-x-auto no-scrollbar">
+                <Repeater 
+                  contentKey="quick.social_links"
+                  isEditMode={isEditMode}
+                  language={language}
+                  siteContent={siteContent}
+                  defaultCount={3}
+                  className="flex gap-2"
+                  renderItem={(i) => (
+                    <EditableLink 
+                      contentKey={`quick.social_links.item_${i}`} 
+                      defaultText={i === 0 ? "Insta" : i === 1 ? "Blog" : "Chat"} 
+                      defaultUrl="#" 
+                      isEditMode={isEditMode} 
+                      language={language} 
+                      siteContent={siteContent} 
+                      className="text-[10px] font-serif italic hover:text-gold transition-colors whitespace-nowrap" 
+                    />
+                  )}
+                />
+              </div>
+            </div>
+
+            {/* Course Explore Badge */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => {
+                const el = document.getElementById('curriculum');
+                if (el) {
+                  el.scrollIntoView({ behavior: 'smooth' });
+                } else {
+                  setView('landing');
+                  setTimeout(() => {
+                    document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' });
+                  }, 100);
+                }
+              }}
+              className="flex items-center gap-2 px-5 py-3 bg-ink/5 border border-ink/10 rounded-full hover:bg-ink/10 transition-all w-full"
+            >
+              <Search size={16} className="text-gold" />
+              <span className="text-[10px] uppercase tracking-widest font-bold opacity-60">
+                {language === 'ko' ? '코스 탐색' : 'Explore Courses'}
+              </span>
+            </motion.button>
           </div>
         </div>
       </div>
@@ -3545,7 +3679,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
           >
-            <ProfileSection isEditMode={isEditMode} language={language} siteContent={siteContent} t={t} isAdmin={isAdmin} />
+            <ProfileSection isEditMode={isEditMode} language={language} siteContent={siteContent} t={t} isAdmin={isAdmin} setView={setView} todayVisits={todayVisits} />
           </motion.div>
 
           {/* Programs Carousel */}
@@ -3671,187 +3805,6 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
         />
         </div>
       </motion.section>
-
-      {/* Hero Section */}
-      <section className={cn(
-        "relative flex items-center overflow-hidden px-4 landing-hero-bg transition-all",
-        deviceMode === 'mobile' ? "h-[85vh] pt-20" : deviceMode === 'pad' ? "h-[75vh]" : "h-[90vh]"
-      )}>
-        <div className="absolute inset-0 landing-hero-overlay pointer-events-none" />
-        <div className={cn(
-          "absolute right-0 top-0 h-full bg-ink/5 z-0 flex items-center justify-center transition-all",
-          deviceMode === 'mobile' ? "w-full opacity-30" : "w-1/2"
-        )}>
-          <div className={cn(
-            "aspect-[3/4] bg-ink/10 rounded-[200px] overflow-hidden relative transition-all",
-            deviceMode === 'mobile' ? "w-[60%]" : deviceMode === 'pad' ? "w-[75%]" : "w-[80%]"
-          )}>
-            <EditableImage 
-              contentKey="hero.image"
-              defaultUrl="https://picsum.photos/seed/chinese-culture/800/1200" 
-              alt="Chinese Culture" 
-              className="w-full h-full object-cover opacity-80"
-              isEditMode={isEditMode}
-              isAdmin={isAdmin}
-              language={language}
-              siteContent={siteContent}
-              rounded="rounded-[200px]"
-            >
-              <div className="absolute inset-0 bg-gradient-to-t from-paper/40 to-transparent pointer-events-none" />
-            </EditableImage>
-          </div>
-          <div className="absolute top-1/2 left-0 -translate-x-1/2 vertical-text opacity-20 text-4xl font-serif">
-            Language & Culture Link
-          </div>
-        </div>
-
-        <div className={cn(
-          "max-w-[1600px] mx-auto w-full grid relative z-10 pointer-events-none px-0 transition-all",
-          deviceMode === 'mobile' ? "grid-cols-1" : "grid-cols-1 md:grid-cols-2"
-        )}>
-          <div className={cn(
-            "space-y-8 pointer-events-auto transition-all",
-            deviceMode === 'mobile' ? "text-center flex flex-col items-center" : ""
-          )}>
-            <motion.div 
-              initial={{ x: -50, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: 0.2 }}
-              className="flex items-center gap-4"
-            >
-              <div className="inline-block px-4 py-1 border border-gold text-gold text-[10px] uppercase tracking-[0.3em] rounded-full">
-                <EditableText contentKey="hero.badge" defaultValue={t.hero.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-              </div>
-              {todayVisits > 0 && (
-                <div className="flex items-center gap-2 px-3 py-1 bg-gold/10 rounded-full">
-                  <div className="w-1.5 h-1.5 bg-gold rounded-full animate-pulse" />
-                  <span className="text-[9px] uppercase tracking-widest font-bold text-gold">
-                    {todayVisits} {language === 'ko' ? '오늘 방문' : 'Visits Today'}
-                  </span>
-                </div>
-              )}
-            </motion.div>
-            <motion.div 
-              initial={{ y: 30, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.4 }}
-              className={cn(
-                "font-serif font-light tracking-tighter transition-all",
-                deviceMode === 'mobile' ? "text-3xl leading-[1.2]" : deviceMode === 'pad' ? "text-6xl leading-[0.9]" : "text-7xl md:text-8xl leading-[0.9]"
-              )}
-            >
-              <EditableText 
-                contentKey="hero.title" 
-                defaultValue={t.hero.title} 
-                isEditMode={isEditMode} 
-                language={language} 
-                siteContent={siteContent} 
-                as="h1" 
-                highlight={language === 'ko' ? "학문이자 삶" : "Academic & Life"}
-                highlightClassName="text-gold"
-              />
-            </motion.div>
-            <motion.div 
-              initial={{ y: 30, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.6 }}
-              className={cn(
-                "font-serif opacity-70 leading-relaxed transition-all",
-                deviceMode === 'mobile' ? "text-sm max-w-xs mx-auto" : "text-lg max-w-md"
-              )}
-            >
-              <div className="text-lg md:text-xl opacity-70 leading-relaxed whitespace-pre-line font-serif italic">
-                <EditableText contentKey="hero.subtitle" defaultValue={t.hero.subtitle} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
-              </div>
-            </motion.div>
-            <motion.div 
-              initial={{ y: 30, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ delay: 0.8 }}
-              className={cn(
-                "flex flex-wrap items-center transition-all",
-                deviceMode === 'mobile' ? "gap-3 justify-center" : "gap-6"
-              )}
-            >
-              <button 
-                onClick={() => document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' })}
-                className={cn(
-                  "bg-ink text-paper rounded-full uppercase tracking-widest hover:scale-105 transition-all",
-                  deviceMode === 'mobile' ? "px-6 py-3 text-[10px]" : "px-10 py-4 text-xs"
-                )}
-              >
-                {t.hero.cta}
-              </button>
-              <button 
-                onClick={() => setView('inquiry')}
-                className={cn(
-                  "border border-ink text-ink rounded-full uppercase tracking-widest hover:bg-ink hover:text-paper transition-all",
-                  deviceMode === 'mobile' ? "px-6 py-3 text-[10px]" : "px-10 py-4 text-xs"
-                )}
-              >
-                {t.inquiry.title}
-              </button>
-              <div className="flex items-center gap-3">
-                <Repeater 
-                  contentKey="hero.avatars"
-                  isEditMode={isEditMode}
-                  language={language}
-                  siteContent={siteContent}
-                  defaultCount={3}
-                  className="flex -space-x-2"
-                  addButtonLabel={language === 'ko' ? '아바타 추가' : 'Add Avatar'}
-                  renderItem={(i) => (
-                    <div className="w-8 h-8 rounded-full border-2 border-paper bg-ink/20 overflow-hidden relative group/avatar">
-                      <EditableImage 
-                        contentKey={`hero.avatar_${i}`}
-                        defaultUrl={`https://i.pravatar.cc/100?img=${i + 10}`}
-                        alt="Student"
-                        className="w-full h-full object-cover"
-                        isEditMode={isEditMode}
-                        isAdmin={isAdmin}
-                        language={language}
-                        siteContent={siteContent}
-                        rounded="rounded-full"
-                      />
-                    </div>
-                  )}
-                />
-                <div className="text-[10px] uppercase tracking-widest opacity-60">
-                  <EditableText contentKey="hero.students_count" defaultValue={language === 'ko' ? '500+ 수강생 참여' : '500+ Students Joined'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
-                </div>
-              </div>
-
-              {/* Social Links in Hero */}
-              <div className={cn(
-                "flex items-center pt-8 transition-all",
-                deviceMode === 'mobile' ? "justify-center gap-4" : "gap-6"
-              )}>
-                <Repeater 
-                  isEditMode={isEditMode}
-                  language={language}
-                  siteContent={siteContent}
-                  contentKey="hero.social_links"
-                  itemsPerPage={5}
-                  defaultCount={2}
-                  className="flex items-center gap-4"
-                  addButtonLabel={language === 'ko' ? '소셜 추가' : 'Add Social'}
-                  renderItem={(i) => (
-                    <EditableLink 
-                      contentKey={`hero.social_links.item_${i}`} 
-                      defaultText={i === 0 ? "Instagram" : i === 1 ? "Blog" : "Link"} 
-                      defaultUrl="#" 
-                      isEditMode={isEditMode} 
-                      language={language} 
-                      siteContent={siteContent} 
-                      className="text-ink/60 hover:text-gold transition-colors flex items-center gap-1 text-sm" 
-                    />
-                  )}
-                />
-              </div>
-            </motion.div>
-          </div>
-        </div>
-      </section>
 
       {/* Dynamic Gallery Section */}
       <motion.section 
