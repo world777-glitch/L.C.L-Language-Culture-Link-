@@ -121,6 +121,96 @@ const pcmToWav = (pcmBase64: string, sampleRate: number = 24000) => {
   return URL.createObjectURL(blob);
 };
 
+const Footer: FC<{ language: LanguageCode, isEditMode: boolean, siteContent: Record<string, any>, setView: (v: any) => void }> = ({ language, isEditMode, siteContent, setView }) => {
+  const t = TRANSLATIONS[language];
+  return (
+    <footer className="bg-ink text-paper py-20 px-6 border-t border-paper/10">
+      <div className="max-w-[1600px] mx-auto grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-16">
+        <div className="space-y-8">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gold rounded-full flex items-center justify-center text-ink font-serif font-bold text-xl">L</div>
+            <div className="flex flex-col">
+              <span className="text-sm font-serif font-bold tracking-widest">L.C.L</span>
+              <span className="text-[8px] uppercase tracking-[0.3em] opacity-40">Language & Culture Link</span>
+            </div>
+          </div>
+          <p className="text-xs opacity-40 leading-relaxed font-serif italic max-w-xs">
+            <EditableText contentKey="footer.description" defaultValue="Premium Chinese language learning platform led by a PhD in Linguistics. Bridging language and culture for global leaders." isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </p>
+          <div className="flex gap-4">
+            <Repeater 
+              contentKey="footer.social"
+              isEditMode={isEditMode}
+              language={language}
+              siteContent={siteContent}
+              defaultCount={3}
+              className="flex gap-4"
+              renderItem={(i) => (
+                <EditableLink 
+                  contentKey={`footer.social.item_${i}`} 
+                  defaultText={i === 0 ? "Instagram" : i === 1 ? "Blog" : "YouTube"} 
+                  defaultUrl="#" 
+                  isEditMode={isEditMode} 
+                  language={language} 
+                  siteContent={siteContent} 
+                  className="w-8 h-8 rounded-full border border-paper/10 flex items-center justify-center hover:bg-gold hover:text-ink transition-all" 
+                />
+              )}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          <h4 className="text-[10px] uppercase tracking-[0.4em] font-bold text-gold">Navigation</h4>
+          <nav className="flex flex-col gap-4">
+            {['landing', 'curriculum', 'pricing', 'archive', 'community'].map((v) => (
+              <button 
+                key={v} 
+                onClick={() => setView(v)}
+                className="text-left text-xs uppercase tracking-widest opacity-60 hover:opacity-100 hover:text-gold transition-all"
+              >
+                {t.nav[v as keyof typeof t.nav] || v}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        <div className="space-y-8">
+          <h4 className="text-[10px] uppercase tracking-[0.4em] font-bold text-gold">Contact</h4>
+          <div className="space-y-4 text-xs opacity-60 leading-relaxed">
+            <div className="flex items-center gap-3">
+              <Mail size={14} className="text-gold" />
+              <EditableText contentKey="footer.email" defaultValue="lhbin777@gmail.com" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+            </div>
+            <div className="flex items-center gap-3">
+              <MessageCircle size={14} className="text-gold" />
+              <EditableText contentKey="footer.phone" defaultValue="+82 10-1234-5678" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-8">
+          <h4 className="text-[10px] uppercase tracking-[0.4em] font-bold text-gold">Newsletter</h4>
+          <p className="text-xs opacity-40 leading-relaxed">
+            <EditableText contentKey="footer.newsletter_text" defaultValue="Subscribe to receive cultural insights and language tips." isEditMode={isEditMode} language={language} siteContent={siteContent} />
+          </p>
+          <div className="flex gap-2">
+            <input type="email" placeholder="Email Address" className="bg-paper/5 border border-paper/10 rounded-full px-4 py-2 text-xs flex-grow outline-none focus:border-gold transition-colors" />
+            <button className="bg-gold text-ink px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-transform">Join</button>
+          </div>
+        </div>
+      </div>
+      <div className="max-w-[1600px] mx-auto mt-20 pt-8 border-t border-paper/5 flex flex-col md:flex-row justify-between items-center gap-4 text-[8px] uppercase tracking-[0.3em] opacity-30">
+        <span>© 2026 L.C.L Language & Culture Link. All Rights Reserved.</span>
+        <div className="flex gap-8">
+          <span>Privacy Policy</span>
+          <span>Terms of Service</span>
+        </div>
+      </div>
+    </footer>
+  );
+};
+
 export default function App() {
   const [user, setUser] = useState<any>(null);
   const [userProfile, setUserProfile] = useState<any>(null);
@@ -358,12 +448,19 @@ export default function App() {
   }, [siteContent]);
 
   const [showScrollTop, setShowScrollTop] = useState(false);
+  const [showScrollBottom, setShowScrollBottom] = useState(true);
 
   useEffect(() => {
     const handleScroll = () => {
-      setShowScrollTop(window.scrollY > 400);
+      const scrollY = window.scrollY;
+      const windowHeight = window.innerHeight;
+      const fullHeight = document.documentElement.scrollHeight;
+      
+      setShowScrollTop(scrollY > 400);
+      setShowScrollBottom(scrollY + windowHeight < fullHeight - 400);
     };
     window.addEventListener('scroll', handleScroll);
+    handleScroll(); // Initial check
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
@@ -511,20 +608,36 @@ export default function App() {
       
       <GlobalStyleEditor isEditMode={isEditMode} siteContent={siteContent} language={language} />
 
-      {/* Scroll to Top Button */}
-      <AnimatePresence>
-        {showScrollTop && (
-          <motion.button 
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.5 }}
-            onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="fixed bottom-8 right-8 z-50 w-12 h-12 bg-ink text-paper rounded-full flex items-center justify-center shadow-2xl hover:bg-gold hover:text-ink transition-all group"
-          >
-            <ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" />
-          </motion.button>
-        )}
-      </AnimatePresence>
+      {/* Scroll Controls */}
+      <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-3">
+        <AnimatePresence>
+          {showScrollTop && (
+            <motion.button 
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
+              className="w-12 h-12 bg-ink text-paper rounded-full flex items-center justify-center shadow-2xl hover:bg-gold hover:text-ink transition-all group"
+            >
+              <ArrowUp size={24} className="group-hover:-translate-y-1 transition-transform" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {showScrollBottom && (
+            <motion.button 
+              initial={{ opacity: 0, scale: 0.5 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.5 }}
+              onClick={() => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' })}
+              className="w-12 h-12 bg-ink text-paper rounded-full flex items-center justify-center shadow-2xl hover:bg-gold hover:text-ink transition-all group"
+            >
+              <ArrowDown size={24} className="group-hover:translate-y-1 transition-transform" />
+            </motion.button>
+          )}
+        </AnimatePresence>
+      </div>
 
       {/* Navigation */}
       <nav 
@@ -553,12 +666,16 @@ export default function App() {
               <span className={cn(
                 "font-serif font-bold tracking-tighter group-hover:text-gold transition-all",
                 deviceMode === 'mobile' ? "text-lg" : "text-2xl"
-              )}>L.C.L</span>
+              )}>
+                <EditableText contentKey="nav.logo.main" defaultValue="L.C.L" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+              </span>
               <div className="h-[1px] w-full bg-gold/20 my-1 group-hover:bg-gold/50 transition-colors" />
               <span className={cn(
                 "uppercase tracking-[0.25em] opacity-60 font-bold transition-all",
                 deviceMode === 'mobile' ? "text-[6px]" : "text-[8px]"
-              )}>Language & Culture Link</span>
+              )}>
+                <EditableText contentKey="nav.logo.sub" defaultValue="Language & Culture Link" isEditMode={isEditMode} language={language} siteContent={siteContent} />
+              </span>
             </div>
           </div>
 
@@ -1245,6 +1362,8 @@ export default function App() {
             </motion.div>
           )}
         </AnimatePresence>
+        
+        <Footer language={language} isEditMode={isEditMode} siteContent={siteContent} setView={setView} />
       </main>
 
       <AnimatePresence>
@@ -2876,6 +2995,7 @@ const EditableLink: FC<{
     if (lower.includes('twitter') || lower.includes('x.com')) return <Twitter size={14} />;
     if (lower.includes('linkedin')) return <Linkedin size={14} />;
     if (lower.includes('blog') || lower.includes('naver')) return <BookOpen size={14} />;
+    if (lower.includes('chat') || lower.includes('kakao') || lower.includes('open.kakao')) return <MessageCircle size={14} />;
     return <ExternalLink size={14} />;
   };
 
@@ -3540,28 +3660,27 @@ const ProfileSection: FC<{
             </motion.a>
 
             {/* Social */}
-            <div className="flex items-center gap-3 px-5 py-3 bg-paper border border-ink/10 rounded-full shadow-sm w-full overflow-hidden">
-              <div className="flex items-center gap-1.5 shrink-0">
-                <Instagram size={14} className="text-gold opacity-60" />
-                <MessageCircle size={14} className="text-gold opacity-60" />
+            <div className="flex flex-col gap-2 px-6 py-4 bg-paper border border-ink/10 rounded-[32px] shadow-sm w-full">
+              <div className="text-[9px] uppercase tracking-[0.2em] font-bold opacity-40">
+                <EditableText contentKey="quick.social.label" defaultValue="소셜" isEditMode={isEditMode} language={language} siteContent={siteContent} />
               </div>
-              <div className="flex gap-2 overflow-x-auto no-scrollbar">
+              <div className="flex gap-4 overflow-x-auto no-scrollbar">
                 <Repeater 
                   contentKey="quick.social_links"
                   isEditMode={isEditMode}
                   language={language}
                   siteContent={siteContent}
                   defaultCount={3}
-                  className="flex gap-2"
+                  className="flex gap-4"
                   renderItem={(i) => (
                     <EditableLink 
                       contentKey={`quick.social_links.item_${i}`} 
-                      defaultText={i === 0 ? "Insta" : i === 1 ? "Blog" : "Chat"} 
-                      defaultUrl="#" 
+                      defaultText={i === 0 ? "Instagram" : i === 1 ? "Blog" : "1:1 오픈 채팅방"} 
+                      defaultUrl={i === 2 ? "https://open.kakao.com" : "#"} 
                       isEditMode={isEditMode} 
                       language={language} 
                       siteContent={siteContent} 
-                      className="text-[10px] font-serif italic hover:text-gold transition-colors whitespace-nowrap" 
+                      className="text-[11px] font-bold hover:text-gold transition-colors whitespace-nowrap" 
                     />
                   )}
                 />
@@ -3573,13 +3692,13 @@ const ProfileSection: FC<{
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
               onClick={() => {
-                const el = document.getElementById('curriculum');
+                const el = document.getElementById('course-list');
                 if (el) {
                   el.scrollIntoView({ behavior: 'smooth' });
                 } else {
                   setView('landing');
                   setTimeout(() => {
-                    document.getElementById('curriculum')?.scrollIntoView({ behavior: 'smooth' });
+                    document.getElementById('course-list')?.scrollIntoView({ behavior: 'smooth' });
                   }, 100);
                 }
               }}
@@ -3774,7 +3893,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
           </div>
         </div>
 
-        <div className="mt-32">
+        <div id="course-list" className="mt-32">
           <Repeater 
             contentKey="landing.curriculum"
           isEditMode={isEditMode}
