@@ -3660,8 +3660,8 @@ const ProfileSection: FC<{
             </motion.a>
 
             {/* Social */}
-            <div className="flex flex-col gap-2 px-6 py-4 bg-paper border border-ink/10 rounded-[32px] shadow-sm w-full">
-              <div className="text-[9px] uppercase tracking-[0.2em] font-bold opacity-40">
+            <div className="flex flex-col gap-2 px-6 py-3.5 bg-ink text-paper rounded-[32px] shadow-lg w-full border border-paper/5">
+              <div className="text-[7px] uppercase tracking-[0.3em] font-bold text-gold/60 leading-none">
                 <EditableText contentKey="quick.social.label" defaultValue="소셜" isEditMode={isEditMode} language={language} siteContent={siteContent} />
               </div>
               <div className="flex gap-4 overflow-x-auto no-scrollbar">
@@ -3680,7 +3680,7 @@ const ProfileSection: FC<{
                       isEditMode={isEditMode} 
                       language={language} 
                       siteContent={siteContent} 
-                      className="text-[11px] font-bold hover:text-gold transition-colors whitespace-nowrap" 
+                      className="text-[10px] font-bold hover:text-gold transition-colors whitespace-nowrap opacity-90" 
                     />
                   )}
                 />
@@ -3689,8 +3689,8 @@ const ProfileSection: FC<{
 
             {/* Course Explore Badge */}
             <motion.button
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
+              whileHover={{ scale: 1.02 }}
+              whileTap={{ scale: 0.98 }}
               onClick={() => {
                 const el = document.getElementById('course-list');
                 if (el) {
@@ -3702,12 +3702,18 @@ const ProfileSection: FC<{
                   }, 100);
                 }
               }}
-              className="flex items-center gap-2 px-5 py-3 bg-ink/5 border border-ink/10 rounded-full hover:bg-ink/10 transition-all w-full"
+              className="flex items-center gap-3 px-5 py-3 bg-paper border border-ink/10 rounded-full hover:bg-gold/5 transition-all w-full group shadow-sm"
             >
-              <Search size={16} className="text-gold" />
-              <span className="text-[10px] uppercase tracking-widest font-bold opacity-60">
-                {language === 'ko' ? '코스 탐색' : 'Explore Courses'}
-              </span>
+              <div className="w-8 h-8 rounded-full bg-ink/5 flex items-center justify-center text-ink/40 group-hover:bg-gold/20 group-hover:text-gold transition-colors">
+                <Search size={14} />
+              </div>
+              <div className="text-left">
+                <div className="text-[7px] uppercase tracking-widest font-bold opacity-40 leading-none mb-0.5">Explore</div>
+                <div className="text-[11px] font-bold leading-none">
+                  <EditableText contentKey="quick.explore.label" defaultValue={language === 'ko' ? '과정 탐색하기' : 'Explore Courses'} isEditMode={isEditMode} language={language} siteContent={siteContent} />
+                </div>
+              </div>
+              <ArrowDown size={12} className="ml-auto opacity-20 group-hover:opacity-100 group-hover:translate-y-0.5 transition-all" />
             </motion.button>
           </div>
         </div>
