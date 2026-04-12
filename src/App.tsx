@@ -136,10 +136,11 @@ const FullMenuOverlay: FC<{
     {
       title: language === 'ko' ? '학습 과정' : 'Programs',
       links: [
-        { label: language === 'ko' ? '정규 커리큘럼' : 'Regular Curriculum', view: 'curriculum' },
-        { label: language === 'ko' ? 'HSK 집중 코칭' : 'HSK Coaching', view: 'curriculum' },
-        { label: language === 'ko' ? '비즈니스 중국어' : 'Business Chinese', view: 'curriculum' },
-        { label: language === 'ko' ? '1:1 맞춤 클래스' : '1:1 Private Class', view: 'curriculum' },
+        { label: language === 'ko' ? '회화 (Conversation)' : 'Conversation', view: 'curriculum' },
+        { label: language === 'ko' ? 'HSK 1-6급' : 'HSK 1-6', view: 'curriculum' },
+        { label: language === 'ko' ? 'HSK 7-9급' : 'HSK 7-9', view: 'curriculum' },
+        { label: language === 'ko' ? '중고등 내신/제2외국어' : 'School Grades', view: 'curriculum' },
+        { label: language === 'ko' ? '토론 및 비즈니스' : 'Discussion & Biz', view: 'curriculum' },
       ]
     },
     {

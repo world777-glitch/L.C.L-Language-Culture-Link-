@@ -18,44 +18,37 @@ export const COURSES: Course[] = [
     description: '일상 생활에서 즉각적으로 활용 가능한 실전 회화 중심 과정'
   },
   {
-    id: 'hsk',
+    id: 'hsk-1-6',
     category: 'HSK',
-    title: 'HSK (Chinese Proficiency Test)',
+    title: 'HSK 1-6급 (Standard)',
     levels: ['HSK1', 'HSK2', 'HSK3', 'HSK4', 'HSK5', 'HSK6'],
-    description: '중국 언어학 박사의 노하우가 담긴 HSK 고득점 전략 과정'
+    description: '최신 출제 경향을 반영한 전략적 접근으로 최단기 합격 실현'
+  },
+  {
+    id: 'hsk-7-9',
+    category: 'HSK',
+    title: 'HSK 7-9급 (Advanced)',
+    levels: ['HSK7', 'HSK8', 'HSK9'],
+    description: '박사 학위 과정의 학술적 분석력을 바탕으로 한 고등 HSK 완벽 대비'
   },
   {
     id: 'acad',
     category: 'Academic',
-    title: '중·고교 내신 관리 (School Grades)',
+    title: '중·고교 내신 및 제2외국어 (School Grades)',
     levels: ['Level 1 (기초)', 'Level 2 (심화)', 'Level 3 (완성)'],
     levelDescriptions: [
       '개념 정리 및 기본적인 문제를 통한 중국어 기초 다지기',
       '기출 문제 빈출 문법 분석과 고난도 응용 문제로 실전 감각 익히기',
       '심화 과정 및 수행평가 완벽 대비로 내신 1등급 굳히기'
     ],
-    description: '중·고교 내신 1등급을 위한 체계적인 문법 정리 및 실전 문제 풀이 과정'
+    description: '국제학교 및 일반 중·고교 내신 1등급을 위한 밀착 관리 과정'
   },
   {
-    id: 'disc',
-    category: 'Discussion',
-    title: '토론 (Discussion)',
-    levels: ['초급', '중급', '고급', '초고급'],
-    description: '논리적 스피킹과 비판적 사고를 기르는 심화 토론 과정'
-  },
-  {
-    id: 'biz',
+    id: 'biz-disc',
     category: 'Business',
-    title: '비즈니스 (Business)',
+    title: '토론 및 비즈니스 (Discussion & Biz)',
     levels: ['초급', '중급', '고급', '초고급'],
-    description: '실무 회의, 계약, 프레젠테이션 중심의 전문 비즈니스 과정'
-  },
-  {
-    id: 'cult',
-    category: 'Culture',
-    title: '문화 (Culture)',
-    levels: ['준비중'],
-    description: '중국 사회와 문화에 대한 인문학적 심층 연구 과정 (준비중)'
+    description: '논리적 스피킹과 실무 중심의 전문 비즈니스 솔루션'
   }
 ];
 
