@@ -11,6 +11,7 @@ import {
   Globe, 
   ChevronRight, 
   ChevronLeft, 
+  ClipboardCheck,
   ArrowUp, 
   ArrowDown, 
   ArrowRight,
@@ -121,6 +122,237 @@ const pcmToWav = (pcmBase64: string, sampleRate: number = 24000) => {
   return URL.createObjectURL(blob);
 };
 
+const FullMenuOverlay: FC<{
+  isOpen: boolean,
+  onClose: () => void,
+  setView: (v: any) => void,
+  language: LanguageCode,
+  isEditMode: boolean,
+  siteContent: Record<string, any>
+}> = ({ isOpen, onClose, setView, language, isEditMode, siteContent }) => {
+  const t = TRANSLATIONS[language];
+  
+  const menuData = [
+    {
+      title: language === 'ko' ? '학습 과정' : 'Programs',
+      links: [
+        { label: language === 'ko' ? '정규 커리큘럼' : 'Regular Curriculum', view: 'curriculum' },
+        { label: language === 'ko' ? 'HSK 집중 코칭' : 'HSK Coaching', view: 'curriculum' },
+        { label: language === 'ko' ? '비즈니스 중국어' : 'Business Chinese', view: 'curriculum' },
+        { label: language === 'ko' ? '1:1 맞춤 클래스' : '1:1 Private Class', view: 'curriculum' },
+      ]
+    },
+    {
+      title: language === 'ko' ? '학습 자료' : 'Resources',
+      links: [
+        { label: language === 'ko' ? '지식 라이브러리' : 'Knowledge Library', view: 'archive' },
+        { label: language === 'ko' ? '학습 아카이브' : 'Learning Archive', view: 'archive' },
+        { label: language === 'ko' ? '최신 교육 뉴스' : 'Education News', view: 'archive' },
+      ]
+    },
+    {
+      title: language === 'ko' ? '커뮤니티' : 'Community',
+      links: [
+        { label: language === 'ko' ? '학습 게시판' : 'Forum', view: 'community' },
+        { label: language === 'ko' ? '수강생 후기' : 'Reviews', view: 'community' },
+        { label: language === 'ko' ? '질문과 답변' : 'Q&A', view: 'community' },
+      ]
+    },
+    {
+      title: language === 'ko' ? '고객 지원' : 'Support',
+      links: [
+        { label: language === 'ko' ? '1:1 상담 문의' : 'Inquiry', view: 'inquiry' },
+        { label: language === 'ko' ? '무료 레벨 테스트' : 'Level Test', view: 'level-test' },
+        { label: language === 'ko' ? '자주 묻는 질문' : 'FAQ', view: 'inquiry' },
+      ]
+    },
+    {
+      title: language === 'ko' ? '소셜 채널' : 'Social',
+      links: [
+        { 
+          label: 'Instagram', 
+          url: siteContent['quick.social_links.item_0']?.url || 'https://instagram.com',
+          contentKey: 'quick.social_links.item_0'
+        },
+        { 
+          label: language === 'ko' ? 'Naver Blog' : 'Naver Blog', 
+          url: siteContent['quick.social_links.item_1']?.url || 'https://blog.naver.com',
+          contentKey: 'quick.social_links.item_1'
+        },
+        { 
+          label: language === 'ko' ? 'Open KakaoTalk' : 'Open KakaoTalk', 
+          url: siteContent['quick.social_links.item_2']?.url || 'https://open.kakao.com',
+          contentKey: 'quick.social_links.item_2'
+        },
+        { 
+          label: 'YouTube', 
+          url: siteContent['social.youtube']?.url || 'https://youtube.com',
+          contentKey: 'social.youtube'
+        },
+      ]
+    }
+  ];
+
+  return (
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[200] bg-ink/95 backdrop-blur-2xl overflow-y-auto custom-scrollbar"
+        >
+          <div className="max-w-[1600px] mx-auto px-6 py-20 min-h-screen flex flex-col">
+            <div className="flex justify-between items-center mb-20">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gold rounded-full flex items-center justify-center text-ink font-serif font-bold text-2xl shadow-lg shadow-gold/20">L</div>
+                <div className="flex flex-col">
+                  <span className="text-xl font-serif font-bold tracking-widest text-paper">L.C.L</span>
+                  <span className="text-[10px] uppercase tracking-[0.3em] text-gold/60">Language & Culture Link</span>
+                </div>
+              </div>
+              <button 
+                onClick={onClose}
+                className="w-14 h-14 rounded-full border border-paper/10 flex items-center justify-center text-paper hover:bg-paper hover:text-ink transition-all group"
+              >
+                <X size={24} className="group-hover:rotate-90 transition-transform" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 md:gap-16">
+              {menuData.map((section, idx) => (
+                <motion.div 
+                  key={section.title}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: idx * 0.05 }}
+                  className="space-y-8"
+                >
+                  <h3 className="text-gold text-[10px] uppercase tracking-[0.4em] font-bold border-b border-gold/20 pb-4">
+                    {section.title}
+                  </h3>
+                  <div className="flex flex-col gap-4">
+                    {section.links.map((link) => (
+                      <div key={link.label} className="flex items-center gap-2 group">
+                        <span className="w-0 group-hover:w-4 h-px bg-gold transition-all" />
+                        {link.contentKey && !link.view ? (
+                          <EditableLink
+                            contentKey={link.contentKey}
+                            defaultText={link.label}
+                            defaultUrl={link.url}
+                            isEditMode={isEditMode}
+                            language={language}
+                            siteContent={siteContent}
+                            className="text-left text-paper/60 hover:text-paper text-lg font-serif transition-colors"
+                          />
+                        ) : (
+                          <button
+                            onClick={() => {
+                              if (link.view) setView(link.view);
+                              else if (link.url) window.open(link.url, '_blank');
+                              onClose();
+                            }}
+                            className="text-left text-paper/60 hover:text-paper text-lg font-serif transition-colors"
+                          >
+                            {link.label}
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            <div className="mt-auto pt-20 border-t border-paper/10 flex flex-col md:flex-row justify-between items-center gap-8">
+              <div className="flex gap-12 text-[10px] uppercase tracking-widest font-bold text-paper/30">
+                <button className="hover:text-gold transition-colors">Privacy Policy</button>
+                <button className="hover:text-gold transition-colors">Terms of Service</button>
+                <button className="hover:text-gold transition-colors">Sitemap</button>
+              </div>
+              <div className="text-[10px] uppercase tracking-widest font-bold text-gold/40">
+                © 2026 L.C.L Language & Culture Link
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      )}
+    </AnimatePresence>
+  );
+};
+
+const QuickMenu: FC<{ 
+  language: LanguageCode, 
+  setView: (v: any) => void, 
+  scrollToSection: (id: string) => void,
+  isEditMode: boolean,
+  siteContent: Record<string, any>,
+  onOpenFullMenu: () => void
+}> = ({ language, setView, scrollToSection, isEditMode, siteContent, onOpenFullMenu }) => {
+  const [isOpen, setIsOpen] = useState(true);
+  const t = TRANSLATIONS[language];
+
+  const menuItems = [
+    { id: 'curriculum', label: language === 'ko' ? '학습 과정' : 'Curriculum', icon: <GraduationCap size={20} />, action: () => setView('curriculum') },
+    { id: 'level-test', label: language === 'ko' ? '레벨 테스트' : 'Level Test', icon: <ClipboardCheck size={20} />, action: () => setView('level-test') },
+    { id: 'community', label: language === 'ko' ? '커뮤니티' : 'Community', icon: <MessageSquare size={20} />, action: () => setView('community') },
+    { id: 'inquiry', label: language === 'ko' ? '상담 문의' : 'Inquiry', icon: <Mail size={20} />, action: () => setView('inquiry') },
+    { id: 'mypage', label: language === 'ko' ? '마이페이지' : 'My Page', icon: <User size={20} />, action: () => setView('mypage') },
+    { id: 'all', label: language === 'ko' ? '전체 보기' : 'View All', icon: <LayoutDashboard size={20} />, action: onOpenFullMenu },
+  ];
+
+  return (
+    <div className="fixed right-0 top-1/2 -translate-y-1/2 z-[60] flex items-start">
+      <AnimatePresence>
+        {isOpen && (
+          <motion.div
+            initial={{ x: 100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 100, opacity: 0 }}
+            className="bg-ink/90 backdrop-blur-xl border-y border-l border-paper/10 rounded-l-[24px] shadow-2xl overflow-hidden w-24 md:w-28"
+          >
+            <div className="bg-gold p-3 text-center">
+              <div className="text-[8px] md:text-[9px] font-bold text-ink uppercase tracking-[0.2em] leading-tight">
+                Quick<br/>Menu
+              </div>
+            </div>
+            <div className="flex flex-col">
+              {menuItems.map((item, idx) => (
+                <button
+                  key={item.id}
+                  onClick={item.action}
+                  className={cn(
+                    "flex flex-col items-center gap-2 p-4 text-paper/60 hover:text-gold hover:bg-paper/5 transition-all border-b border-paper/5 last:border-none group",
+                  )}
+                >
+                  <div className="group-hover:scale-110 transition-transform">
+                    {item.icon}
+                  </div>
+                  <span className="text-[9px] md:text-[10px] font-bold whitespace-nowrap">
+                    <EditableText 
+                      contentKey={`quickmenu.item_${idx}.label`} 
+                      defaultValue={item.label} 
+                      isEditMode={isEditMode} 
+                      language={language} 
+                      siteContent={siteContent} 
+                    />
+                  </span>
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+      <button 
+        onClick={() => setIsOpen(!isOpen)}
+        className="bg-gold text-ink p-1 rounded-l-md shadow-lg hover:pr-2 transition-all"
+      >
+        {isOpen ? <ChevronRight size={14} /> : <ChevronLeft size={14} />}
+      </button>
+    </div>
+  );
+};
+
 const Footer: FC<{ language: LanguageCode, isEditMode: boolean, siteContent: Record<string, any>, setView: (v: any) => void }> = ({ language, isEditMode, siteContent, setView }) => {
   const t = TRANSLATIONS[language];
   return (
@@ -221,6 +453,7 @@ export default function App() {
   const [appMode, setAppMode] = useState<'learner' | 'admin'>('learner');
   const [deviceMode, setDeviceMode] = useState<'pc' | 'pad' | 'mobile'>('pc');
   const [isAnyTextEditing, setIsAnyTextEditing] = useState(false);
+  const [isFullMenuOpen, setIsFullMenuOpen] = useState(false);
 
   useEffect(() => {
     const handleResize = () => {
@@ -607,6 +840,24 @@ export default function App() {
       `}} />
       
       <GlobalStyleEditor isEditMode={isEditMode} siteContent={siteContent} language={language} />
+
+      <FullMenuOverlay 
+        isOpen={isFullMenuOpen} 
+        onClose={() => setIsFullMenuOpen(false)} 
+        setView={setView} 
+        language={language} 
+        isEditMode={isEditMode} 
+        siteContent={siteContent} 
+      />
+
+      <QuickMenu 
+        language={language} 
+        setView={setView} 
+        scrollToSection={scrollToSection} 
+        isEditMode={isEditMode} 
+        siteContent={siteContent} 
+        onOpenFullMenu={() => setIsFullMenuOpen(true)}
+      />
 
       {/* Scroll Controls */}
       <div className="fixed bottom-8 right-8 z-50 flex flex-col gap-3">
@@ -2345,14 +2596,14 @@ const DynamicContentArea: FC<{
                       dragControls={dragControls}
                       dragListener={false}
                       dragMomentum={false}
-                      className="bg-white/90 backdrop-blur-md p-3 rounded-2xl shadow-2xl border border-gold/20 flex flex-col gap-3"
+                      className="bg-white/95 backdrop-blur-xl p-4 rounded-[24px] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-gold/20 flex flex-col gap-4 min-w-[200px]"
                     >
                       <div 
                         onPointerDown={(e) => dragControls.start(e)}
-                        className="flex items-center justify-between border-b border-ink/5 pb-1 mb-1 cursor-move active:cursor-grabbing"
+                        className="flex items-center gap-2 border-b border-ink/5 pb-2 mb-1 cursor-move active:cursor-grabbing group/drag"
                       >
-                        <span className="text-[8px] uppercase tracking-widest font-bold text-gold select-none">Settings</span>
-                        <div className="w-1 h-1 bg-gold/30 rounded-full" />
+                        <GripHorizontal size={14} className="text-gold opacity-40 group-hover/drag:opacity-100 transition-opacity" />
+                        <span className="text-[9px] uppercase tracking-widest font-bold text-ink/60 select-none">Block Settings</span>
                       </div>
                       <div className="flex flex-col gap-1">
                         <span className="text-[8px] uppercase tracking-widest opacity-50 font-bold">Text Overlay</span>
@@ -3179,7 +3430,7 @@ const GlobalStyleEditor: FC<{
     <>
       <button 
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-8 right-8 w-14 h-14 bg-gold text-ink rounded-full flex items-center justify-center shadow-2xl z-50 hover:scale-110 transition-transform group"
+        className="fixed bottom-8 left-8 w-14 h-14 bg-gold text-ink rounded-full flex items-center justify-center shadow-2xl z-50 hover:scale-110 transition-transform group"
       >
         <Palette size={24} className="group-hover:rotate-12 transition-transform" />
       </button>
@@ -3766,12 +4017,26 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
   
   return (
     <motion.div 
+      id="hero"
       initial={{ opacity: 0 }} 
       animate={{ opacity: 1 }} 
       exit={{ opacity: 0 }}
       className="space-y-20"
     >
-      <DynamicContentArea contentKey="landing.top" isEditMode={isEditMode} isAdmin={isAdmin} language={language} siteContent={siteContent} />
+      <div className="relative">
+        <DynamicContentArea contentKey="landing.top" isEditMode={isEditMode} isAdmin={isAdmin} language={language} siteContent={siteContent} />
+        
+        {/* Scroll Down Hint */}
+        <motion.div 
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1, duration: 1, repeat: Infinity, repeatType: 'reverse' }}
+          className="absolute bottom-10 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 pointer-events-none z-10"
+        >
+          <span className="text-[8px] uppercase tracking-[0.4em] font-bold text-white/40">Scroll</span>
+          <ArrowDown size={16} className="text-white/60" />
+        </motion.div>
+      </div>
 
       {/* Live Activity Ticker */}
       <div className="bg-ink text-paper py-2 overflow-hidden whitespace-nowrap relative">
