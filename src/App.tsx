@@ -122,6 +122,22 @@ const pcmToWav = (pcmBase64: string, sampleRate: number = 24000) => {
   return URL.createObjectURL(blob);
 };
 
+const ScrollProgress: FC = () => {
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, {
+    stiffness: 100,
+    damping: 30,
+    restDelta: 0.001
+  });
+
+  return (
+    <motion.div
+      className="fixed top-0 left-0 right-0 h-1 bg-gold z-[1000] origin-left shadow-[0_0_10px_rgba(212,175,55,0.5)]"
+      style={{ scaleX }}
+    />
+  );
+};
+
 const FullMenuOverlay: FC<{
   isOpen: boolean,
   onClose: () => void,
@@ -194,6 +210,22 @@ const FullMenuOverlay: FC<{
     }
   ];
 
+  const containerVariants = {
+    hidden: { opacity: 0 },
+    visible: {
+      opacity: 1,
+      transition: {
+        staggerChildren: 0.1,
+        delayChildren: 0.2
+      }
+    }
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -220,13 +252,16 @@ const FullMenuOverlay: FC<{
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 md:gap-16">
-              {menuData.map((section, idx) => (
+            <motion.div 
+              variants={containerVariants}
+              initial="hidden"
+              animate="visible"
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 md:gap-16 flex-grow"
+            >
+              {menuData.map((section) => (
                 <motion.div 
                   key={section.title}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: idx * 0.05 }}
+                  variants={itemVariants}
                   className="space-y-8"
                 >
                   <h3 className="text-gold text-[10px] uppercase tracking-[0.4em] font-bold border-b border-gold/20 pb-4">
@@ -263,7 +298,7 @@ const FullMenuOverlay: FC<{
                   </div>
                 </motion.div>
               ))}
-            </div>
+            </motion.div>
 
             <div className="mt-auto pt-20 border-t border-paper/10 flex flex-col md:flex-row justify-between items-center gap-8">
               <div className="flex gap-12 text-[10px] uppercase tracking-widest font-bold text-paper/30">
@@ -298,6 +333,15 @@ const QuickMenu: FC<{
     { id: 'level-test', label: language === 'ko' ? '레벨 테스트' : 'Level Test', icon: <ClipboardCheck size={20} />, action: () => setView('level-test') },
     { id: 'community', label: language === 'ko' ? '커뮤니티' : 'Community', icon: <MessageSquare size={20} />, action: () => setView('community') },
     { id: 'inquiry', label: language === 'ko' ? '상담 문의' : 'Inquiry', icon: <Mail size={20} />, action: () => setView('inquiry') },
+    { 
+      id: 'kakao', 
+      label: language === 'ko' ? '카톡 상담' : 'Kakao Talk', 
+      icon: <MessageCircle size={20} />, 
+      action: () => {
+        const url = siteContent['quick.social_links.item_2']?.url || 'https://open.kakao.com';
+        window.open(url, '_blank');
+      } 
+    },
     { id: 'mypage', label: language === 'ko' ? '마이페이지' : 'My Page', icon: <User size={20} />, action: () => setView('mypage') },
     { id: 'all', label: language === 'ko' ? '전체 보기' : 'View All', icon: <LayoutDashboard size={20} />, action: onOpenFullMenu },
   ];
@@ -319,11 +363,13 @@ const QuickMenu: FC<{
             </div>
             <div className="flex flex-col">
               {menuItems.map((item, idx) => (
-                <button
+                <motion.button
                   key={item.id}
                   onClick={item.action}
+                  whileHover={{ backgroundColor: "rgba(255, 255, 255, 0.05)", x: -4 }}
+                  whileTap={{ scale: 0.95 }}
                   className={cn(
-                    "flex flex-col items-center gap-2 p-4 text-paper/60 hover:text-gold hover:bg-paper/5 transition-all border-b border-paper/5 last:border-none group",
+                    "flex flex-col items-center gap-2 p-4 text-paper/60 hover:text-gold transition-all border-b border-paper/5 last:border-none group",
                   )}
                 >
                   <div className="group-hover:scale-110 transition-transform">
@@ -338,7 +384,7 @@ const QuickMenu: FC<{
                       siteContent={siteContent} 
                     />
                   </span>
-                </button>
+                </motion.button>
               ))}
             </div>
           </motion.div>
@@ -841,6 +887,8 @@ export default function App() {
       `}} />
       
       <GlobalStyleEditor isEditMode={isEditMode} siteContent={siteContent} language={language} />
+
+      <ScrollProgress />
 
       <FullMenuOverlay 
         isOpen={isFullMenuOpen} 
