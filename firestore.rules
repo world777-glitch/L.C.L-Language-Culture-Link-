@@ -52,7 +52,7 @@ service cloud.firestore {
     }
 
     function isValidVisit(data) {
-      return data.keys().hasAll(['timestamp', 'path']) &&
+      return data.keys().hasAll(['timestamp', 'date']) &&
              isRecent(data.timestamp);
     }
 

@@ -314,17 +314,23 @@ const FullMenuOverlay: FC<{
               animate="visible"
               className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-12 md:gap-16 flex-grow"
             >
-              {menuData.map((section) => (
+              {menuData.map((section, sIdx) => (
                 <motion.div 
                   key={section.title}
                   variants={itemVariants}
                   className="space-y-8"
                 >
                   <h3 className="text-gold text-[10px] uppercase tracking-[0.4em] font-bold border-b border-gold/20 pb-4">
-                    {section.title}
+                    <EditableText 
+                      contentKey={`fullmenu.section_${sIdx}.title`}
+                      defaultValue={section.title}
+                      isEditMode={isEditMode}
+                      language={language}
+                      siteContent={siteContent}
+                    />
                   </h3>
                   <div className="flex flex-col gap-4">
-                    {section.links.map((link) => (
+                    {section.links.map((link, lIdx) => (
                       <div key={link.label} className="flex items-center gap-2 group">
                         <span className="w-0 group-hover:w-4 h-px bg-gold transition-all" />
                         {link.contentKey && !link.view ? (
@@ -338,16 +344,22 @@ const FullMenuOverlay: FC<{
                             className="text-left text-paper/60 hover:text-paper text-lg font-serif transition-colors"
                           />
                         ) : (
-                          <button
+                          <div
                             onClick={() => {
                               if (link.view) setView(link.view);
                               else if (link.url) window.open(link.url, '_blank');
                               onClose();
                             }}
-                            className="text-left text-paper/60 hover:text-paper text-lg font-serif transition-colors"
+                            className="text-left text-paper/60 hover:text-paper text-lg font-serif transition-colors cursor-pointer"
                           >
-                            {link.label}
-                          </button>
+                            <EditableText 
+                              contentKey={`fullmenu.section_${sIdx}.link_${lIdx}.label`}
+                              defaultValue={link.label}
+                              isEditMode={isEditMode}
+                              language={language}
+                              siteContent={siteContent}
+                            />
+                          </div>
                         )}
                       </div>
                     ))}
@@ -415,7 +427,13 @@ const QuickMenu: FC<{
           >
             <div className="bg-gold p-3 text-center">
               <div className="text-[8px] md:text-[9px] font-bold text-ink uppercase tracking-[0.2em] leading-tight">
-                Quick<br/>Menu
+                <EditableText 
+                  contentKey="quickmenu.header"
+                  defaultValue="Quick<br/>Menu"
+                  isEditMode={isEditMode}
+                  language={language}
+                  siteContent={siteContent}
+                />
               </div>
             </div>
             <motion.div 
@@ -432,42 +450,85 @@ const QuickMenu: FC<{
               }}
               className="flex flex-col"
             >
-              {menuItems.map((item, idx) => (
-                <motion.button
-                  key={item.id}
-                  onClick={item.action}
-                  variants={{
-                    hidden: { x: 20, opacity: 0 },
-                    visible: { x: 0, opacity: 1 }
-                  }}
-                  whileHover={{ 
-                    backgroundColor: "rgba(197, 160, 89, 0.1)", 
-                    x: -8,
-                    transition: { type: "spring", stiffness: 400, damping: 10 }
-                  }}
-                  whileTap={{ scale: 0.95 }}
-                  className={cn(
-                    "flex flex-col items-center gap-2 p-4 text-paper/60 hover:text-gold transition-all border-b border-paper/5 last:border-none group relative",
-                  )}
-                >
-                  <div className="group-hover:scale-110 group-hover:drop-shadow-[0_0_8px_rgba(197,160,89,0.5)] transition-all duration-300">
-                    {item.icon}
-                  </div>
-                  <span className="text-[9px] md:text-[10px] font-bold whitespace-nowrap">
-                    <EditableText 
-                      contentKey={`quickmenu.item_${idx}.label`} 
-                      defaultValue={item.label} 
-                      isEditMode={isEditMode} 
-                      language={language} 
-                      siteContent={siteContent} 
+              {menuItems.map((item, idx) => {
+                const isKakao = item.id === 'kakao';
+                
+                const itemContent = (text?: string) => (
+                  <>
+                    <div className="group-hover:scale-110 group-hover:drop-shadow-[0_0_8px_rgba(197,160,89,0.5)] transition-all duration-300">
+                      {item.icon}
+                    </div>
+                    <span className="text-[9px] md:text-[10px] font-bold whitespace-nowrap">
+                      {isKakao ? (
+                        text || item.label
+                      ) : (
+                        <EditableText 
+                          contentKey={`quickmenu.item_${idx}.label`} 
+                          defaultValue={item.label} 
+                          isEditMode={isEditMode} 
+                          language={language} 
+                          siteContent={siteContent} 
+                        />
+                      )}
+                    </span>
+                    <motion.div 
+                      className="absolute left-0 top-0 bottom-0 w-1 bg-gold opacity-0 group-hover:opacity-100 transition-opacity"
+                      layoutId="quick-menu-indicator"
                     />
-                  </span>
-                  <motion.div 
-                    className="absolute left-0 top-0 bottom-0 w-1 bg-gold opacity-0 group-hover:opacity-100 transition-opacity"
-                    layoutId="quick-menu-indicator"
-                  />
-                </motion.button>
-              ))}
+                  </>
+                );
+
+                if (isKakao) {
+                  return (
+                    <EditableLink
+                      key={item.id}
+                      contentKey="quick.social_links.item_2"
+                      defaultText={item.label}
+                      defaultUrl="https://open.kakao.com"
+                      isEditMode={isEditMode}
+                      language={language}
+                      siteContent={siteContent}
+                      as={motion.a}
+                      variants={{
+                        hidden: { x: 20, opacity: 0 },
+                        visible: { x: 0, opacity: 1 }
+                      }}
+                      whileHover={{ 
+                        backgroundColor: "rgba(197, 160, 89, 0.1)", 
+                        x: -8,
+                        transition: { type: "spring", stiffness: 400, damping: 10 }
+                      }}
+                      whileTap={{ scale: 0.95 }}
+                      className={cn(
+                        "flex flex-col items-center gap-2 p-4 text-paper/60 hover:text-gold transition-all border-b border-paper/5 last:border-none group relative w-full",
+                      )}
+                      renderCustom={(text: string) => itemContent(text)}
+                    />
+                  );
+                }
+
+                return (
+                  <motion.div
+                    key={item.id}
+                    onClick={item.action}
+                    variants={{
+                      hidden: { x: 20, opacity: 0 },
+                      visible: { x: 0, opacity: 1 }
+                    }}
+                    whileHover={{ 
+                      backgroundColor: "rgba(197, 160, 89, 0.1)", 
+                      x: -8,
+                      transition: { type: "spring", stiffness: 400, damping: 10 }
+                    }}
+                    whileTap={{ scale: 0.95 }}
+                    className={cn(
+                      "flex flex-col items-center gap-2 p-4 text-paper/60 hover:text-gold transition-all border-b border-paper/5 last:border-none group relative cursor-pointer",
+                    )}
+                  >
+                    {itemContent()}
+                  </motion.div>
+                );
+              })}
             </motion.div>
           </motion.div>
         )}
@@ -495,9 +556,9 @@ const Footer: FC<{ language: LanguageCode, isEditMode: boolean, siteContent: Rec
               <span className="text-[8px] uppercase tracking-[0.3em] opacity-40">Language & Culture Link</span>
             </div>
           </div>
-          <p className="text-xs opacity-40 leading-relaxed font-serif italic max-w-xs">
+          <div className="text-xs opacity-40 leading-relaxed font-serif italic max-w-xs">
             <EditableText contentKey="footer.description" defaultValue="Premium Chinese language learning platform led by a PhD in Linguistics. Bridging language and culture for global leaders." isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </p>
+          </div>
           <div className="flex gap-4">
             <Repeater 
               contentKey="footer.social"
@@ -552,9 +613,9 @@ const Footer: FC<{ language: LanguageCode, isEditMode: boolean, siteContent: Rec
 
         <div className="space-y-8">
           <h4 className="text-[10px] uppercase tracking-[0.4em] font-bold text-gold">Newsletter</h4>
-          <p className="text-xs opacity-40 leading-relaxed">
+          <div className="text-xs opacity-40 leading-relaxed">
             <EditableText contentKey="footer.newsletter_text" defaultValue="Subscribe to receive cultural insights and language tips." isEditMode={isEditMode} language={language} siteContent={siteContent} />
-          </p>
+          </div>
           <div className="flex gap-2">
             <input type="email" placeholder="Email Address" className="bg-paper/5 border border-paper/10 rounded-full px-4 py-2 text-xs flex-grow outline-none focus:border-gold transition-colors" />
             <button className="bg-gold text-ink px-4 py-2 rounded-full text-[10px] font-bold uppercase tracking-widest hover:scale-105 transition-transform">Join</button>
@@ -863,7 +924,7 @@ export default function App() {
           });
           localStorage.setItem('lastVisit', today);
         } catch (error) {
-          console.error('Failed to track visit:', error);
+          handleFirestoreError(error, OperationType.CREATE, 'visits');
         }
       }
     };
@@ -1998,7 +2059,7 @@ const EditableText: FC<{
             dragListener={false}
             dragMomentum={false}
             className={cn(
-              "fixed top-1/4 left-1/2 -ml-[170px] p-6 bg-card border-2 border-gold shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[32px] z-[1000] flex flex-col gap-5 min-w-[340px] max-w-[95vw]",
+              "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 bg-card border-2 border-gold shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[32px] z-[1000] flex flex-col gap-5 w-[calc(100%-2rem)] max-w-[340px]",
               "animate-in fade-in zoom-in duration-300"
             )}
           >
@@ -3192,7 +3253,7 @@ const EditableMedia: FC<{
             dragControls={dragControls}
             dragListener={false}
             dragMomentum={false}
-            className="fixed top-1/4 left-1/2 -ml-[150px] bg-white/95 backdrop-blur-xl p-5 rounded-[32px] shadow-[0_30px_60px_rgba(0,0,0,0.3)] border-2 border-gold flex flex-col gap-4 min-w-[300px] z-[1000] cursor-default"
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-xl p-5 rounded-[32px] shadow-[0_30px_60px_rgba(0,0,0,0.3)] border-2 border-gold flex flex-col gap-4 w-[calc(100%-2rem)] max-w-[320px] z-[1000] cursor-default"
           >
             <div 
               onPointerDown={(e) => dragControls.start(e)}
@@ -3363,8 +3424,10 @@ const EditableLink: FC<{
   isEditMode: boolean, 
   language: string,
   siteContent: Record<string, any>,
-  className?: string
-}> = ({ contentKey, defaultText, defaultUrl, isEditMode, language, siteContent, className }) => {
+  className?: string,
+  as?: any,
+  renderCustom?: (text: string, url: string) => ReactNode
+} & any> = ({ contentKey, defaultText, defaultUrl, isEditMode, language, siteContent, className, as: Component = 'a', renderCustom, ...props }) => {
   const [isEditing, setIsEditing] = useState(false);
   const dragControls = useDragControls();
   const content = siteContent[contentKey] || {};
@@ -3417,7 +3480,7 @@ const EditableLink: FC<{
             dragControls={dragControls}
             dragListener={false}
             dragMomentum={false}
-            className="fixed top-1/4 left-1/2 -ml-[150px] flex flex-col gap-4 w-full min-w-[300px] bg-white/95 backdrop-blur-xl p-6 rounded-[32px] border-2 border-gold shadow-[0_30px_60px_rgba(0,0,0,0.3)] z-[1000]"
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-4 w-[calc(100%-2rem)] max-w-[320px] bg-white/95 backdrop-blur-xl p-6 rounded-[32px] border-2 border-gold shadow-[0_30px_60px_rgba(0,0,0,0.3)] z-[1000]"
           >
             <div 
               onPointerDown={(e) => dragControls.start(e)}
@@ -3460,10 +3523,12 @@ const EditableLink: FC<{
             onClick={() => setIsEditing(true)}
           >
             <div className="absolute -inset-1 border border-dashed border-gold/0 group-hover/item:border-gold/40 rounded transition-colors -z-10" />
-            <div className="flex items-center gap-1">
-              {getIcon(url)}
-              <span className={cn(className, !text && "opacity-30 italic")}>{displayValue}</span>
-            </div>
+            {renderCustom ? renderCustom(displayValue, url) : (
+              <div className="flex items-center gap-1">
+                {getIcon(url)}
+                <span className={cn(className, !text && "opacity-30 italic")}>{displayValue}</span>
+              </div>
+            )}
             <button 
               className="absolute -top-2 -right-2 w-5 h-5 bg-gold text-ink rounded-full flex items-center justify-center opacity-0 group-hover/item:opacity-100 transition-opacity shadow-lg z-10"
             >
@@ -3496,21 +3561,27 @@ const EditableLink: FC<{
   const isLinkActive = finalUrl !== '#';
 
   return (
-    <a 
+    <Component 
       href={finalUrl} 
       target={isLinkActive ? "_blank" : undefined} 
       rel="noopener noreferrer"
       referrerPolicy="no-referrer"
       className={cn(className, !isLinkActive && "cursor-default")}
-      onClick={(e) => {
+      onClick={(e: any) => {
         if (!isLinkActive) {
           e.preventDefault();
         }
+        if (props.onClick) props.onClick(e);
       }}
+      {...props}
     >
-      {getIcon(url)}
-      {text}
-    </a>
+      {renderCustom ? renderCustom(text, finalUrl) : (
+        <>
+          {getIcon(url)}
+          {text}
+        </>
+      )}
+    </Component>
   );
 };
 
@@ -4011,11 +4082,11 @@ const ProfileSection: FC<{
           {/* Compact Quick Actions - 2x2 Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-4 max-w-xl">
             {/* Consultation */}
-            <motion.button 
+            <motion.div 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => setView('inquiry')}
-              className="flex items-center gap-3 px-5 py-3 bg-gold text-ink rounded-full shadow-sm hover:shadow-md transition-all group w-full"
+              className="flex items-center gap-3 px-5 py-3 bg-gold text-ink rounded-full shadow-sm hover:shadow-md transition-all group w-full cursor-pointer"
             >
               <MessageCircle size={18} />
               <div className="text-left">
@@ -4025,14 +4096,14 @@ const ProfileSection: FC<{
                 </div>
               </div>
               <ArrowUpRight size={12} className="ml-auto opacity-40 group-hover:opacity-100 transition-opacity" />
-            </motion.button>
+            </motion.div>
 
             {/* Contact */}
-            <motion.a 
+            <motion.div 
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
-              href={`mailto:${siteContent['quick.contact.email']?.value || 'lhbin777@gmail.com'}`}
               className="flex items-center gap-3 px-5 py-3 bg-ink text-paper rounded-full shadow-sm hover:bg-ink/90 transition-all cursor-pointer w-full"
+              onClick={() => window.location.href = `mailto:${siteContent['quick.contact.email']?.value || 'lhbin777@gmail.com'}`}
             >
               <Mail size={18} className="text-gold" />
               <div className="text-left">
@@ -4041,7 +4112,7 @@ const ProfileSection: FC<{
                   <EditableText contentKey="quick.contact.email" defaultValue="lhbin777@gmail.com" isEditMode={isEditMode} language={language} siteContent={siteContent} />
                 </div>
               </div>
-            </motion.a>
+            </motion.div>
 
             {/* Social */}
             <div className="flex flex-col gap-2 px-6 py-3.5 bg-ink text-paper rounded-[32px] shadow-lg w-full border border-paper/5">
@@ -4072,7 +4143,7 @@ const ProfileSection: FC<{
             </div>
 
             {/* Course Explore Badge */}
-            <motion.button
+            <motion.div
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               onClick={() => {
@@ -4086,7 +4157,7 @@ const ProfileSection: FC<{
                   }, 100);
                 }
               }}
-              className="flex items-center gap-3 px-5 py-3 bg-paper border border-ink/10 rounded-full hover:bg-gold/5 transition-all w-full group shadow-sm"
+              className="flex items-center gap-3 px-5 py-3 bg-paper border border-ink/10 rounded-full hover:bg-gold/5 transition-all w-full group shadow-sm cursor-pointer"
             >
               <div className="w-8 h-8 rounded-full bg-ink/5 flex items-center justify-center text-ink/40 group-hover:bg-gold/20 group-hover:text-gold transition-colors">
                 <Search size={14} />
@@ -4098,7 +4169,7 @@ const ProfileSection: FC<{
                 </div>
               </div>
               <ArrowDown size={12} className="ml-auto opacity-20 group-hover:opacity-100 group-hover:translate-y-0.5 transition-all" />
-            </motion.button>
+            </motion.div>
           </div>
         </div>
       </div>
