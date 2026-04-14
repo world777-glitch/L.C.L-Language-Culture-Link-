@@ -93,6 +93,62 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { collection, addDoc, setDoc, serverTimestamp, onSnapshot, query, where, orderBy, limit, doc, getDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 
+// Error Boundary Component
+class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean, error: Error | null }> {
+  constructor(props: { children: ReactNode }) {
+    super(props);
+    this.state = { hasError: false, error: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
+    console.error("ErrorBoundary caught an error", error, errorInfo);
+  }
+
+  render() {
+    if (this.state.hasError) {
+      let errorMessage = "An unexpected error occurred.";
+      try {
+        // Check if the error is a JSON string from handleFirestoreError
+        const parsed = JSON.parse(this.state.error?.message || "");
+        if (parsed.error && parsed.operationType) {
+          errorMessage = `Database error during ${parsed.operationType}: ${parsed.error}`;
+        }
+      } catch (e) {
+        // Not a JSON error, use the message if available
+        if (this.state.error?.message) {
+          errorMessage = this.state.error.message;
+        }
+      }
+
+      return (
+        <div className="min-h-screen bg-ink flex items-center justify-center p-6 text-center">
+          <div className="max-w-md w-full space-y-6 p-10 bg-paper/5 rounded-[40px] border border-paper/10 backdrop-blur-xl">
+            <div className="w-20 h-20 bg-gold/10 rounded-full flex items-center justify-center text-gold mx-auto">
+              <AlertCircle size={40} />
+            </div>
+            <h2 className="text-2xl font-serif text-paper">Something went wrong</h2>
+            <p className="text-paper/60 text-sm leading-relaxed">
+              {errorMessage}
+            </p>
+            <button
+              onClick={() => window.location.reload()}
+              className="w-full py-4 bg-gold text-ink font-bold rounded-2xl hover:bg-gold/90 transition-all shadow-lg shadow-gold/20"
+            >
+              Refresh Page
+            </button>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
 // Helper to convert raw PCM from Gemini TTS to a playable WAV Blob
 const pcmToWav = (pcmBase64: string, sampleRate: number = 24000) => {
   const binaryString = atob(pcmBase64);
@@ -354,6 +410,7 @@ const QuickMenu: FC<{
             initial={{ x: 100, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 100, opacity: 0 }}
+            transition={{ type: "spring", damping: 20, stiffness: 100 }}
             className="bg-ink/90 backdrop-blur-xl border-y border-l border-paper/10 rounded-l-[24px] shadow-2xl overflow-hidden w-24 md:w-28"
           >
             <div className="bg-gold p-3 text-center">
@@ -361,18 +418,39 @@ const QuickMenu: FC<{
                 Quick<br/>Menu
               </div>
             </div>
-            <div className="flex flex-col">
+            <motion.div 
+              initial="hidden"
+              animate="visible"
+              variants={{
+                hidden: { opacity: 0 },
+                visible: {
+                  opacity: 1,
+                  transition: {
+                    staggerChildren: 0.05
+                  }
+                }
+              }}
+              className="flex flex-col"
+            >
               {menuItems.map((item, idx) => (
                 <motion.button
                   key={item.id}
                   onClick={item.action}
-                  whileHover={{ backgroundColor: "rgba(255, 255, 255, 0.05)", x: -4 }}
+                  variants={{
+                    hidden: { x: 20, opacity: 0 },
+                    visible: { x: 0, opacity: 1 }
+                  }}
+                  whileHover={{ 
+                    backgroundColor: "rgba(197, 160, 89, 0.1)", 
+                    x: -8,
+                    transition: { type: "spring", stiffness: 400, damping: 10 }
+                  }}
                   whileTap={{ scale: 0.95 }}
                   className={cn(
-                    "flex flex-col items-center gap-2 p-4 text-paper/60 hover:text-gold transition-all border-b border-paper/5 last:border-none group",
+                    "flex flex-col items-center gap-2 p-4 text-paper/60 hover:text-gold transition-all border-b border-paper/5 last:border-none group relative",
                   )}
                 >
-                  <div className="group-hover:scale-110 transition-transform">
+                  <div className="group-hover:scale-110 group-hover:drop-shadow-[0_0_8px_rgba(197,160,89,0.5)] transition-all duration-300">
                     {item.icon}
                   </div>
                   <span className="text-[9px] md:text-[10px] font-bold whitespace-nowrap">
@@ -384,9 +462,13 @@ const QuickMenu: FC<{
                       siteContent={siteContent} 
                     />
                   </span>
+                  <motion.div 
+                    className="absolute left-0 top-0 bottom-0 w-1 bg-gold opacity-0 group-hover:opacity-100 transition-opacity"
+                    layoutId="quick-menu-indicator"
+                  />
                 </motion.button>
               ))}
-            </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
@@ -838,7 +920,8 @@ export default function App() {
   });
 
   return (
-    <div className={cn("min-h-screen flex flex-col bg-paper text-ink font-sans selection:bg-gold selection:text-ink overflow-x-hidden transition-colors duration-300", isDarkMode && "dark")}>
+    <ErrorBoundary>
+      <div className={cn("min-h-screen flex flex-col bg-paper text-ink font-sans selection:bg-gold selection:text-ink overflow-x-hidden transition-colors duration-300", isDarkMode && "dark")}>
       {/* Scroll Progress Bar */}
       <motion.div
         className="fixed top-0 left-0 right-0 h-1 bg-gold z-[1000] origin-left"
@@ -1747,6 +1830,7 @@ export default function App() {
       </footer>
     </div>
   </div>
+    </ErrorBoundary>
   );
 }
 
