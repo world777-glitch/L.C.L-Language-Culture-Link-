@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo, Component, ReactNode, FC, FormEvent } from 'react';
+import { createPortal } from 'react-dom';
 import * as React from 'react';
 import Markdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -423,10 +424,10 @@ const QuickMenu: FC<{
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 100, opacity: 0 }}
             transition={{ type: "spring", damping: 20, stiffness: 100 }}
-            className="bg-ink/90 backdrop-blur-xl border-y border-l border-paper/10 rounded-l-[24px] shadow-2xl overflow-hidden w-24 md:w-28"
+            className="bg-ink/90 backdrop-blur-xl border-y border-l border-paper/10 rounded-l-[24px] shadow-2xl overflow-hidden w-20 md:w-28"
           >
-            <div className="bg-gold p-3 text-center">
-              <div className="text-[8px] md:text-[9px] font-bold text-ink uppercase tracking-[0.2em] leading-tight">
+            <div className="bg-gold p-2 md:p-3 text-center">
+              <div className="text-[7px] md:text-[9px] font-bold text-ink uppercase tracking-[0.2em] leading-tight">
                 <EditableText 
                   contentKey="quickmenu.header"
                   defaultValue="Quick<br/>Menu"
@@ -500,7 +501,7 @@ const QuickMenu: FC<{
                       }}
                       whileTap={{ scale: 0.95 }}
                       className={cn(
-                        "flex flex-col items-center gap-2 p-4 text-paper/60 hover:text-gold transition-all border-b border-paper/5 last:border-none group relative w-full",
+                        "flex flex-col items-center gap-1.5 md:gap-2 p-3 md:p-4 text-paper/60 hover:text-gold transition-all border-b border-paper/5 last:border-none group relative w-full",
                       )}
                       renderCustom={(text: string) => itemContent(text)}
                     />
@@ -522,7 +523,7 @@ const QuickMenu: FC<{
                     }}
                     whileTap={{ scale: 0.95 }}
                     className={cn(
-                      "flex flex-col items-center gap-2 p-4 text-paper/60 hover:text-gold transition-all border-b border-paper/5 last:border-none group relative cursor-pointer",
+                      "flex flex-col items-center gap-1.5 md:gap-2 p-3 md:p-4 text-paper/60 hover:text-gold transition-all border-b border-paper/5 last:border-none group relative cursor-pointer",
                     )}
                   >
                     {itemContent()}
@@ -683,6 +684,7 @@ export default function App() {
   const t = TRANSLATIONS[language];
 
   const [isEditMode, setIsEditMode] = useState(false);
+  const [isStyleEditorOpen, setIsStyleEditorOpen] = useState(false);
   const [hoveredMenu, setHoveredMenu] = useState<string | null>(null);
   const [hoveredSubItem, setHoveredSubItem] = useState<string | null>(null);
 
@@ -993,7 +995,7 @@ export default function App() {
         :root {
           --color-paper: ${isDarkMode ? '#1a1a1a' : styles.paper};
           --color-ink: ${isDarkMode ? '#f5f2ed' : styles.ink};
-          --color-gold: ${isDarkMode ? '#d4af37' : styles.gold};
+          --color-gold: ${siteContent['global.style.primaryColor']?.value || (isDarkMode ? '#d4af37' : styles.gold)};
           --font-serif: ${styles.fontSerif};
           --font-sans: ${styles.fontSans};
         }
@@ -1030,7 +1032,13 @@ export default function App() {
         }
       `}} />
       
-      <GlobalStyleEditor isEditMode={isEditMode} siteContent={siteContent} language={language} />
+      <GlobalStyleEditor 
+        isEditMode={isEditMode} 
+        siteContent={siteContent} 
+        language={language} 
+        isOpen={isStyleEditorOpen}
+        onClose={() => setIsStyleEditorOpen(false)}
+      />
 
       <ScrollProgress />
 
@@ -1041,6 +1049,49 @@ export default function App() {
         language={language} 
         isEditMode={isEditMode} 
         siteContent={siteContent} 
+      />
+
+      {/* Global Edit Mode Indicator */}
+      <AnimatePresence>
+        {isEditMode && (
+          <motion.div 
+            initial={{ y: -100 }}
+            animate={{ y: 0 }}
+            exit={{ y: -100 }}
+            className="fixed top-0 left-0 right-0 z-[10000] flex justify-center pointer-events-none"
+          >
+            <div className="bg-gold/95 backdrop-blur-md px-8 py-3 rounded-b-[32px] shadow-[0_10px_40px_rgba(197,160,89,0.4)] border-x border-b border-white/20 flex items-center gap-6 pointer-events-auto">
+              <div className="flex items-center gap-3">
+                <div className="w-2 h-2 bg-ink rounded-full animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-[0.3em] text-ink">Admin Editing Mode</span>
+              </div>
+              <div className="h-4 w-[1px] bg-ink/10" />
+              <div className="flex items-center gap-2">
+                <button 
+                  onClick={() => setIsStyleEditorOpen(true)}
+                  className="px-4 py-1.5 bg-white/20 text-ink rounded-full text-[9px] font-bold uppercase tracking-widest hover:bg-white/40 transition-all flex items-center gap-2"
+                >
+                  <Palette size={12} />
+                  Global Styles
+                </button>
+                <button 
+                  onClick={() => setIsEditMode(false)}
+                  className="px-4 py-1.5 bg-ink text-white rounded-full text-[9px] font-bold uppercase tracking-widest hover:scale-105 active:scale-95 transition-all"
+                >
+                  Exit & Save
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <GlobalStyleEditor 
+        isEditMode={isEditMode}
+        language={language}
+        siteContent={siteContent}
+        isOpen={isStyleEditorOpen}
+        onClose={() => setIsStyleEditorOpen(false)}
       />
 
       <QuickMenu 
@@ -2052,16 +2103,17 @@ const EditableText: FC<{
           dangerouslySetInnerHTML={!isEditing ? { __html: value || defaultValue } : undefined}
         />
         
-        {isEditing && (
+        {isEditing && createPortal(
           <motion.div 
             drag
             dragControls={dragControls}
             dragListener={false}
             dragMomentum={false}
             className={cn(
-              "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 bg-card border-2 border-gold shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[32px] z-[1000] flex flex-col gap-5 w-[calc(100%-2rem)] max-w-[340px]",
+              "fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 p-6 bg-card border-2 border-gold shadow-[0_30px_60px_rgba(0,0,0,0.4)] rounded-[32px] z-[9999] flex flex-col gap-5 w-[calc(100%-2rem)] max-w-[340px]",
               "animate-in fade-in zoom-in duration-300"
             )}
+            onClick={(e) => e.stopPropagation()}
           >
             <div 
               onPointerDown={(e) => dragControls.start(e)}
@@ -2169,7 +2221,8 @@ const EditableText: FC<{
                 Save Changes
               </button>
             </div>
-          </motion.div>
+          </motion.div>,
+          document.body
         )}
       </div>
     );
@@ -2675,7 +2728,7 @@ const DynamicContentArea: FC<{
                   viewport={{ once: true }}
                   className="max-w-3xl mx-auto text-center space-y-8"
                 >
-                  <div className="text-4xl md:text-5xl font-serif font-light">
+                  <div className="text-2xl md:text-4xl lg:text-5xl font-serif font-light">
                     <EditableText contentKey={`${contentKey}.item_${i}.title`} defaultValue="New Section Title" isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
                   </div>
                   <div className="text-lg opacity-70 font-serif leading-relaxed">
@@ -2709,11 +2762,11 @@ const DynamicContentArea: FC<{
                         'justify-center items-center text-center'
                       )}>
                         <div className="absolute inset-0 bg-ink/20 pointer-events-none" />
-                        <div className="relative z-10 space-y-4 max-w-2xl">
-                          <div className="text-4xl md:text-6xl font-serif font-light text-white drop-shadow-2xl">
+                        <div className="relative z-10 space-y-4 max-w-2xl px-6">
+                          <div className="text-2xl md:text-4xl lg:text-6xl font-serif font-light text-white drop-shadow-2xl">
                             <EditableText contentKey={`${contentKey}.item_${i}.overlayTitle`} defaultValue="Image Title" isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
                           </div>
-                          <div className="text-lg md:text-xl font-serif text-white/90 drop-shadow-xl">
+                          <div className="text-sm md:text-lg lg:text-xl font-serif text-white/90 drop-shadow-xl">
                             <EditableText contentKey={`${contentKey}.item_${i}.overlaySubtitle`} defaultValue="Image Subtitle or Description" isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
                           </div>
                         </div>
@@ -2747,7 +2800,7 @@ const DynamicContentArea: FC<{
                   initial={{ opacity: 0, x: -20 }}
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
-                  className="max-w-4xl mx-auto p-12 bg-gold/5 border-l-4 border-gold rounded-r-[40px] space-y-6"
+                  className="max-w-4xl mx-auto p-6 md:p-12 bg-gold/5 border-l-4 border-gold rounded-r-[40px] space-y-6"
                 >
                   <div className="text-3xl font-serif italic opacity-80">
                     <EditableText contentKey={`${contentKey}.item_${i}.quote`} defaultValue="A meaningful quote or highlight that stands out." isEditMode={isEditMode} language={language} siteContent={siteContent} />
@@ -2974,6 +3027,7 @@ const EditableMedia: FC<{
   rounded?: string
 }> = ({ contentKey, defaultUrls, isEditMode, isAdmin, language, siteContent, className, aspectRatio = "aspect-[3/4]", rounded = "rounded-2xl" }) => {
   const [isUploading, setIsUploading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const [uploadProgress, setUploadProgress] = useState({ current: 0, total: 0 });
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
@@ -3236,6 +3290,16 @@ const EditableMedia: FC<{
                   </div>
                 ) : <Plus size={14} />}
               </button>
+              <button 
+                onClick={() => setIsEditing(!isEditing)}
+                className={cn(
+                  "w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition-all",
+                  isEditing ? "bg-gold text-ink" : "bg-white text-ink"
+                )}
+                title={language === 'ko' ? "설정" : "Settings"}
+              >
+                <Settings size={14} />
+              </button>
             </div>
             {mediaItems.length > 0 && (
               <button 
@@ -3248,69 +3312,89 @@ const EditableMedia: FC<{
             )}
           </div>
 
-          <motion.div 
-            drag
-            dragControls={dragControls}
-            dragListener={false}
-            dragMomentum={false}
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-xl p-5 rounded-[32px] shadow-[0_30px_60px_rgba(0,0,0,0.3)] border-2 border-gold flex flex-col gap-4 w-[calc(100%-2rem)] max-w-[320px] z-[1000] cursor-default"
-          >
-            <div 
-              onPointerDown={(e) => dragControls.start(e)}
-              className="flex items-center gap-3 border-b border-ink/5 pb-3 mb-1 cursor-move active:cursor-grabbing group/drag"
+          {isEditing && createPortal(
+            <motion.div 
+              drag
+              dragControls={dragControls}
+              dragListener={false}
+              dragMomentum={false}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-xl p-6 rounded-[32px] shadow-[0_30px_60px_rgba(0,0,0,0.3)] border-2 border-gold flex flex-col gap-5 w-[calc(100%-2rem)] max-w-[340px] z-[9999] cursor-default"
+              onClick={(e) => e.stopPropagation()}
             >
-              <div className="p-1.5 bg-gold/10 rounded-lg">
-                <GripHorizontal size={16} className="text-gold" />
+              <div 
+                onPointerDown={(e) => dragControls.start(e)}
+                className="flex items-center justify-between border-b border-ink/10 pb-4 cursor-move active:cursor-grabbing group/drag"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 bg-gold/10 rounded-lg">
+                    <GripHorizontal size={18} className="text-gold" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40 leading-none mb-1">Editor</span>
+                    <span className="text-xs font-bold text-ink leading-none">Media Settings</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsEditing(false)}
+                  className="p-2 hover:bg-ink/5 rounded-full transition-colors"
+                >
+                  <X size={16} />
+                </button>
               </div>
-              <div className="flex flex-col">
-                <span className="text-[9px] uppercase tracking-widest opacity-40 font-bold leading-none mb-1">Editor</span>
-                <span className="text-[11px] font-bold text-ink leading-none">Media Settings</span>
+              <div className="flex flex-col gap-2">
+                <span className="text-[10px] uppercase tracking-widest opacity-40 font-bold">Aspect Ratio</span>
+                <div className="flex flex-wrap gap-2">
+                  {[
+                    { label: '16:9', val: 'aspect-video' },
+                    { label: '1:1', val: 'aspect-square' },
+                    { label: '4:3', val: 'aspect-[4/3]' },
+                    { label: '4:5', val: 'aspect-[4/5]' },
+                    { label: 'Auto', val: 'aspect-auto' }
+                  ].map(opt => (
+                    <button 
+                      key={opt.val}
+                      onClick={() => updateSetting('aspect', opt.val)}
+                      className={cn(
+                        "px-3 py-2 text-[10px] font-bold rounded-xl border transition-all flex-1 min-w-[60px]",
+                        currentAspect === opt.val ? "bg-gold text-ink border-gold shadow-md" : "bg-ink/5 border-transparent hover:border-gold/30"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-[8px] uppercase tracking-widest opacity-50 font-bold">Aspect Ratio</span>
-              <div className="flex gap-1">
-                {[
-                  { label: '16:9', val: 'aspect-video' },
-                  { label: '1:1', val: 'aspect-square' },
-                  { label: '4:3', val: 'aspect-[4/3]' },
-                  { label: '4:5', val: 'aspect-[4/5]' },
-                  { label: 'Auto', val: 'aspect-auto' }
-                ].map(opt => (
-                  <button 
-                    key={opt.val}
-                    onClick={() => updateSetting('aspect', opt.val)}
-                    className={cn(
-                      "px-2 py-1 text-[8px] rounded-md border transition-all",
-                      currentAspect === opt.val ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+              <div className="flex flex-col gap-2">
+                <span className="text-[10px] uppercase tracking-widest opacity-40 font-bold">Fit</span>
+                <div className="flex gap-2">
+                  {[
+                    { label: 'Cover', val: 'object-cover' },
+                    { label: 'Contain', val: 'object-contain' }
+                  ].map(opt => (
+                    <button 
+                      key={opt.val}
+                      onClick={() => updateSetting('fit', opt.val)}
+                      className={cn(
+                        "px-3 py-2 text-[10px] font-bold rounded-xl border transition-all flex-1",
+                        currentFit === opt.val ? "bg-gold text-ink border-gold shadow-md" : "bg-ink/5 border-transparent hover:border-gold/30"
+                      )}
+                    >
+                      {opt.label}
+                    </button>
+                  ))}
+                </div>
               </div>
-            </div>
-            <div className="flex flex-col gap-1">
-              <span className="text-[8px] uppercase tracking-widest opacity-50 font-bold">Fit</span>
-              <div className="flex gap-1">
-                {[
-                  { label: 'Cover', val: 'object-cover' },
-                  { label: 'Contain', val: 'object-contain' }
-                ].map(opt => (
-                  <button 
-                    key={opt.val}
-                    onClick={() => updateSetting('fit', opt.val)}
-                    className={cn(
-                      "px-2 py-1 text-[8px] rounded-md border transition-all",
-                      currentFit === opt.val ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
+              <div className="pt-2">
+                <button 
+                  onClick={() => setIsEditing(false)}
+                  className="w-full py-3 bg-ink text-white rounded-2xl text-[10px] uppercase tracking-widest font-bold hover:bg-ink/90 transition-colors"
+                >
+                  Close Settings
+                </button>
               </div>
-            </div>
-          </motion.div>
+            </motion.div>,
+            document.body
+          )}
           
           <input 
             type="file" 
@@ -3323,6 +3407,253 @@ const EditableMedia: FC<{
         </div>
       )}
     </div>
+  );
+};
+
+const GlobalStyleEditor: FC<{ 
+  isEditMode: boolean, 
+  language: string, 
+  siteContent: Record<string, any>,
+  isOpen: boolean,
+  onClose: () => void
+}> = ({ isEditMode, language, siteContent, isOpen, onClose }) => {
+  const dragControls = useDragControls();
+  
+  const updateStyle = async (key: string, value: string) => {
+    const docId = `${language}_global_style_${key.replace(/\./g, '_')}`;
+    try {
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: `global.style.${key}`,
+        language,
+        value,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
+  if (!isEditMode || !isOpen) return null;
+
+  return createPortal(
+    <motion.div 
+      initial={{ opacity: 0, scale: 0.9, y: 20 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.9, y: 20 }}
+      drag
+      dragControls={dragControls}
+      dragListener={false}
+      dragMomentum={false}
+      className="fixed top-24 right-8 bg-white/95 backdrop-blur-xl p-6 rounded-[32px] shadow-[0_30px_60px_rgba(0,0,0,0.3)] border-2 border-gold flex flex-col gap-6 w-[calc(100%-2rem)] max-w-[360px] z-[10001] cursor-default"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <div 
+        onPointerDown={(e) => dragControls.start(e)}
+        className="flex items-center justify-between border-b border-ink/10 pb-4 cursor-move active:cursor-grabbing group/drag"
+      >
+        <div className="flex items-center gap-3">
+          <div className="p-1.5 bg-gold/10 rounded-lg">
+            <Palette size={18} className="text-gold" />
+          </div>
+          <div className="flex flex-col">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40 leading-none mb-1">Admin</span>
+            <span className="text-xs font-bold text-ink leading-none">Global Styles</span>
+          </div>
+        </div>
+        <button 
+          onClick={onClose}
+          className="p-2 hover:bg-ink/5 rounded-full transition-colors"
+        >
+          <X size={16} />
+        </button>
+      </div>
+
+      <div className="space-y-6 max-h-[60vh] overflow-y-auto pr-2 custom-scrollbar">
+        {/* Primary Color */}
+        <div className="space-y-3">
+          <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">Primary Color (Gold)</label>
+          <div className="flex flex-wrap gap-2">
+            {['#c5a059', '#d4af37', '#b8860b', '#daa520', '#ffd700', '#000000', '#ffffff'].map(c => (
+              <button 
+                key={c}
+                onClick={() => updateStyle('primaryColor', c)}
+                className={cn(
+                  "w-8 h-8 rounded-full border border-ink/10 transition-all hover:scale-110",
+                  siteContent['global.style.primaryColor']?.value === c && "ring-2 ring-gold ring-offset-2"
+                )}
+                style={{ backgroundColor: c }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Navigation Styles */}
+        <div className="space-y-4">
+          <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">Navigation (L1)</label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <span className="text-[9px] opacity-50">Font Size</span>
+              <select 
+                value={siteContent['global.style.navL1FontSize']?.value || '12'}
+                onChange={(e) => updateStyle('navL1FontSize', e.target.value)}
+                className="w-full text-xs p-2 bg-paper border border-ink/10 rounded-xl outline-none focus:ring-1 focus:ring-gold"
+              >
+                {[10, 11, 12, 13, 14, 15, 16].map(s => <option key={s} value={s}>{s}px</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[9px] opacity-50">Font Weight</span>
+              <select 
+                value={siteContent['global.style.navL1FontWeight']?.value || '400'}
+                onChange={(e) => updateStyle('navL1FontWeight', e.target.value)}
+                className="w-full text-xs p-2 bg-paper border border-ink/10 rounded-xl outline-none focus:ring-1 focus:ring-gold"
+              >
+                {[300, 400, 500, 600, 700, 800, 900].map(w => <option key={w} value={w}>{w}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <div className="space-y-4">
+          <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">Navigation (L2)</label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <span className="text-[9px] opacity-50">Font Size</span>
+              <select 
+                value={siteContent['global.style.navL2FontSize']?.value || '11'}
+                onChange={(e) => updateStyle('navL2FontSize', e.target.value)}
+                className="w-full text-xs p-2 bg-paper border border-ink/10 rounded-xl outline-none focus:ring-1 focus:ring-gold"
+              >
+                {[9, 10, 11, 12, 13, 14].map(s => <option key={s} value={s}>{s}px</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[9px] opacity-50">Font Weight</span>
+              <select 
+                value={siteContent['global.style.navL2FontWeight']?.value || '400'}
+                onChange={(e) => updateStyle('navL2FontWeight', e.target.value)}
+                className="w-full text-xs p-2 bg-paper border border-ink/10 rounded-xl outline-none focus:ring-1 focus:ring-gold"
+              >
+                {[300, 400, 500, 600, 700, 800, 900].map(w => <option key={w} value={w}>{w}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Level 3 Navigation */}
+        <div className="space-y-4">
+          <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">Navigation (L3)</label>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <span className="text-[9px] opacity-50">Font Size</span>
+              <select 
+                value={siteContent['global.style.navL3FontSize']?.value || '10'}
+                onChange={(e) => updateStyle('navL3FontSize', e.target.value)}
+                className="w-full text-xs p-2 bg-paper border border-ink/10 rounded-xl outline-none focus:ring-1 focus:ring-gold"
+              >
+                {[8, 9, 10, 11, 12].map(s => <option key={s} value={s}>{s}px</option>)}
+              </select>
+            </div>
+            <div className="space-y-1">
+              <span className="text-[9px] opacity-50">Font Weight</span>
+              <select 
+                value={siteContent['global.style.navL3FontWeight']?.value || '400'}
+                onChange={(e) => updateStyle('navL3FontWeight', e.target.value)}
+                className="w-full text-xs p-2 bg-paper border border-ink/10 rounded-xl outline-none focus:ring-1 focus:ring-gold"
+              >
+                {[300, 400, 500, 600, 700, 800, 900].map(w => <option key={w} value={w}>{w}</option>)}
+              </select>
+            </div>
+          </div>
+        </div>
+
+        {/* Fonts */}
+        <div className="space-y-4">
+          <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">Typography</label>
+          <div className="space-y-3">
+            <span className="text-[9px] opacity-50">Serif Font (Headings)</span>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { name: 'Cormorant', value: '"Cormorant Garamond", serif' },
+                { name: 'Playfair', value: '"Playfair Display", serif' },
+                { name: 'Lora', value: '"Lora", serif' },
+                { name: 'Merriweather', value: '"Merriweather", serif' }
+              ].map(f => (
+                <button 
+                  key={f.name}
+                  onClick={() => updateStyle('fontSerif', f.value)}
+                  className={cn(
+                    "px-3 py-2 rounded-xl text-[10px] font-serif border transition-all",
+                    (siteContent['global.style.fontSerif']?.value || '"Cormorant Garamond", serif') === f.value ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
+                  )}
+                >
+                  {f.name}
+                </button>
+              ))}
+            </div>
+          </div>
+          <div className="space-y-3">
+            <span className="text-[9px] opacity-50">Sans Font (Body)</span>
+            <div className="grid grid-cols-2 gap-2">
+              {[
+                { name: 'Montserrat', value: '"Montserrat", sans-serif' },
+                { name: 'Inter', value: '"Inter", sans-serif' },
+                { name: 'Outfit', value: '"Outfit", sans-serif' },
+                { name: 'Space Grotesk', value: '"Space Grotesk", sans-serif' }
+              ].map(f => (
+                <button 
+                  key={f.name}
+                  onClick={() => updateStyle('fontSans', f.value)}
+                  className={cn(
+                    "px-3 py-2 rounded-xl text-[10px] font-sans border transition-all",
+                    (siteContent['global.style.fontSans']?.value || '"Montserrat", sans-serif') === f.value ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
+                  )}
+                >
+                  {f.name}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Backgrounds */}
+        <div className="space-y-4">
+          <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">Backgrounds</label>
+          <div className="space-y-2">
+            <span className="text-[9px] opacity-50">Hero Background URL</span>
+            <input 
+              type="text" 
+              value={siteContent['global.style.landingBg']?.value || ''} 
+              onChange={(e) => updateStyle('landingBg', e.target.value)}
+              placeholder="https://..."
+              className="w-full p-2 text-xs bg-paper border border-ink/10 rounded-xl outline-none focus:ring-1 focus:ring-gold"
+            />
+          </div>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <span className="text-[9px] opacity-50">Hero Overlay</span>
+              <span className="text-[9px] font-mono text-gold">{siteContent['global.style.landingOverlay']?.value || '0'}</span>
+            </div>
+            <input 
+              type="range" min="0" max="1" step="0.1"
+              value={siteContent['global.style.landingOverlay']?.value || '0'} 
+              onChange={(e) => updateStyle('landingOverlay', e.target.value)}
+              className="w-full accent-gold"
+            />
+          </div>
+        </div>
+      </div>
+
+      <div className="pt-2">
+        <button 
+          onClick={onClose}
+          className="w-full py-3 bg-ink text-white rounded-2xl text-[10px] uppercase tracking-widest font-bold hover:bg-ink/90 transition-colors shadow-lg"
+        >
+          Finish Styling
+        </button>
+      </div>
+    </motion.div>,
+    document.body
   );
 };
 
@@ -3339,11 +3670,17 @@ const EditableImage: FC<{
   children?: React.ReactNode
 }> = ({ contentKey, defaultUrl, isEditMode, isAdmin, language, siteContent, className, alt, rounded = "rounded-lg", children }) => {
   const [isUploading, setIsUploading] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   const content = siteContent[contentKey] || {};
   const url = content.value || defaultUrl;
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const dragControls = useDragControls();
 
   const showControls = isEditMode || isAdmin;
+
+  const currentFit = content.fit || 'object-cover';
+  const currentOpacity = content.opacity || '100';
+  const currentBlur = content.blur || '0';
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -3361,7 +3698,7 @@ const EditableImage: FC<{
         language,
         value: downloadUrl,
         updatedAt: serverTimestamp()
-      });
+      }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
     } finally {
@@ -3369,33 +3706,152 @@ const EditableImage: FC<{
     }
   };
 
+  const updateSetting = async (setting: string, val: string) => {
+    const docId = `${language}_${contentKey.replace(/\./g, '_')}`;
+    try {
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: contentKey,
+        language,
+        [setting]: val,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
   // Filter out image-specific classes from the container
-  const containerClasses = className?.split(' ').filter(c => !['object-cover', 'object-contain', 'opacity-80', 'opacity-70'].includes(c)).join(' ');
-  const imgClasses = className?.split(' ').filter(c => ['object-cover', 'object-contain', 'opacity-80', 'opacity-70'].includes(c)).join(' ');
+  const containerClasses = className?.split(' ').filter(c => !['object-cover', 'object-contain', 'opacity-80', 'opacity-70', 'blur-sm', 'blur-md'].includes(c)).join(' ');
+  
+  const imgStyles = {
+    opacity: parseInt(currentOpacity) / 100,
+    filter: currentBlur !== '0' ? `blur(${currentBlur}px)` : undefined
+  };
 
   if (showControls) {
     return (
-      <div className={cn("relative group cursor-pointer", containerClasses, rounded)}>
-        <div 
-          className="relative w-full h-full"
-          onClick={() => fileInputRef.current?.click()}
-        >
-          <img src={url} alt={alt} className={cn("w-full h-full", imgClasses)} referrerPolicy="no-referrer" />
+      <div className={cn("relative group", containerClasses, rounded)}>
+        <div className="relative w-full h-full overflow-hidden">
+          <img 
+            src={url} 
+            alt={alt} 
+            className={cn("w-full h-full transition-all duration-500", currentFit)} 
+            style={imgStyles}
+            referrerPolicy="no-referrer" 
+          />
           {children}
           
-          {/* Dashed border - always visible in edit mode */}
-          <div className={cn("absolute inset-0 border-2 border-dashed border-gold/60 pointer-events-none z-30", rounded)} />
+          {/* Dashed border */}
+          <div className={cn("absolute inset-0 border-2 border-dashed border-gold/40 pointer-events-none z-30", rounded)} />
           
-          {/* Hover overlay with button */}
-          <div className={cn(
-            "absolute inset-0 bg-ink/40 opacity-0 group-hover:opacity-100 transition-all duration-300 flex items-center justify-center z-50 backdrop-blur-[1px]",
-            rounded
-          )}>
-            <div className="bg-white text-ink px-6 py-3 rounded-full text-[10px] uppercase tracking-widest font-bold shadow-2xl flex items-center gap-3 transform scale-90 group-hover:scale-100 transition-transform duration-300">
-              {isUploading ? <Clock size={14} className="animate-spin text-gold" /> : <Upload size={14} className="text-gold" />}
-              {isUploading ? (language === 'ko' ? '업로드 중...' : 'Uploading...') : (language === 'ko' ? '이미지 변경' : 'Change Image')}
-            </div>
+          {/* Controls Bar */}
+          <div className="absolute top-2 right-2 flex gap-2 z-40 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button 
+              onClick={() => fileInputRef.current?.click()}
+              className="w-8 h-8 bg-white text-ink rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+              title={language === 'ko' ? '이미지 변경' : 'Change Image'}
+            >
+              {isUploading ? <Clock size={14} className="animate-spin text-gold" /> : <Upload size={14} />}
+            </button>
+            <button 
+              onClick={() => setIsEditing(true)}
+              className={cn(
+                "w-8 h-8 rounded-full flex items-center justify-center shadow-lg transition-all hover:scale-110",
+                isEditing ? "bg-gold text-ink" : "bg-white text-ink"
+              )}
+              title={language === 'ko' ? '설정' : 'Settings'}
+            >
+              <Settings size={14} />
+            </button>
           </div>
+
+          {isEditing && createPortal(
+            <motion.div 
+              drag
+              dragControls={dragControls}
+              dragListener={false}
+              dragMomentum={false}
+              className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white/95 backdrop-blur-xl p-6 rounded-[32px] shadow-[0_30px_60px_rgba(0,0,0,0.3)] border-2 border-gold flex flex-col gap-5 w-[calc(100%-2rem)] max-w-[340px] z-[9999] cursor-default"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div 
+                onPointerDown={(e) => dragControls.start(e)}
+                className="flex items-center justify-between border-b border-ink/10 pb-4 cursor-move active:cursor-grabbing group/drag"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="p-1.5 bg-gold/10 rounded-lg">
+                    <GripHorizontal size={18} className="text-gold" />
+                  </div>
+                  <div className="flex flex-col">
+                    <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40 leading-none mb-1">Editor</span>
+                    <span className="text-xs font-bold text-ink leading-none">Image Settings</span>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setIsEditing(false)}
+                  className="p-2 hover:bg-ink/5 rounded-full transition-colors"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="flex flex-col gap-2">
+                  <span className="text-[10px] uppercase tracking-widest opacity-40 font-bold">Object Fit</span>
+                  <div className="flex gap-2">
+                    {['object-cover', 'object-contain', 'object-fill'].map(fit => (
+                      <button 
+                        key={fit}
+                        onClick={() => updateSetting('fit', fit)}
+                        className={cn(
+                          "px-3 py-2 text-[10px] font-bold rounded-xl border transition-all flex-1",
+                          currentFit === fit ? "bg-gold text-ink border-gold shadow-md" : "bg-ink/5 border-transparent hover:border-gold/30"
+                        )}
+                      >
+                        {fit.split('-')[1].toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] uppercase tracking-widest opacity-40 font-bold">Opacity</span>
+                    <span className="text-[10px] font-mono font-bold text-gold">{currentOpacity}%</span>
+                  </div>
+                  <input 
+                    type="range" min="0" max="100" step="10"
+                    value={currentOpacity}
+                    onChange={(e) => updateSetting('opacity', e.target.value)}
+                    className="w-full accent-gold"
+                  />
+                </div>
+
+                <div className="flex flex-col gap-2">
+                  <div className="flex justify-between items-center">
+                    <span className="text-[10px] uppercase tracking-widest opacity-40 font-bold">Blur</span>
+                    <span className="text-[10px] font-mono font-bold text-gold">{currentBlur}px</span>
+                  </div>
+                  <input 
+                    type="range" min="0" max="20" step="2"
+                    value={currentBlur}
+                    onChange={(e) => updateSetting('blur', e.target.value)}
+                    className="w-full accent-gold"
+                  />
+                </div>
+              </div>
+
+              <div className="pt-2">
+                <button 
+                  onClick={() => setIsEditing(false)}
+                  className="w-full py-3 bg-ink text-white rounded-2xl text-[10px] uppercase tracking-widest font-bold hover:bg-ink/90 transition-colors shadow-lg"
+                >
+                  Close Settings
+                </button>
+              </div>
+            </motion.div>,
+            document.body
+          )}
           
           <input 
             type="file" 
@@ -3411,7 +3867,13 @@ const EditableImage: FC<{
 
   return (
     <div className={cn("relative overflow-hidden", containerClasses, rounded)}>
-      <img src={url} alt={alt} className={cn("w-full h-full", imgClasses)} referrerPolicy="no-referrer" />
+      <img 
+        src={url} 
+        alt={alt} 
+        className={cn("w-full h-full transition-all duration-500", currentFit)} 
+        style={imgStyles}
+        referrerPolicy="no-referrer" 
+      />
       {children}
     </div>
   );
@@ -3474,13 +3936,14 @@ const EditableLink: FC<{
   if (isEditMode) {
     return (
       <div className={cn("relative group inline-block", className)}>
-        {isEditing ? (
+        {isEditing ? createPortal(
           <motion.div 
             drag
             dragControls={dragControls}
             dragListener={false}
             dragMomentum={false}
-            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-4 w-[calc(100%-2rem)] max-w-[320px] bg-white/95 backdrop-blur-xl p-6 rounded-[32px] border-2 border-gold shadow-[0_30px_60px_rgba(0,0,0,0.3)] z-[1000]"
+            className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 flex flex-col gap-4 w-[calc(100%-2rem)] max-w-[320px] bg-white/95 backdrop-blur-xl p-6 rounded-[32px] border-2 border-gold shadow-[0_30px_60px_rgba(0,0,0,0.3)] z-[9999]"
+            onClick={(e) => e.stopPropagation()}
           >
             <div 
               onPointerDown={(e) => dragControls.start(e)}
@@ -3516,7 +3979,8 @@ const EditableLink: FC<{
               <button onClick={() => setIsEditing(false)} className="px-3 py-1 text-[10px] uppercase tracking-widest opacity-50 hover:opacity-100 transition-opacity">Cancel</button>
               <button onClick={handleSave} className="px-3 py-1 bg-gold text-ink rounded-full text-[10px] uppercase tracking-widest font-bold hover:scale-105 transition-transform">Save</button>
             </div>
-          </motion.div>
+          </motion.div>,
+          document.body
         ) : (
           <div 
             className="relative cursor-pointer group/item"
@@ -3585,353 +4049,6 @@ const EditableLink: FC<{
   );
 };
 
-const GlobalStyleEditor: FC<{
-  isEditMode: boolean,
-  siteContent: Record<string, any>,
-  language: string
-}> = ({ isEditMode, siteContent, language }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  const updateStyle = async (key: string, value: string) => {
-    const docId = `${language}_global_style_${key}`;
-    try {
-      await setDoc(doc(db, 'siteContent', docId), {
-        key: `global.style.${key}`,
-        language,
-        value,
-        updatedAt: serverTimestamp()
-      });
-    } catch (error) {
-      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
-    }
-  };
-
-  if (!isEditMode) return null;
-
-  const styles = {
-    paper: siteContent['global.style.paper']?.value || '#f5f2ed',
-    ink: siteContent['global.style.ink']?.value || '#1a1a1a',
-    gold: siteContent['global.style.gold']?.value || '#c5a059',
-    fontSerif: siteContent['global.style.fontSerif']?.value || '"Cormorant Garamond", serif',
-    fontSans: siteContent['global.style.fontSans']?.value || '"Montserrat", sans-serif',
-    navL1FontSize: siteContent['global.style.navL1FontSize']?.value || '12',
-    navL1FontColor: siteContent['global.style.navL1FontColor']?.value || '#1a1a1a',
-    navL1FontWeight: siteContent['global.style.navL1FontWeight']?.value || '500',
-    navL2FontSize: siteContent['global.style.navL2FontSize']?.value || '12',
-    navL2FontColor: siteContent['global.style.navL2FontColor']?.value || '#1a1a1a',
-    navL2FontWeight: siteContent['global.style.navL2FontWeight']?.value || '500',
-    navL3FontSize: siteContent['global.style.navL3FontSize']?.value || '10',
-    navL3FontColor: siteContent['global.style.navL3FontColor']?.value || '#1a1a1a',
-    navL3FontWeight: siteContent['global.style.navL3FontWeight']?.value || '400',
-    landingBg: siteContent['global.style.landingBg']?.value || '',
-    landingOverlay: siteContent['global.style.landingOverlay']?.value || '0',
-    allPagesBg: siteContent['global.style.allPagesBg']?.value || '',
-  };
-
-  const t = TRANSLATIONS[language] || TRANSLATIONS.en;
-
-  return (
-    <>
-      <button 
-        onClick={() => setIsOpen(true)}
-        className="fixed bottom-8 left-8 w-14 h-14 bg-gold text-ink rounded-full flex items-center justify-center shadow-2xl z-50 hover:scale-110 transition-transform group"
-      >
-        <Palette size={24} className="group-hover:rotate-12 transition-transform" />
-      </button>
-
-      <AnimatePresence>
-        {isOpen && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-end p-6 pointer-events-none">
-            <motion.div 
-              initial={{ x: 400, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              exit={{ x: 400, opacity: 0 }}
-              className="w-80 bg-paper border border-ink/10 rounded-[40px] shadow-2xl p-8 space-y-8 pointer-events-auto max-h-[90vh] overflow-y-auto custom-scrollbar"
-            >
-              <div className="flex items-center justify-between">
-                <h3 className="text-xl font-serif font-bold">{t.globalStyle.title}</h3>
-                <button onClick={() => setIsOpen(false)} className="p-2 hover:bg-ink/5 rounded-full transition-colors">
-                  <X size={20} />
-                </button>
-              </div>
-
-              <div className="space-y-6">
-                <div className="space-y-3">
-                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.colors}</label>
-                  <div className="grid grid-cols-3 gap-3">
-                    <div className="space-y-2">
-                      <input 
-                        type="color" 
-                        value={styles.paper} 
-                        onChange={(e) => updateStyle('paper', e.target.value)}
-                        className="w-full h-10 rounded-xl cursor-pointer border-none bg-transparent"
-                      />
-                      <p className="text-[8px] text-center uppercase opacity-40">{t.globalStyle.paper}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <input 
-                        type="color" 
-                        value={styles.ink} 
-                        onChange={(e) => updateStyle('ink', e.target.value)}
-                        className="w-full h-10 rounded-xl cursor-pointer border-none bg-transparent"
-                      />
-                      <p className="text-[8px] text-center uppercase opacity-40">{t.globalStyle.ink}</p>
-                    </div>
-                    <div className="space-y-2">
-                      <input 
-                        type="color" 
-                        value={styles.gold} 
-                        onChange={(e) => updateStyle('gold', e.target.value)}
-                        className="w-full h-10 rounded-xl cursor-pointer border-none bg-transparent"
-                      />
-                      <p className="text-[8px] text-center uppercase opacity-40">{t.globalStyle.gold}</p>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Level 1 Navigation */}
-                <div className="p-4 bg-ink/5 rounded-2xl space-y-4">
-                  <p className="text-[10px] uppercase tracking-widest font-bold opacity-40">Level 1 Navigation</p>
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL1FontSize} ({styles.navL1FontSize}px)</label>
-                    <input 
-                      type="range" 
-                      min="8" max="32" step="1"
-                      value={styles.navL1FontSize} 
-                      onChange={(e) => updateStyle('navL1FontSize', e.target.value)}
-                      className="w-full accent-gold"
-                    />
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL1FontColor}</label>
-                    <div className="flex items-center gap-4">
-                      <input 
-                        type="color" 
-                        value={styles.navL1FontColor} 
-                        onChange={(e) => updateStyle('navL1FontColor', e.target.value)}
-                        className="w-12 h-10 rounded-xl cursor-pointer border-none bg-transparent"
-                      />
-                      <span className="text-xs font-mono opacity-50">{styles.navL1FontColor}</span>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL1FontWeight}</label>
-                    <select 
-                      value={styles.navL1FontWeight} 
-                      onChange={(e) => updateStyle('navL1FontWeight', e.target.value)}
-                      className="w-full p-2 text-xs bg-ink/5 border border-ink/10 rounded-lg"
-                    >
-                      <option value="300">Light (300)</option>
-                      <option value="400">Regular (400)</option>
-                      <option value="500">Medium (500)</option>
-                      <option value="600">Semi-Bold (600)</option>
-                      <option value="700">Bold (700)</option>
-                      <option value="800">Extra-Bold (800)</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Level 2 Navigation */}
-                <div className="p-4 bg-ink/5 rounded-2xl space-y-4">
-                  <p className="text-[10px] uppercase tracking-widest font-bold opacity-40">Level 2 Navigation</p>
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL2FontSize} ({styles.navL2FontSize}px)</label>
-                    <input 
-                      type="range" 
-                      min="8" max="32" step="1"
-                      value={styles.navL2FontSize} 
-                      onChange={(e) => updateStyle('navL2FontSize', e.target.value)}
-                      className="w-full accent-gold"
-                    />
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL2FontColor}</label>
-                    <div className="flex items-center gap-4">
-                      <input 
-                        type="color" 
-                        value={styles.navL2FontColor} 
-                        onChange={(e) => updateStyle('navL2FontColor', e.target.value)}
-                        className="w-12 h-10 rounded-xl cursor-pointer border-none bg-transparent"
-                      />
-                      <span className="text-xs font-mono opacity-50">{styles.navL2FontColor}</span>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL2FontWeight}</label>
-                    <select 
-                      value={styles.navL2FontWeight} 
-                      onChange={(e) => updateStyle('navL2FontWeight', e.target.value)}
-                      className="w-full p-2 text-xs bg-ink/5 border border-ink/10 rounded-lg"
-                    >
-                      <option value="300">Light (300)</option>
-                      <option value="400">Regular (400)</option>
-                      <option value="500">Medium (500)</option>
-                      <option value="600">Semi-Bold (600)</option>
-                      <option value="700">Bold (700)</option>
-                      <option value="800">Extra-Bold (800)</option>
-                    </select>
-                  </div>
-                </div>
-
-                {/* Level 3 Navigation */}
-                <div className="p-4 bg-ink/5 rounded-2xl space-y-4">
-                  <p className="text-[10px] uppercase tracking-widest font-bold opacity-40">Level 3 Navigation</p>
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL3FontSize} ({styles.navL3FontSize}px)</label>
-                    <input 
-                      type="range" 
-                      min="8" max="32" step="1"
-                      value={styles.navL3FontSize} 
-                      onChange={(e) => updateStyle('navL3FontSize', e.target.value)}
-                      className="w-full accent-gold"
-                    />
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL3FontColor}</label>
-                    <div className="flex items-center gap-4">
-                      <input 
-                        type="color" 
-                        value={styles.navL3FontColor} 
-                        onChange={(e) => updateStyle('navL3FontColor', e.target.value)}
-                        className="w-12 h-10 rounded-xl cursor-pointer border-none bg-transparent"
-                      />
-                      <span className="text-xs font-mono opacity-50">{styles.navL3FontColor}</span>
-                    </div>
-                  </div>
-                  <div className="space-y-3">
-                    <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.navL3FontWeight}</label>
-                    <select 
-                      value={styles.navL3FontWeight} 
-                      onChange={(e) => updateStyle('navL3FontWeight', e.target.value)}
-                      className="w-full p-2 text-xs bg-ink/5 border border-ink/10 rounded-lg"
-                    >
-                      <option value="300">Light (300)</option>
-                      <option value="400">Regular (400)</option>
-                      <option value="500">Medium (500)</option>
-                      <option value="600">Semi-Bold (600)</option>
-                      <option value="700">Bold (700)</option>
-                      <option value="800">Extra-Bold (800)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.backgrounds}</label>
-                  <div className="space-y-4">
-                    <div className="space-y-2">
-                      <p className="text-[10px] opacity-60">{t.globalStyle.landingBg}</p>
-                      <input 
-                        type="text" 
-                        value={styles.landingBg} 
-                        onChange={(e) => updateStyle('landingBg', e.target.value)}
-                        placeholder="https://..."
-                        className="w-full p-2 text-xs bg-ink/5 border border-ink/10 rounded-lg"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-[10px] opacity-60">{t.globalStyle.landingOverlay} ({styles.landingOverlay})</p>
-                      <input 
-                        type="range" 
-                        min="0" max="1" step="0.1"
-                        value={styles.landingOverlay} 
-                        onChange={(e) => updateStyle('landingOverlay', e.target.value)}
-                        className="w-full accent-gold"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <p className="text-[10px] opacity-60">{t.globalStyle.allPagesBg}</p>
-                      <input 
-                        type="text" 
-                        value={styles.allPagesBg} 
-                        onChange={(e) => updateStyle('allPagesBg', e.target.value)}
-                        placeholder="https://..."
-                        className="w-full p-2 text-xs bg-ink/5 border border-ink/10 rounded-lg"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.serifFont}</label>
-                  <div className="grid grid-cols-1 gap-2">
-                    {[
-                      { name: 'Cormorant', value: '"Cormorant Garamond", serif' },
-                      { name: 'Playfair', value: '"Playfair Display", serif' },
-                      { name: 'Lora', value: '"Lora", serif' },
-                      { name: 'Merriweather', value: '"Merriweather", serif' }
-                    ].map(f => (
-                      <button 
-                        key={f.name}
-                        onClick={() => updateStyle('fontSerif', f.value)}
-                        className={cn(
-                          "px-4 py-2 rounded-xl text-sm font-serif border transition-all text-left",
-                          styles.fontSerif === f.value ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
-                        )}
-                      >
-                        {f.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="text-[10px] uppercase tracking-widest opacity-50 font-bold">{t.globalStyle.sansFont}</label>
-                  <div className="grid grid-cols-1 gap-2">
-                    {[
-                      { name: 'Montserrat', value: '"Montserrat", sans-serif' },
-                      { name: 'Inter', value: '"Inter", sans-serif' },
-                      { name: 'Outfit', value: '"Outfit", sans-serif' },
-                      { name: 'Space Grotesk', value: '"Space Grotesk", sans-serif' }
-                    ].map(f => (
-                      <button 
-                        key={f.name}
-                        onClick={() => updateStyle('fontSans', f.value)}
-                        className={cn(
-                          "px-4 py-2 rounded-xl text-sm font-sans border transition-all text-left",
-                          styles.fontSans === f.value ? "bg-gold text-ink border-gold" : "bg-ink/5 border-transparent hover:border-gold/30"
-                        )}
-                      >
-                        {f.name}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-ink/5">
-                  <button 
-                    onClick={() => {
-                      updateStyle('paper', '#f5f2ed');
-                      updateStyle('ink', '#1a1a1a');
-                      updateStyle('gold', '#c5a059');
-                      updateStyle('fontSerif', '"Cormorant Garamond", serif');
-                      updateStyle('fontSans', '"Montserrat", sans-serif');
-                      updateStyle('navL1FontSize', '12');
-                      updateStyle('navL1FontColor', '#1a1a1a');
-                      updateStyle('navL1FontWeight', '500');
-                      updateStyle('navL2FontSize', '12');
-                      updateStyle('navL2FontColor', '#1a1a1a');
-                      updateStyle('navL2FontWeight', '500');
-                      updateStyle('navL3FontSize', '10');
-                      updateStyle('navL3FontColor', '#1a1a1a');
-                      updateStyle('navL3FontWeight', '400');
-                      updateStyle('landingBg', '');
-                      updateStyle('landingOverlay', '0');
-                      updateStyle('allPagesBg', '');
-                    }}
-                    className="w-full py-3 bg-ink/5 text-[10px] uppercase tracking-widest font-bold rounded-xl hover:bg-red-500 hover:text-white transition-all"
-                  >
-                    {t.globalStyle.reset}
-                  </button>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
-    </>
-  );
-};
-
 const ProgramCarousel: FC<{
   isEditMode: boolean;
   language: LanguageCode;
@@ -3954,7 +4071,7 @@ const ProgramCarousel: FC<{
           <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
             <EditableText contentKey="programs.badge" defaultValue="Programs" isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
-          <EditableText contentKey="programs.title" defaultValue={t.programs.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" className="text-3xl md:text-4xl font-serif" />
+          <EditableText contentKey="programs.title" defaultValue={t.programs.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" className="text-2xl md:text-4xl font-serif" />
         </div>
         <div className="flex gap-3">
           <button onClick={prev} className="w-12 h-12 rounded-full border border-ink/10 flex items-center justify-center hover:bg-ink hover:text-paper transition-all">
@@ -3976,7 +4093,7 @@ const ProgramCarousel: FC<{
             className="space-y-8"
           >
             <div className="space-y-4">
-              <EditableText contentKey={`programs.item_${index}.title`} defaultValue={items[index].title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h4" className="text-2xl md:text-3xl font-serif text-gold" />
+              <EditableText contentKey={`programs.item_${index}.title`} defaultValue={items[index].title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h4" className="text-xl md:text-3xl font-serif text-gold" />
               <div className="w-12 h-1 bg-gold/30 rounded-full" />
             </div>
             <div className="text-lg md:text-xl opacity-70 leading-relaxed whitespace-pre-line font-serif italic">
@@ -4012,7 +4129,7 @@ const ProfileSection: FC<{
   todayVisits: number;
 }> = ({ isEditMode, language, siteContent, t, isAdmin, setView, todayVisits }) => {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 lg:gap-16 items-center">
       <div className="space-y-10">
         <div className="space-y-6">
           <div className="flex items-center justify-between">
@@ -4268,14 +4385,14 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-100px" }}
         id="curriculum" 
-        className="max-w-[1600px] mx-auto px-0 py-16"
+        className="max-w-[1600px] mx-auto px-4 md:px-6 py-16"
       >
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-20 gap-8">
           <div className="space-y-4">
             <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
               <EditableText contentKey="curriculum.badge" defaultValue={t.curriculum.badge} isEditMode={isEditMode} language={language} siteContent={siteContent} />
             </div>
-            <div className="text-5xl font-serif font-light">
+            <div className="text-3xl md:text-5xl font-serif font-light">
               <EditableText contentKey="curriculum.title" defaultValue={t.curriculum.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
             </div>
           </div>
@@ -4309,7 +4426,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
                 <EditableText contentKey="differentiation.badge" defaultValue="Differentiation" isEditMode={isEditMode} language={language} siteContent={siteContent} />
               </div>
-              <EditableText contentKey="differentiation.title" defaultValue={t.differentiation.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" className="text-4xl font-serif" />
+              <EditableText contentKey="differentiation.title" defaultValue={t.differentiation.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" className="text-2xl md:text-4xl font-serif" />
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
               {(t.differentiation?.items || []).map((item: any, i: number) => (
@@ -4341,7 +4458,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
             <div className="absolute top-0 right-0 w-64 h-64 bg-gold/10 blur-[100px] rounded-full -translate-y-1/2 translate-x-1/2" />
             <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-16">
               <div className="space-y-8">
-                <EditableText contentKey="consultation.title" defaultValue={t.consultation.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" className="text-4xl font-serif" />
+                <EditableText contentKey="consultation.title" defaultValue={t.consultation.title} isEditMode={isEditMode} language={language} siteContent={siteContent} as="h3" className="text-2xl md:text-4xl font-serif" />
                 <div className="space-y-6">
                   {(t.consultation?.items || []).map((item: any, i: number) => (
                     <div key={i} className="flex items-center gap-6 border-b border-paper/10 pb-4">
@@ -4423,13 +4540,13 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-100px" }}
-        className="max-w-[1600px] mx-auto px-0 py-16"
+        className="max-w-[1600px] mx-auto px-4 md:px-6 py-16"
       >
         <div className="text-center space-y-4 mb-20">
           <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
             <EditableText contentKey="gallery.badge" defaultValue="Gallery & Highlights" isEditMode={isEditMode} language={language} siteContent={siteContent} />
           </div>
-          <div className="text-5xl font-serif font-light">
+          <div className="text-3xl md:text-5xl font-serif font-light">
             <EditableText contentKey="gallery.title" defaultValue={language === 'ko' ? '우리의 특별한 순간들' : 'Our Special Moments'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
           </div>
         </div>
@@ -4488,7 +4605,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
               <div className="text-gold text-[10px] uppercase tracking-[0.4em]">
                 <EditableText contentKey="activity.badge" defaultValue="Live Updates" isEditMode={isEditMode} language={language} siteContent={siteContent} />
               </div>
-              <div className="text-4xl font-serif font-light">
+              <div className="text-2xl md:text-4xl font-serif font-light">
                 <EditableText contentKey="activity.title" defaultValue={language === 'ko' ? '최근 커뮤니티 소식' : 'Recent Community Activity'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
               </div>
             </div>
@@ -4538,7 +4655,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true, margin: "-100px" }}
           id="landing-dynamic-area" 
-          className="max-w-[1600px] mx-auto px-0 py-16"
+          className="max-w-[1600px] mx-auto px-4 md:px-6 py-16"
         >
           <DynamicContentArea 
             contentKey="landing.dynamic"
@@ -4608,8 +4725,8 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
                 <EditableText contentKey="library.description" defaultValue={language === 'ko' ? 'L.C.L Knowledge Library는 중국 언어학 박사의 학문적 엄격함과 20년 현지 체류의 직관을 결합한 지식의 정수입니다. 단순한 학습 자료를 넘어, 언어의 구조적 원리와 문화적 맥락을 관통하는 통찰력을 제공합니다.' : 'The L.C.L Knowledge Library is the essence of knowledge that combines the academic rigor of a PhD in Chinese linguistics with the intuition of 20 years of local residence. Beyond simple learning materials, it provides insight into the structural principles and cultural context of language.'} isEditMode={isEditMode} language={language} siteContent={siteContent} as="div" />
               </div>
             </div>
-            <div className="relative hidden md:block">
-              <div className="aspect-[16/9] bg-ink/5 rounded-[40px] overflow-hidden rotate-1">
+            <div className="relative block">
+              <div className="aspect-[16/9] bg-ink/5 rounded-[40px] overflow-hidden md:rotate-1">
                 <EditableImage 
                   contentKey="library.image"
                   defaultUrl="https://picsum.photos/seed/library-main/1200/800" 
