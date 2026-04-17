@@ -96,6 +96,66 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { collection, addDoc, setDoc, serverTimestamp, onSnapshot, query, where, orderBy, limit, doc, getDoc, updateDoc, deleteDoc, writeBatch } from 'firebase/firestore';
 import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase/storage';
 
+// Resize Handles Component for interactive scaling
+const ResizeHandles: FC<{ 
+  show: boolean, 
+  onResize: (e: any, info: any) => void,
+  containerRef: React.RefObject<HTMLDivElement>
+}> = ({ show, onResize, containerRef }) => {
+  const positions = [
+    { name: 'tl', top: '-10px', left: '-10px', cursor: 'nw-resize' },
+    { name: 'tr', top: '-10px', right: '-10px', cursor: 'ne-resize' },
+    { name: 'bl', bottom: '-10px', left: '-10px', cursor: 'sw-resize' },
+    { name: 'br', bottom: '-10px', right: '-10px', cursor: 'se-resize' },
+    { name: 't', top: '-10px', left: '50%', transform: 'translateX(-50%)', cursor: 'n-resize' },
+    { name: 'b', bottom: '-10px', left: '50%', transform: 'translateX(-50%)', cursor: 's-resize' },
+    { name: 'l', top: '50%', left: '-10px', transform: 'translateY(-50%)', cursor: 'w-resize' },
+    { name: 'r', top: '50%', right: '-10px', transform: 'translateY(-50%)', cursor: 'e-resize' },
+  ];
+
+  return (
+    <>
+      {positions.map((pos) => (
+        <motion.div
+          key={pos.name}
+          drag
+          dragMomentum={false}
+          onDrag={onResize}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className={cn(
+            "absolute w-6 h-6 bg-gold border-2 border-white rounded-full shadow-[0_0_15px_rgba(197,160,89,0.5)] z-[100] cursor-pointer flex items-center justify-center transition-opacity duration-300",
+            show ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+          )}
+          style={{ 
+            top: pos.top, 
+            left: pos.left, 
+            right: pos.right, 
+            bottom: pos.bottom, 
+            transform: pos.transform, 
+            cursor: pos.cursor 
+          }}
+        >
+          {/* Inner pulse for visibility */}
+          <motion.div 
+            animate={{ 
+              scale: [1, 1.3, 1],
+              opacity: [0.5, 1, 0.5]
+            }}
+            transition={{ 
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            className="w-full h-full rounded-full bg-gold/30 absolute"
+          />
+          <div className="w-2 h-2 bg-white rounded-full relative z-10" />
+        </motion.div>
+      ))}
+    </>
+  );
+};
+
 // Error Boundary Component
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean, error: Error | null }> {
   constructor(props: { children: ReactNode }) {
@@ -2068,7 +2128,7 @@ const EditableText: FC<{
   if (isEditMode) {
     return (
       <div 
-        className={cn("relative group inline-block", className, isEditing && "z-[400]")}
+        className={cn("relative group inline-block", className, isEditing ? "z-[400]" : "editable-hover")}
         onClick={(e) => e.stopPropagation()}
       >
         <Component
@@ -2600,6 +2660,21 @@ const HeroCarousel: FC<{
   const [isPlaying, setIsPlaying] = useState(true);
   const [isUploading, setIsUploading] = useState(false);
 
+  const updateCarouselSetting = async (index: number, key: string, value: string) => {
+    const fullKey = `${contentKey}.item_${index}.${key}`;
+    const docId = `${language}_${fullKey.replace(/\./g, '_')}`;
+    try {
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: fullKey,
+        language,
+        value,
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
   useEffect(() => {
     if (!isPlaying || isEditMode) return;
     const timer = setInterval(() => {
@@ -2703,23 +2778,52 @@ const HeroCarousel: FC<{
 
                 {(isEditMode || siteContent[`${contentKey}.item_${index}.fileUrl`]?.value) && (
                   <div className="flex items-center gap-2">
-                    <motion.a
-                      href={siteContent[`${contentKey}.item_${index}.fileUrl`]?.value || '#'}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      whileHover={{ scale: 1.05 }}
-                      whileTap={{ scale: 0.95 }}
-                      className="px-6 md:px-8 py-3 md:py-4 bg-paper/10 backdrop-blur-md border border-paper/20 text-paper rounded-full font-bold text-sm md:text-base flex items-center gap-2 hover:bg-paper/20 transition-all"
-                    >
-                      <Download size={18} />
-                      <EditableText 
-                        contentKey={`${contentKey}.item_${index}.fileLabel`} 
-                        defaultValue={language === 'ko' ? '브로슈어 다운로드' : 'Download Brochure'} 
-                        isEditMode={isEditMode} 
-                        language={language} 
-                        siteContent={siteContent} 
-                      />
-                    </motion.a>
+                    <div className="relative group/brochure brochure-container">
+                      <motion.div
+                        style={{ scale: (siteContent[`${contentKey}.item_${index}.fileScale`]?.value || 100) / 100 }}
+                        className="relative"
+                      >
+                        <motion.a
+                          href={siteContent[`${contentKey}.item_${index}.fileUrl`]?.value || '#'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          whileHover={{ scale: 1.05 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="px-6 md:px-8 py-3 md:py-4 bg-paper/10 backdrop-blur-md border border-paper/20 text-paper rounded-full font-bold text-sm md:text-base flex items-center gap-2 hover:bg-paper/20 transition-all"
+                        >
+                          <Download size={18} />
+                          <EditableText 
+                            contentKey={`${contentKey}.item_${index}.fileLabel`} 
+                            defaultValue={language === 'ko' ? '브로슈어 다운로드' : 'Download Brochure'} 
+                            isEditMode={isEditMode} 
+                            language={language} 
+                            siteContent={siteContent} 
+                          />
+                        </motion.a>
+
+                        {isEditMode && (
+                          <motion.div
+                            drag
+                            dragMomentum={false}
+                            onDrag={(e: any, info) => {
+                              const target = e.target as HTMLElement;
+                              const rect = target?.closest('.brochure-container')?.getBoundingClientRect();
+                              if (!rect) return;
+                              const centerX = rect.left + rect.width / 2;
+                              const centerY = rect.top + rect.height / 2;
+                              const dist = Math.sqrt(Math.pow(info.point.x - centerX, 2) + Math.pow(info.point.y - centerY, 2));
+                              const initialDist = Math.sqrt(Math.pow(rect.width / 2, 2) + Math.pow(rect.height / 2, 2));
+                              const newScale = Math.round((dist / initialDist) * 100);
+                              updateCarouselSetting(index, 'fileScale', Math.min(300, Math.max(50, newScale)).toString());
+                            }}
+                            className="absolute -bottom-2 -right-2 w-6 h-6 bg-gold text-ink rounded-full flex items-center justify-center shadow-xl z-50 cursor-nwse-resize opacity-0 group-hover/brochure:opacity-100 transition-opacity"
+                          >
+                            <Maximize2 size={12} />
+                          </motion.div>
+                        )}
+                      </motion.div>
+                    </div>
+
                     {isEditMode && isAdmin && (
                       <div className="relative group/upload">
                         <input 
@@ -3425,8 +3529,36 @@ const EditableMedia: FC<{
     }
   };
 
+  const handleReset = async () => {
+    try {
+      await updateSetting('fit', 'object-cover');
+      await updateSetting('scale', '100');
+      await updateSetting('xOffset', '0');
+      await updateSetting('yOffset', '0');
+    } catch (error) {
+      console.error('Reset error:', error);
+    }
+  };
+
+  const clearAll = async () => {
+    if (!window.confirm(language === 'ko' ? '모든 미디어를 삭제하시겠습니까?' : 'Are you sure you want to delete all media?')) return;
+    const docId = `${language}_${contentKey.replace(/\./g, '_')}`;
+    try {
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: contentKey,
+        language,
+        value: [],
+        updatedAt: serverTimestamp()
+      });
+      setCurrentIndex(0);
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
   const content = siteContent[contentKey] || {};
   const mediaItems = content.value ? (Array.isArray(content.value) ? content.value : [content.value]) : defaultUrls;
+  const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const autoPlayRef = useRef<NodeJS.Timeout | null>(null);
 
@@ -3581,49 +3713,97 @@ const EditableMedia: FC<{
   const url = typeof currentMedia === 'string' ? currentMedia : currentMedia.url;
   const type = typeof currentMedia === 'string' ? 'image' : currentMedia.type;
 
-  return (
-    <div className={cn("relative group overflow-hidden", currentAspect, rounded, className)}>
-      <AnimatePresence mode="wait">
-        <motion.div 
-          key={currentIndex}
-          initial={{ opacity: 0, x: 20 }}
-          animate={{ opacity: 1, x: 0 }}
-          exit={{ opacity: 0, x: -20 }}
-          className="absolute inset-0 cursor-pointer group/media"
-          onClick={() => showControls && fileInputRef.current?.click()}
-        >
-          {type === 'video' ? (
-            <video 
-              src={url} 
-              autoPlay 
-              muted 
-              loop 
-              playsInline 
-              className={cn("w-full h-full transition-all duration-500", currentFit)}
-              style={{ transform: `scale(${parseInt(currentScale) / 100}) translate(${currentX}%, ${currentY}%)` }}
-            />
-          ) : (
-            <img 
-              src={url} 
-              className={cn("w-full h-full transition-all duration-500", currentFit)} 
-              referrerPolicy="no-referrer" 
-              style={{ transform: `scale(${parseInt(currentScale) / 100}) translate(${currentX}%, ${currentY}%)` }}
-            />
-          )}
+  const handleResizeDrag = (e: any, info: any) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dist = Math.sqrt(Math.pow(info.point.x - centerX, 2) + Math.pow(info.point.y - centerY, 2));
+    const initialDist = Math.sqrt(Math.pow(rect.width / 2, 2) + Math.pow(rect.height / 2, 2));
+    const newScale = Math.round((dist / initialDist) * 100);
+    updateSetting('scale', Math.min(500, Math.max(10, newScale)).toString());
+  };
 
-          {/* Upload Overlay */}
-          {showControls && (
-            <div className="absolute inset-0 bg-ink/40 opacity-0 group-hover/media:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2 z-20">
-              <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
-                {isUploading ? <Clock size={24} className="animate-spin text-gold" /> : <Plus size={24} />}
+  const handleMoveDragEnd = (e: any, info: any) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const deltaX = (info.offset.x / rect.width) * 100;
+    const deltaY = (info.offset.y / rect.height) * 100;
+    updateSetting('xOffset', (parseFloat(currentX) + deltaX).toFixed(1));
+    updateSetting('yOffset', (parseFloat(currentY) + deltaY).toFixed(1));
+  };
+
+  return (
+    <div 
+      ref={containerRef}
+      className={cn("relative group", currentAspect, rounded, className, isEditMode && !isEditing && "editable-hover")}
+    >
+      <div className="absolute inset-0 overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div 
+            key={currentIndex}
+            initial={{ opacity: 0, x: 20 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -20 }}
+            className="absolute inset-0 group/media"
+            onClick={() => showControls && !isEditing && fileInputRef.current?.click()}
+          >
+            {type === 'video' ? (
+              <motion.video 
+                drag={isEditing}
+                dragMomentum={false}
+                onDragEnd={handleMoveDragEnd}
+                src={url} 
+                autoPlay 
+                muted 
+                loop 
+                playsInline 
+                className={cn("w-full h-full transition-all duration-500", currentFit)}
+                style={{ 
+                  transform: `scale(${parseInt(currentScale) / 100}) translate(${currentX}%, ${currentY}%)`,
+                  cursor: isEditing ? 'move' : 'pointer'
+                }}
+              />
+            ) : (
+              <motion.img 
+                drag={isEditing}
+                dragMomentum={false}
+                onDragEnd={handleMoveDragEnd}
+                src={url} 
+                className={cn("w-full h-full transition-all duration-500", currentFit)} 
+                referrerPolicy="no-referrer" 
+                style={{ 
+                  transform: `scale(${parseInt(currentScale) / 100}) translate(${currentX}%, ${currentY}%)`,
+                  cursor: isEditing ? 'move' : 'pointer'
+                }}
+              />
+            )}
+
+            {/* Upload Overlay */}
+            {showControls && !isEditing && (
+              <div className="absolute inset-0 bg-ink/40 opacity-0 group-hover/media:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2 z-20 pointer-events-none">
+                <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+                  {isUploading ? <Clock size={24} className="animate-spin text-gold" /> : <Plus size={24} />}
+                </div>
+                <span className="text-[10px] font-bold uppercase tracking-widest">
+                  {isUploading ? (language === 'ko' ? `업로드 중 (${uploadProgress.current}/${uploadProgress.total})` : `Uploading (${uploadProgress.current}/${uploadProgress.total})`) : (language === 'ko' ? '미디어 추가' : 'Add Media')}
+                </span>
               </div>
-              <span className="text-[10px] font-bold uppercase tracking-widest">
-                {isUploading ? (language === 'ko' ? `업로드 중 (${uploadProgress.current}/${uploadProgress.total})` : `Uploading (${uploadProgress.current}/${uploadProgress.total})`) : (language === 'ko' ? '미디어 추가' : 'Add Media')}
-              </span>
-            </div>
-          )}
-        </motion.div>
-      </AnimatePresence>
+            )}
+          </motion.div>
+        </AnimatePresence>
+      </div>
+
+      {/* Resize Handles (Outside overflow-hidden) */}
+      {isEditMode && isAdmin && (
+        <ResizeHandles 
+          show={isEditing} 
+          onResize={handleResizeDrag} 
+          containerRef={containerRef} 
+        />
+      )}
 
       {mediaItems.length > 1 && (
         <>
@@ -3695,13 +3875,22 @@ const EditableMedia: FC<{
               </button>
             </div>
             {mediaItems.length > 0 && (
-              <button 
-                onClick={() => removeItem(currentIndex)}
-                className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
-                title={language === 'ko' ? "현재 항목 삭제" : "Remove Current"}
-              >
-                <Trash2 size={14} />
-              </button>
+              <div className="flex gap-1">
+                <button 
+                  onClick={() => removeItem(currentIndex)}
+                  className="w-8 h-8 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                  title={language === 'ko' ? "현재 항목 삭제" : "Remove Current"}
+                >
+                  <Trash2 size={14} />
+                </button>
+                <button 
+                  onClick={clearAll}
+                  className="w-8 h-8 bg-ink text-white rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
+                  title={language === 'ko' ? "전체 삭제" : "Clear All"}
+                >
+                  <X size={14} />
+                </button>
+              </div>
             )}
           </div>
 
@@ -3818,10 +4007,16 @@ const EditableMedia: FC<{
                 </div>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 flex gap-2">
+                <button 
+                  onClick={handleReset}
+                  className="flex-1 py-3 bg-ink/5 text-ink rounded-2xl text-[10px] uppercase tracking-widest font-bold hover:bg-ink/10 transition-colors"
+                >
+                  Reset
+                </button>
                 <button 
                   onClick={() => setIsEditing(false)}
-                  className="w-full py-3 bg-ink text-white rounded-2xl text-[10px] uppercase tracking-widest font-bold hover:bg-ink/90 transition-colors"
+                  className="flex-[2] py-3 bg-ink text-white rounded-2xl text-[10px] uppercase tracking-widest font-bold hover:bg-ink/90 transition-colors"
                 >
                   Close Settings
                 </button>
@@ -3852,8 +4047,10 @@ const GlobalStyleEditor: FC<{
   onClose: () => void
 }> = ({ isEditMode, language, siteContent, isOpen, onClose }) => {
   const dragControls = useDragControls();
+  const [isSaving, setIsSaving] = useState(false);
   
   const updateStyle = async (key: string, value: string) => {
+    setIsSaving(true);
     const docId = `${language}_global_style_${key.replace(/\./g, '_')}`;
     try {
       await setDoc(doc(db, 'siteContent', docId), {
@@ -3864,6 +4061,52 @@ const GlobalStyleEditor: FC<{
       }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    } finally {
+      setTimeout(() => setIsSaving(false), 500);
+    }
+  };
+
+  const handleExport = () => {
+    const data = JSON.stringify(siteContent, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `site-content-${language}-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const handleResetAll = async () => {
+    if (!window.confirm(language === 'ko' ? '모든 글로벌 스타일을 초기화하시겠습니까?' : 'Are you sure you want to reset all global styles?')) return;
+    setIsSaving(true);
+    const defaults = {
+      primaryColor: '#c5a059',
+      navL1FontSize: '12',
+      navL1FontWeight: '400',
+      navL2FontSize: '11',
+      navL2FontWeight: '400',
+      navL3FontSize: '10',
+      navL3FontWeight: '400',
+      fontSerif: '"Cormorant Garamond", serif',
+      fontSans: '"Montserrat", sans-serif',
+      landingOverlay: '0'
+    };
+    
+    try {
+      for (const [key, value] of Object.entries(defaults)) {
+        const docId = `${language}_global_style_${key.replace(/\./g, '_')}`;
+        await setDoc(doc(db, 'siteContent', docId), {
+          key: `global.style.${key}`,
+          language,
+          value,
+          updatedAt: serverTimestamp()
+        }, { merge: true });
+      }
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    } finally {
+      setTimeout(() => setIsSaving(false), 500);
     }
   };
 
@@ -3891,7 +4134,19 @@ const GlobalStyleEditor: FC<{
           </div>
           <div className="flex flex-col">
             <span className="text-[10px] font-bold uppercase tracking-widest text-ink/40 leading-none mb-1">Admin</span>
-            <span className="text-xs font-bold text-ink leading-none">Global Styles</span>
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-bold text-ink leading-none">Global Styles</span>
+              {isSaving && (
+                <motion.div 
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="flex items-center gap-1"
+                >
+                  <div className="w-1 h-1 bg-gold rounded-full animate-bounce" />
+                  <span className="text-[8px] text-gold font-bold uppercase">Saving</span>
+                </motion.div>
+              )}
+            </div>
           </div>
         </div>
         <button 
@@ -4076,15 +4331,56 @@ const GlobalStyleEditor: FC<{
             />
           </div>
         </div>
-      </div>
 
-      <div className="pt-2">
-        <button 
-          onClick={onClose}
-          className="w-full py-3 bg-ink text-white rounded-2xl text-[10px] uppercase tracking-widest font-bold hover:bg-ink/90 transition-colors shadow-lg"
-        >
-          Finish Styling
-        </button>
+        {/* Quick Navigation */}
+        <div className="space-y-3">
+          <label className="text-[10px] uppercase tracking-widest opacity-40 font-bold">Quick Navigation</label>
+          <div className="grid grid-cols-2 gap-2">
+            {[
+              { label: 'Hero', id: 'hero' },
+              { label: 'Curriculum', id: 'curriculum' },
+              { label: 'Archive', id: 'archive' },
+              { label: 'Community', id: 'community' }
+            ].map(item => (
+              <button 
+                key={item.id}
+                onClick={() => {
+                  const el = document.getElementById(item.id);
+                  if (el) el.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="px-3 py-2 bg-ink/5 rounded-xl text-[10px] font-bold hover:bg-gold hover:text-ink transition-all"
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Actions */}
+        <div className="pt-4 border-t border-ink/10 space-y-3">
+          <button 
+            onClick={handleExport}
+            className="w-full py-3 bg-ink text-white rounded-2xl text-[10px] uppercase tracking-widest font-bold hover:bg-ink/90 transition-all flex items-center justify-center gap-2 shadow-lg"
+          >
+            <Download size={14} /> Export Content (JSON)
+          </button>
+          <div className="flex gap-2">
+            <button 
+              onClick={handleResetAll}
+              aria-label={language === 'ko' ? '모든 스타일 초기화' : 'Reset all styles'}
+              className="flex-1 py-3 bg-red-500/10 text-red-500 rounded-2xl text-[10px] uppercase tracking-widest font-bold hover:bg-red-500 hover:text-white transition-all"
+            >
+              Reset All
+            </button>
+            <button 
+              onClick={onClose}
+              aria-label={language === 'ko' ? '에디터 닫기' : 'Close editor'}
+              className="flex-[2] py-3 bg-ink/5 text-ink rounded-2xl text-[10px] uppercase tracking-widest font-bold hover:bg-ink/10 transition-all"
+            >
+              Close Editor
+            </button>
+          </div>
+        </div>
       </div>
     </motion.div>,
     document.body
@@ -4105,9 +4401,12 @@ const EditableImage: FC<{
 }> = ({ contentKey, defaultUrl, isEditMode, isAdmin, language, siteContent, className, alt, rounded = "rounded-lg", children }) => {
   const [isUploading, setIsUploading] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const content = siteContent[contentKey] || {};
   const url = content.value || defaultUrl;
+  const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isResizing, setIsResizing] = useState(false);
   const dragControls = useDragControls();
 
   const showControls = isEditMode || isAdmin;
@@ -4162,6 +4461,37 @@ const EditableImage: FC<{
     }
   };
 
+  const handleReset = async () => {
+    const docId = `${language}_${contentKey.replace(/\./g, '_')}`;
+    try {
+      await setDoc(doc(db, 'siteContent', docId), {
+        key: contentKey,
+        language,
+        fit: defaultFit,
+        opacity: '100',
+        blur: '0',
+        scale: '100',
+        xOffset: '0',
+        yOffset: '0',
+        updatedAt: serverTimestamp()
+      }, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, 'siteContent');
+    }
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    if (!showControls) return;
+    
+    const file = e.dataTransfer.files?.[0];
+    if (file && file.type.startsWith('image/')) {
+      const mockEvent = { target: { files: e.dataTransfer.files } } as any;
+      handleUpload(mockEvent);
+    }
+  };
+
   const updateSetting = async (setting: string, val: string) => {
     const docId = `${language}_${contentKey.replace(/\./g, '_')}`;
     try {
@@ -4182,17 +4512,50 @@ const EditableImage: FC<{
   const imgStyles = {
     opacity: parseInt(currentOpacity) / 100,
     filter: currentBlur !== '0' ? `blur(${currentBlur}px)` : undefined,
-    transform: `scale(${parseInt(currentScale) / 100}) translate(${currentX}%, ${currentY}%)`
+    transform: `scale(${parseInt(currentScale) / 100}) translate(${currentX}%, ${currentY}%)`,
+    cursor: isEditing ? 'move' : 'pointer'
+  };
+
+  const handleResizeDrag = (e: any, info: any) => {
+    // Calculate scale based on drag distance from center
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const dist = Math.sqrt(Math.pow(info.point.x - centerX, 2) + Math.pow(info.point.y - centerY, 2));
+    const initialDist = Math.sqrt(Math.pow(rect.width / 2, 2) + Math.pow(rect.height / 2, 2));
+    const newScale = Math.round((dist / initialDist) * 100);
+    updateSetting('scale', Math.min(500, Math.max(10, newScale)).toString());
+  };
+
+  const handleMoveDragEnd = (e: any, info: any) => {
+    const container = containerRef.current;
+    if (!container) return;
+    const rect = container.getBoundingClientRect();
+    const deltaX = (info.offset.x / rect.width) * 100;
+    const deltaY = (info.offset.y / rect.height) * 100;
+    updateSetting('xOffset', (parseFloat(currentX) + deltaX).toFixed(1));
+    updateSetting('yOffset', (parseFloat(currentY) + deltaY).toFixed(1));
   };
 
   if (showControls) {
     return (
-      <div className={cn("relative group", containerClasses, rounded)}>
+      <div 
+        ref={containerRef}
+        className={cn("relative group", containerClasses, rounded, isDragging && "ring-4 ring-gold ring-inset", !isEditing && "editable-hover")}
+        onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
+        onDragLeave={() => setIsDragging(false)}
+        onDrop={handleDrop}
+      >
         <div 
-          className="relative w-full h-full overflow-hidden cursor-pointer group/img"
-          onClick={() => fileInputRef.current?.click()}
+          className="relative w-full h-full overflow-hidden group/img"
+          onClick={() => !isEditing && fileInputRef.current?.click()}
         >
-          <img 
+          <motion.img 
+            drag={isEditing}
+            dragMomentum={false}
+            onDragEnd={handleMoveDragEnd}
             src={url} 
             alt={alt} 
             className={cn("w-full h-full transition-all duration-500", currentFit)} 
@@ -4201,22 +4564,34 @@ const EditableImage: FC<{
           />
           
           {/* Upload Overlay */}
-          <div className="absolute inset-0 bg-ink/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2 z-20">
-            <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
-              {isUploading ? <Clock size={24} className="animate-spin text-gold" /> : <Upload size={24} />}
+          {!isEditing && (
+            <div className="absolute inset-0 bg-ink/40 opacity-0 group-hover/img:opacity-100 transition-opacity flex flex-col items-center justify-center text-white gap-2 z-20 pointer-events-none">
+              <div className="w-12 h-12 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center border border-white/30">
+                {isUploading ? <Clock size={24} className="animate-spin text-gold" /> : <Upload size={24} />}
+              </div>
+              <span className="text-[10px] font-bold uppercase tracking-widest">
+                {isUploading ? (language === 'ko' ? '업로드 중...' : 'Uploading...') : (language === 'ko' ? '이미지 변경' : 'Change Image')}
+              </span>
             </div>
-            <span className="text-[10px] font-bold uppercase tracking-widest">
-              {isUploading ? (language === 'ko' ? '업로드 중...' : 'Uploading...') : (language === 'ko' ? '이미지 변경' : 'Change Image')}
-            </span>
-          </div>
+          )}
 
           {children}
           
           {/* Dashed border */}
           <div className={cn("absolute inset-0 border-2 border-dashed border-gold/40 pointer-events-none z-30", rounded)} />
-          
-          {/* Controls Bar */}
-          <div className="absolute top-2 right-2 flex gap-2 z-40 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+        </div>
+
+        {/* Resize Handles (Outside overflow-hidden) */}
+        {isEditMode && isAdmin && (
+          <ResizeHandles 
+            show={isEditing} 
+            onResize={handleResizeDrag} 
+            containerRef={containerRef} 
+          />
+        )}
+
+        {/* Controls Bar */}
+        <div className="absolute top-2 right-2 flex gap-2 z-40 opacity-0 group-hover:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
             <button 
               onClick={() => fileInputRef.current?.click()}
               className="w-8 h-8 bg-white text-ink rounded-full flex items-center justify-center shadow-lg hover:scale-110 transition-transform"
@@ -4234,9 +4609,9 @@ const EditableImage: FC<{
             >
               <Settings size={14} />
             </button>
-          </div>
+        </div>
 
-          {isEditing && createPortal(
+        {isEditing && createPortal(
             <motion.div 
               drag
               dragControls={dragControls}
@@ -4352,10 +4727,16 @@ const EditableImage: FC<{
                 </div>
               </div>
 
-              <div className="pt-2">
+              <div className="pt-2 flex gap-2">
+                <button 
+                  onClick={handleReset}
+                  className="flex-1 py-3 bg-ink/5 text-ink rounded-2xl text-[10px] uppercase tracking-widest font-bold hover:bg-ink/10 transition-colors"
+                >
+                  Reset
+                </button>
                 <button 
                   onClick={() => setIsEditing(false)}
-                  className="w-full py-3 bg-ink text-white rounded-2xl text-[10px] uppercase tracking-widest font-bold hover:bg-ink/90 transition-colors shadow-lg"
+                  className="flex-[2] py-3 bg-ink text-white rounded-2xl text-[10px] uppercase tracking-widest font-bold hover:bg-ink/90 transition-colors shadow-lg"
                 >
                   Close Settings
                 </button>
@@ -4372,7 +4753,6 @@ const EditableImage: FC<{
             accept="image/png,image/jpeg,image/webp,image/gif,.wps,.wpt,.dps,.dpt,.et,.ett"
           />
         </div>
-      </div>
     );
   }
 
@@ -5094,6 +5474,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
 
       {/* Recent Activity Section */}
       <motion.section 
+        id="community"
         initial={{ opacity: 0 }}
         whileInView={{ opacity: 1 }}
         viewport={{ once: true }}
@@ -5197,7 +5578,7 @@ const LandingView: FC<{ setView: (v: any) => void, onBook: (course: any) => void
         initial={{ opacity: 0, y: 30 }}
         whileInView={{ opacity: 1, y: 0 }}
         viewport={{ once: true, margin: "-100px" }}
-        id="library" 
+        id="archive" 
         className={cn(
           "bg-paper border-y border-ink/5 transition-all",
           deviceMode === 'mobile' ? "py-12 px-4" : "py-20 px-6"
@@ -8692,9 +9073,10 @@ const ArchiveView: FC<{
                           <option value="pdf">PDF</option>
                           <option value="mp3">MP3</option>
                           <option value="image">Image</option>
-                          <option value="video">Video (Max 10s)</option>
+                          <option value="video">Video (Max 15s)</option>
                           <option value="ppt">PPT / PowerPoint</option>
                           <option value="word">Word / Document</option>
+                          <option value="wps">WPS Office</option>
                           <option value="text">Text / Content</option>
                         </select>
                       </div>
