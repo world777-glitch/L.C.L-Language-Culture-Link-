@@ -78,7 +78,8 @@ import {
   Settings,
   Menu,
   TrendingUp,
-  GripHorizontal
+  GripHorizontal,
+  RotateCcw
 } from 'lucide-react';
 import { motion, AnimatePresence, Reorder, useScroll, useSpring, useDragControls } from 'motion/react';
 import { GoogleGenAI, Modality, Type } from "@google/genai";
@@ -100,58 +101,210 @@ import { ref, uploadBytes, getDownloadURL, uploadBytesResumable } from 'firebase
 const ResizeHandles: FC<{ 
   show: boolean, 
   onResize: (e: any, info: any) => void,
+  onRotate?: (angle: number) => void,
+  onResizeEnd: () => void,
+  onReset: () => void,
+  onResizeStatusChange?: (isResizing: boolean) => void,
+  currentScale: string,
+  currentRotation?: string,
+  currentX?: string,
+  currentY?: string,
   containerRef: React.RefObject<HTMLDivElement>
-}> = ({ show, onResize, containerRef }) => {
+}> = ({ show, onResize, onRotate, onResizeEnd, onReset, onResizeStatusChange, currentScale, currentRotation = '0', currentX = '0', currentY = '0', containerRef }) => {
+  const [isResizing, setIsResizing] = useState(false);
+  const [isRotating, setIsRotating] = useState(false);
+  const [lastSnapped, setLastSnapped] = useState<string | null>(null);
+  const [isShiftPressed, setIsShiftPressed] = useState(false);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => { if (e.shiftKey) setIsShiftPressed(true); };
+    const handleKeyUp = (e: KeyboardEvent) => { if (!e.shiftKey) setIsShiftPressed(false); };
+    window.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('keyup', handleKeyUp);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('keyup', handleKeyUp);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (isResizing) {
+      const snapPoints = ['25', '50', '75', '100', '125', '150', '200', '250', '300', '400', '500'];
+      if (snapPoints.includes(currentScale) && lastSnapped !== currentScale && !isShiftPressed) {
+        setLastSnapped(currentScale);
+      }
+    } else {
+      setLastSnapped(null);
+    }
+  }, [currentScale, isResizing, lastSnapped, isShiftPressed]);
+
+  const handleDragStart = () => {
+    setIsResizing(true);
+    onResizeStatusChange?.(true);
+  };
+
+  const handleDragEnd = () => {
+    setIsResizing(false);
+    onResizeStatusChange?.(false);
+    onResizeEnd();
+  };
+
+  const handleRotateDrag = (e: any, info: any) => {
+    if (!onRotate || !containerRef.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const centerX = rect.left + rect.width / 2;
+    const centerY = rect.top + rect.height / 2;
+    const angle = Math.atan2(info.point.y - centerY, info.point.x - centerX) * (180 / Math.PI) + 90;
+    
+    // Snapping for rotation
+    const snapThreshold = 5;
+    const snapAngles = [0, 90, 180, 270, 360, -90, -180, -270];
+    const snappedAngle = snapAngles.find(a => Math.abs(a - angle) < snapThreshold);
+    
+    onRotate(snappedAngle !== undefined ? snappedAngle : Math.round(angle));
+  };
+
   const positions = [
-    { name: 'tl', top: '-10px', left: '-10px', cursor: 'nw-resize' },
-    { name: 'tr', top: '-10px', right: '-10px', cursor: 'ne-resize' },
-    { name: 'bl', bottom: '-10px', left: '-10px', cursor: 'sw-resize' },
-    { name: 'br', bottom: '-10px', right: '-10px', cursor: 'se-resize' },
-    { name: 't', top: '-10px', left: '50%', transform: 'translateX(-50%)', cursor: 'n-resize' },
-    { name: 'b', bottom: '-10px', left: '50%', transform: 'translateX(-50%)', cursor: 's-resize' },
-    { name: 'l', top: '50%', left: '-10px', transform: 'translateY(-50%)', cursor: 'w-resize' },
-    { name: 'r', top: '50%', right: '-10px', transform: 'translateY(-50%)', cursor: 'e-resize' },
+    { name: 'tl', top: '-14px', left: '-14px', cursor: 'nw-resize', icon: '↖' },
+    { name: 'tr', top: '-14px', right: '-14px', cursor: 'ne-resize', icon: '↗' },
+    { name: 'bl', bottom: '-14px', left: '-14px', cursor: 'sw-resize', icon: '↙' },
+    { name: 'br', bottom: '-14px', right: '-14px', cursor: 'se-resize', icon: '↘' },
+    { name: 't', top: '-14px', left: '50%', transform: 'translateX(-50%)', cursor: 'n-resize', icon: '↕' },
+    { name: 'b', bottom: '-14px', left: '50%', transform: 'translateX(-50%)', cursor: 's-resize', icon: '↕' },
+    { name: 'l', top: '50%', left: '-14px', transform: 'translateY(-50%)', cursor: 'w-resize', icon: '↔' },
+    { name: 'r', top: '50%', right: '-14px', transform: 'translateY(-50%)', cursor: 'e-resize', icon: '↔' },
   ];
 
   return (
     <>
-      {positions.map((pos) => (
-        <motion.div
-          key={pos.name}
-          drag
-          dragMomentum={false}
-          onDrag={onResize}
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          className={cn(
-            "absolute w-6 h-6 bg-gold border-2 border-white rounded-full shadow-[0_0_15px_rgba(197,160,89,0.5)] z-[100] cursor-pointer flex items-center justify-center transition-opacity duration-300",
-            show ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-          )}
-          style={{ 
-            top: pos.top, 
-            left: pos.left, 
-            right: pos.right, 
-            bottom: pos.bottom, 
-            transform: pos.transform, 
-            cursor: pos.cursor 
-          }}
+      <AnimatePresence>
+        {positions.map((pos) => (
+          <motion.div
+            key={pos.name}
+            drag
+            dragMomentum={false}
+            onDragStart={handleDragStart}
+            onDragEnd={handleDragEnd}
+            onDrag={onResize}
+            onDoubleClick={onReset}
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: (show || isResizing || isRotating) ? 1 : 0 }}
+            exit={{ scale: 0, opacity: 0 }}
+            className={cn(
+              "absolute w-8 h-8 z-[100] flex items-center justify-center pointer-events-auto",
+              !(show || isResizing || isRotating) && "group-hover:opacity-100"
+            )}
+            style={{ 
+              top: pos.top, 
+              left: pos.left, 
+              right: pos.right, 
+              bottom: pos.bottom, 
+              transform: pos.transform, 
+              cursor: pos.cursor 
+            }}
+            title="Double-click to reset (100%)"
+          >
+            {/* Hit area */}
+            <div className="absolute inset-0 scale-150 rounded-full" />
+
+            {/* Status Tooltip */}
+            {(isResizing || isRotating) && (
+              <motion.div 
+                layoutId="scale-badge"
+                className="absolute pointer-events-none bg-ink text-gold text-[10px] font-mono font-bold px-2 py-0.5 rounded border border-gold/30 shadow-[0_4px_12px_rgba(0,0,0,0.5)] whitespace-nowrap z-[110]"
+                style={{ top: '-45px' }}
+              >
+                <div className="flex flex-col items-center gap-0.5">
+                  <div className="flex items-center gap-2">
+                    {isResizing && (
+                      <>
+                        <span>SCAL: {currentScale}%</span>
+                        <span className="opacity-40">|</span>
+                        <span>POS: {currentX}, {currentY}</span>
+                      </>
+                    )}
+                    {isRotating && <span>ROT: {currentRotation}°</span>}
+                  </div>
+                  {(isShiftPressed || lastSnapped === currentScale) && (
+                    <div className="flex gap-2 items-center border-t border-gold/10 pt-0.5 w-full justify-center">
+                      {isShiftPressed && <span className="text-[7px] text-white bg-gold/20 px-1 rounded">PRECISION</span>}
+                      {lastSnapped === currentScale && !isShiftPressed && <span className="text-[7px] text-green-400">SNAPPED</span>}
+                    </div>
+                  )}
+                </div>
+              </motion.div>
+            )}
+
+            {/* Hardware-style Handle */}
+            <motion.div 
+              whileHover={{ scale: 1.15 }}
+              whileTap={{ scale: 0.95 }}
+              className={cn(
+                "w-5 h-5 rounded border-2 flex items-center justify-center transition-all shadow-lg",
+                isResizing ? "bg-white border-gold text-gold" : "bg-gold border-white text-ink/40"
+              )}
+            >
+               <span className="text-[10px] font-black select-none leading-none">
+                 {pos.icon}
+               </span>
+            </motion.div>
+            
+            {/* Visual pulse for discovery */}
+            <motion.div 
+              animate={{ 
+                scale: [1, 1.4, 1],
+                opacity: [0.1, 0.3, 0.1]
+              }}
+              transition={{ duration: 3, repeat: Infinity }}
+              className="w-full h-full rounded-full bg-gold absolute inset-0 -z-10"
+            />
+          </motion.div>
+        ))}
+
+        {/* Rotation Handle */}
+        {(show || isResizing || isRotating) && (
+          <motion.div
+            initial={{ scale: 0, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="absolute -top-12 left-1/2 -translate-x-1/2 flex flex-col items-center z-[100]"
+          >
+            <div className="w-[1px] h-6 bg-gold/50" />
+            <motion.div
+              drag
+              dragMomentum={false}
+              onDragStart={() => setIsRotating(true)}
+              onDragEnd={() => { setIsRotating(false); onResizeEnd(); }}
+              onDrag={handleRotateDrag}
+              whileHover={{ scale: 1.2 }}
+              className="w-6 h-6 rounded-full bg-gold border-2 border-white flex items-center justify-center cursor-grab active:cursor-grabbing shadow-xl"
+            >
+              <RotateCcw size={10} className="text-ink" />
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Center Pivot Visualization */}
+      {(isResizing || isRotating) && (
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 0.5 }}
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none z-50"
         >
-          {/* Inner pulse for visibility */}
-          <motion.div 
-            animate={{ 
-              scale: [1, 1.3, 1],
-              opacity: [0.5, 1, 0.5]
-            }}
-            transition={{ 
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-            className="w-full h-full rounded-full bg-gold/30 absolute"
-          />
-          <div className="w-2 h-2 bg-white rounded-full relative z-10" />
+          <div className="absolute top-1/2 left-0 w-full h-[1px] bg-gold" />
+          <div className="absolute left-1/2 top-0 h-full w-[1px] bg-gold" />
+          <div className="absolute inset-0 rounded-full border border-gold" />
         </motion.div>
-      ))}
+      )}
+
+      {/* Snap Flash Feedback */}
+      {lastSnapped && isResizing && !isShiftPressed && (
+        <motion.div 
+          initial={{ opacity: 0.3 }}
+          animate={{ opacity: 0 }}
+          className="absolute inset-0 border-4 border-gold pointer-events-none z-50 mix-blend-overlay"
+        />
+      )}
     </>
   );
 };
@@ -3507,12 +3660,18 @@ const EditableMedia: FC<{
   const [currentIndex, setCurrentIndex] = useState(0);
   const [isAutoPlay, setIsAutoPlay] = useState(true);
   const dragControls = useDragControls();
+  const [localScale, setLocalScale] = useState<number | null>(null);
+  const [localRotation, setLocalRotation] = useState<number | null>(null);
   
   const currentAspect = siteContent[`${contentKey}.aspect`]?.value || aspectRatio;
   const currentFit = siteContent[`${contentKey}.fit`]?.value || 'object-cover';
-  const currentScale = siteContent[`${contentKey}.scale`]?.value || '100';
+  const currentScale = localScale !== null ? localScale.toString() : (siteContent[`${contentKey}.scale`]?.value || '100');
+  const currentRotation = localRotation !== null ? localRotation.toString() : (siteContent[`${contentKey}.rotation`]?.value || '0');
   const currentX = siteContent[`${contentKey}.xOffset`]?.value || '0';
   const currentY = siteContent[`${contentKey}.yOffset`]?.value || '0';
+
+  const isCenteredX = parseFloat(currentX) > -0.5 && parseFloat(currentX) < 0.5;
+  const isCenteredY = parseFloat(currentY) > -0.5 && parseFloat(currentY) < 0.5;
 
   const updateSetting = async (key: string, value: any) => {
     const settingKey = `${contentKey}.${key}`;
@@ -3713,6 +3872,8 @@ const EditableMedia: FC<{
   const url = typeof currentMedia === 'string' ? currentMedia : currentMedia.url;
   const type = typeof currentMedia === 'string' ? 'image' : currentMedia.type;
 
+  const [isResizing, setIsResizing] = useState(false);
+
   const handleResizeDrag = (e: any, info: any) => {
     const container = containerRef.current;
     if (!container) return;
@@ -3721,8 +3882,36 @@ const EditableMedia: FC<{
     const centerY = rect.top + rect.height / 2;
     const dist = Math.sqrt(Math.pow(info.point.x - centerX, 2) + Math.pow(info.point.y - centerY, 2));
     const initialDist = Math.sqrt(Math.pow(rect.width / 2, 2) + Math.pow(rect.height / 2, 2));
-    const newScale = Math.round((dist / initialDist) * 100);
-    updateSetting('scale', Math.min(500, Math.max(10, newScale)).toString());
+    let newScale = Math.round((dist / initialDist) * 100);
+    
+    // Snapping logic (Disable snap if Shift key is pressed)
+    const isPrecisionMode = e.shiftKey;
+    if (!isPrecisionMode) {
+      const snapPoints = [25, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500];
+      const threshold = 4;
+      const snapPoint = snapPoints.find(p => Math.abs(p - newScale) < threshold);
+      if (snapPoint) newScale = snapPoint;
+    }
+
+    setLocalScale(Math.min(500, Math.max(10, newScale)));
+  };
+
+  const handleResizeEnd = () => {
+    if (localScale !== null) {
+      updateSetting('scale', localScale.toString());
+      setLocalScale(null);
+    }
+    if (localRotation !== null) {
+      updateSetting('rotation', localRotation.toString());
+      setLocalRotation(null);
+    }
+  };
+
+  const handleResetScale = () => {
+    updateSetting('scale', '100');
+    updateSetting('rotation', '0');
+    setLocalScale(null);
+    setLocalRotation(null);
   };
 
   const handleMoveDragEnd = (e: any, info: any) => {
@@ -3738,7 +3927,14 @@ const EditableMedia: FC<{
   return (
     <div 
       ref={containerRef}
-      className={cn("relative group", currentAspect, rounded, className, isEditMode && !isEditing && "editable-hover")}
+      className={cn(
+        "relative group transition-all duration-300", 
+        currentAspect, 
+        rounded, 
+        className, 
+        isEditMode && !isEditing && "editable-hover",
+        isResizing && "ring-4 ring-gold ring-offset-2 shadow-[0_0_30px_rgba(197,160,89,0.4)] z-50"
+      )}
     >
       <div className="absolute inset-0 overflow-hidden">
         <AnimatePresence mode="wait">
@@ -3762,7 +3958,7 @@ const EditableMedia: FC<{
                 playsInline 
                 className={cn("w-full h-full transition-all duration-500", currentFit)}
                 style={{ 
-                  transform: `scale(${parseInt(currentScale) / 100}) translate(${currentX}%, ${currentY}%)`,
+                  transform: `scale(${parseInt(currentScale) / 100}) translate(${currentX}%, ${currentY}%) rotate(${currentRotation}deg)`,
                   cursor: isEditing ? 'move' : 'pointer'
                 }}
               />
@@ -3775,7 +3971,7 @@ const EditableMedia: FC<{
                 className={cn("w-full h-full transition-all duration-500", currentFit)} 
                 referrerPolicy="no-referrer" 
                 style={{ 
-                  transform: `scale(${parseInt(currentScale) / 100}) translate(${currentX}%, ${currentY}%)`,
+                  transform: `scale(${parseInt(currentScale) / 100}) translate(${currentX}%, ${currentY}%) rotate(${currentRotation}deg)`,
                   cursor: isEditing ? 'move' : 'pointer'
                 }}
               />
@@ -3798,11 +3994,46 @@ const EditableMedia: FC<{
 
       {/* Resize Handles (Outside overflow-hidden) */}
       {isEditMode && isAdmin && (
-        <ResizeHandles 
-          show={isEditing} 
-          onResize={handleResizeDrag} 
-          containerRef={containerRef} 
-        />
+        <>
+            <ResizeHandles 
+              show={isEditing} 
+              currentScale={currentScale}
+              currentRotation={currentRotation}
+              currentX={currentX}
+              currentY={currentY}
+              onResize={handleResizeDrag} 
+              onRotate={(angle) => setLocalRotation(angle)}
+              onResizeEnd={handleResizeEnd}
+              onReset={handleResetScale}
+              onResizeStatusChange={setIsResizing}
+              containerRef={containerRef} 
+            />
+          {/* Alignment Guides */}
+          {isResizing && (
+            <>
+              {isCenteredX && <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-gold/50 z-[40] pointer-events-none md:block hidden" />}
+              {isCenteredY && <div className="absolute left-0 right-0 top-1/2 h-[0.5px] bg-gold/50 z-[40] pointer-events-none md:block hidden" />}
+            </>
+          )}
+          {/* Status Bar */}
+          {isEditing && (
+            <motion.div 
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-ink/90 text-white text-[9px] font-mono px-3 py-1.5 rounded-full border border-white/10 shadow-2xl z-[60] flex items-center gap-3 backdrop-blur-md"
+            >
+              <div className="flex items-center gap-1.5">
+                <span className="opacity-40">SCAL</span>
+                <span className={cn("font-bold", parseInt(currentScale) === 100 ? "text-gold" : "text-white")}>{currentScale}%</span>
+              </div>
+              <div className="w-[1px] h-3 bg-white/10" />
+              <div className="flex items-center gap-1.5">
+                <span className="opacity-40">POS</span>
+                <span className={cn("font-bold", (isCenteredX && isCenteredY) ? "text-gold" : "text-white")}>{currentX}, {currentY}</span>
+              </div>
+            </motion.div>
+          )}
+        </>
       )}
 
       {mediaItems.length > 1 && (
@@ -4407,6 +4638,8 @@ const EditableImage: FC<{
   const containerRef = useRef<HTMLDivElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isResizing, setIsResizing] = useState(false);
+  const [localScale, setLocalScale] = useState<number | null>(null);
+  const [localRotation, setLocalRotation] = useState<number | null>(null);
   const dragControls = useDragControls();
 
   const showControls = isEditMode || isAdmin;
@@ -4415,9 +4648,13 @@ const EditableImage: FC<{
   const currentFit = content.fit || defaultFit;
   const currentOpacity = content.opacity || '100';
   const currentBlur = content.blur || '0';
-  const currentScale = content.scale || '100';
+  const currentScale = localScale !== null ? localScale.toString() : (content.scale || '100');
+  const currentRotation = localRotation !== null ? localRotation.toString() : (content.rotation || '0');
   const currentX = content.xOffset || '0';
   const currentY = content.yOffset || '0';
+
+  const isImgCenteredX = parseFloat(currentX) > -0.5 && parseFloat(currentX) < 0.5;
+  const isImgCenteredY = parseFloat(currentY) > -0.5 && parseFloat(currentY) < 0.5;
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -4512,7 +4749,7 @@ const EditableImage: FC<{
   const imgStyles = {
     opacity: parseInt(currentOpacity) / 100,
     filter: currentBlur !== '0' ? `blur(${currentBlur}px)` : undefined,
-    transform: `scale(${parseInt(currentScale) / 100}) translate(${currentX}%, ${currentY}%)`,
+    transform: `scale(${parseInt(currentScale) / 100}) translate(${currentX}%, ${currentY}%) rotate(${currentRotation}deg)`,
     cursor: isEditing ? 'move' : 'pointer'
   };
 
@@ -4525,8 +4762,36 @@ const EditableImage: FC<{
     const centerY = rect.top + rect.height / 2;
     const dist = Math.sqrt(Math.pow(info.point.x - centerX, 2) + Math.pow(info.point.y - centerY, 2));
     const initialDist = Math.sqrt(Math.pow(rect.width / 2, 2) + Math.pow(rect.height / 2, 2));
-    const newScale = Math.round((dist / initialDist) * 100);
-    updateSetting('scale', Math.min(500, Math.max(10, newScale)).toString());
+    let newScale = Math.round((dist / initialDist) * 100);
+    
+    // Snapping logic (Disable snap if Shift key is pressed)
+    const isPrecisionMode = e.shiftKey;
+    if (!isPrecisionMode) {
+      const snapPoints = [25, 50, 75, 100, 125, 150, 200, 250, 300, 400, 500];
+      const threshold = 4;
+      const snapPoint = snapPoints.find(p => Math.abs(p - newScale) < threshold);
+      if (snapPoint) newScale = snapPoint;
+    }
+
+    setLocalScale(Math.min(500, Math.max(10, newScale)));
+  };
+
+  const handleResizeEnd = () => {
+    if (localScale !== null) {
+      updateSetting('scale', localScale.toString());
+      setLocalScale(null);
+    }
+    if (localRotation !== null) {
+      updateSetting('rotation', localRotation.toString());
+      setLocalRotation(null);
+    }
+  };
+
+  const handleResetScale = () => {
+    updateSetting('scale', '100');
+    updateSetting('rotation', '0');
+    setLocalScale(null);
+    setLocalRotation(null);
   };
 
   const handleMoveDragEnd = (e: any, info: any) => {
@@ -4543,7 +4808,14 @@ const EditableImage: FC<{
     return (
       <div 
         ref={containerRef}
-        className={cn("relative group", containerClasses, rounded, isDragging && "ring-4 ring-gold ring-inset", !isEditing && "editable-hover")}
+        className={cn(
+          "relative group transition-all duration-300", 
+          containerClasses, 
+          rounded, 
+          isDragging && "ring-4 ring-gold ring-inset", 
+          isResizing && "ring-4 ring-gold ring-offset-2 shadow-[0_0_30px_rgba(197,160,89,0.4)] z-50",
+          !isEditing && "editable-hover"
+        )}
         onDragOver={(e) => { e.preventDefault(); setIsDragging(true); }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={handleDrop}
@@ -4583,11 +4855,46 @@ const EditableImage: FC<{
 
         {/* Resize Handles (Outside overflow-hidden) */}
         {isEditMode && isAdmin && (
-          <ResizeHandles 
-            show={isEditing} 
-            onResize={handleResizeDrag} 
-            containerRef={containerRef} 
-          />
+          <>
+            <ResizeHandles 
+              show={isEditing} 
+              currentScale={currentScale}
+              currentRotation={currentRotation}
+              currentX={currentX}
+              currentY={currentY}
+              onResize={handleResizeDrag} 
+              onRotate={(angle) => setLocalRotation(angle)}
+              onResizeEnd={handleResizeEnd}
+              onReset={handleResetScale}
+              onResizeStatusChange={setIsResizing}
+              containerRef={containerRef} 
+            />
+            {/* Alignment Guides */}
+            {isResizing && (
+              <>
+                {isImgCenteredX && <div className="absolute top-0 bottom-0 left-1/2 w-[1px] bg-gold/50 z-[40] pointer-events-none md:block hidden" />}
+                {isImgCenteredY && <div className="absolute left-0 right-0 top-1/2 h-[1px] bg-gold/50 z-[40] pointer-events-none md:block hidden" />}
+              </>
+            )}
+            {/* Status Bar */}
+            {isEditing && (
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="absolute -bottom-10 left-1/2 -translate-x-1/2 bg-ink/90 text-white text-[9px] font-mono px-3 py-1.5 rounded-full border border-white/10 shadow-2xl z-[60] flex items-center gap-3 backdrop-blur-md"
+              >
+                <div className="flex items-center gap-1.5">
+                  <span className="opacity-40">SCAL</span>
+                  <span className={cn("font-bold", parseInt(currentScale) === 100 ? "text-gold" : "text-white")}>{currentScale}%</span>
+                </div>
+                <div className="w-[1px] h-3 bg-white/10" />
+                <div className="flex items-center gap-1.5">
+                  <span className="opacity-40">POS</span>
+                  <span className={cn("font-bold", (isImgCenteredX && isImgCenteredY) ? "text-gold" : "text-white")}>{currentX}, {currentY}</span>
+                </div>
+              </motion.div>
+            )}
+          </>
         )}
 
         {/* Controls Bar */}
